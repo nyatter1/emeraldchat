@@ -7,6 +7,7 @@ export interface Profile {
   bio: string;
   avatar_url: string;
   banner_url: string;
+  updated_at?: string;
 }
 
 export interface Message {

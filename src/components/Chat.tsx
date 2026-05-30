@@ -3,6 +3,63 @@ import { supabase } from '../lib/supabase';
 import { Profile, Message } from '../types';
 import { LogOut, Send, MoreVertical, X, Upload, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
+
+const SPOTIFY_URL_REGEX = /https:\/\/open\.spotify\.com\/(track|album|playlist|episode)\/([a-zA-Z0-9]+)(\?.*)?/;
+
+function SpotifyEmbed({ url }: { url: string }) {
+  const match = url.match(SPOTIFY_URL_REGEX);
+  if (!match) return null;
+  return (
+    <div className="my-3 w-full">
+      <iframe style={{ borderRadius: '12px' }} src={`https://open.spotify.com/embed/${match[1]}/${match[2]}?utm_source=generator&theme=0`} width="100%" height="152" frameBorder="0" allowFullScreen={false} allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+    </div>
+  );
+}
+
+const MarkdownComponents = {
+  a: ({ node, href, children, ...props }: any) => {
+    if (href && SPOTIFY_URL_REGEX.test(href)) {
+      return (
+        <div className="flex flex-col gap-1 w-full max-w-sm">
+          <a href={href} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline break-all">{children}</a>
+          <SpotifyEmbed url={href} />
+        </div>
+      );
+    }
+    return <a href={href} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline break-all" {...props}>{children}</a>;
+  },
+  img: ({ src, alt }: any) => <img src={src} alt={alt} className="max-w-full rounded-lg my-2 border border-zinc-800" loading="lazy" />,
+  p: ({ children }: any) => <p className="mb-2 last:mb-0 leading-relaxed text-zinc-300 break-words">{children}</p>,
+  strong: ({ children }: any) => <strong className="font-bold text-zinc-100">{children}</strong>,
+  em: ({ children }: any) => <em className="italic text-zinc-400">{children}</em>,
+  h1: ({ children }: any) => <h1 className="text-xl font-bold text-white mt-4 mb-2">{children}</h1>,
+  h2: ({ children }: any) => <h2 className="text-lg font-bold text-white mt-3 mb-2">{children}</h2>,
+  h3: ({ children }: any) => <h3 className="text-base font-bold text-white mt-2 mb-1">{children}</h3>,
+  code: ({ inline, children }: any) => inline ? <code className="bg-zinc-800/50 text-emerald-400 px-1 py-0.5 rounded text-sm font-mono">{children}</code> : <code className="block bg-zinc-900 border border-zinc-800 text-zinc-300 p-3 rounded-lg text-sm font-mono my-2 overflow-x-auto whitespace-pre-wrap">{children}</code>
+};
+
+export interface BioData {
+  text: string;
+  mood: string;
+}
+
+export function parseBio(bioStr: string | null | undefined): BioData {
+  if (!bioStr) return { text: '', mood: '' };
+  try {
+    const data = JSON.parse(bioStr);
+    if (data.text !== undefined && data.mood !== undefined) {
+      return data;
+    }
+  } catch (e) {}
+  return { text: bioStr, mood: '' };
+}
+
+export function stringifyBio(data: BioData): string {
+  return JSON.stringify(data);
+}
 
 export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { currentUserProfile: Profile, onSignOut: () => void, onProfileUpdate: (p: Profile) => void }) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -216,7 +273,6 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                 </div>
                 <div className="flex flex-col items-start overflow-hidden w-full">
                   <span className="max-w-full truncate text-[14px] font-bold text-zinc-200" style={{ color: user.id === currentUserProfile.id ? '#10b981' : '' }}>{user.username}</span>
-                  {user.bio && <span className="max-w-full truncate text-[11px] text-zinc-500">{user.bio}</span>}
                 </div>
               </button>
             ))}
@@ -246,9 +302,11 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
-  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | null>(null);
+  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | null>(null);
+  const [activeTab, setActiveTab] = useState<'info' | 'bio'>('bio');
   
   const isSelf = profileId === currentUserId;
+  const bioData = profile ? parseBio(profile.bio) : { text: '', mood: '' };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -289,7 +347,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-[#141416] border border-zinc-800 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
         
         <button onClick={onClose} className="absolute right-3 top-3 z-10 p-1.5 bg-black/40 text-white rounded-full hover:bg-black/60 transition-colors">
           <X className="h-5 w-5" />
@@ -299,7 +357,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
           <div className="h-64 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-zinc-500" /></div>
         ) : (
           <>
-            <div className="relative h-32 w-full group">
+            <div className="relative h-32 w-full group shrink-0">
               <img src={profile!.banner_url} alt="Banner" className="h-full w-full object-cover" />
               {editMode && (
                 <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity">
@@ -309,9 +367,9 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
               )}
             </div>
             
-            <div className="px-6 pb-6 relative">
+            <div className="px-6 pb-4 relative shrink-0">
               <div className="flex justify-between items-end">
-                <div className="relative group -mt-12 mb-4 border-4 border-zinc-900 rounded-full h-24 w-24 bg-zinc-800">
+                <div className="relative group -mt-12 mb-4 border-4 border-[#141416] rounded-full h-24 w-24 bg-zinc-800">
                    <img src={profile!.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
                    {editMode && (
                     <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity rounded-full">
@@ -324,7 +382,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                   <div className="flex gap-2 mb-4">
                     <button 
                       onClick={() => setEditMode(!editMode)}
-                      className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${editMode ? 'bg-white text-black' : 'bg-zinc-800 text-white hover:bg-zinc-700'}`}
+                      className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${editMode ? 'bg-emerald-600 text-white' : 'bg-[#1e1e22] text-white hover:bg-zinc-800 border border-zinc-800'}`}
                     >
                       {editMode ? 'Done' : 'Edit Profile'}
                     </button>
@@ -334,28 +392,62 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
 
               <div>
                 <h3 className="text-xl font-bold text-white">{profile!.username}</h3>
-                <div className="flex items-center gap-3 mt-1.5 text-sm text-zinc-400">
-                  <span>{profile!.age} years old</span>
-                  <span className="w-1 h-1 rounded-full bg-zinc-600"></span>
-                  <span>{profile!.gender}</span>
-                </div>
+                {bioData.mood && (
+                  <p className="text-sm mt-1 mb-1 text-emerald-400 font-medium">{bioData.mood}</p>
+                )}
               </div>
-
-              <div className="mt-4 pt-4 border-t border-zinc-800">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">About Me</h4>
-                <p className="text-sm text-zinc-300 leading-relaxed max-h-32 overflow-y-auto whitespace-pre-wrap">
-                  {profile!.bio || 'No bio provided yet.'}
-                </p>
-              </div>
-
-              {editMode && (
-                <div className="mt-6 flex flex-col gap-2">
-                  <button onClick={() => setActiveEditModal('info')} className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors">Edit Age & Gender</button>
-                  <button onClick={() => setActiveEditModal('username')} className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors">Edit Username</button>
-                  <button onClick={() => setActiveEditModal('bio')} className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors">Edit Bio</button>
-                </div>
-              )}
             </div>
+
+            {!editMode ? (
+              <div className="flex flex-col flex-1 pb-4 shadow-inner">
+                <div className="flex gap-6 border-b border-zinc-800 px-6 shrink-0 h-10">
+                  <button onClick={() => setActiveTab('bio')} className={`pb-1 flex items-center border-b-2 font-medium transition-colors text-sm ${activeTab === 'bio' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}>About Me</button>
+                  <button onClick={() => setActiveTab('info')} className={`pb-1 flex items-center border-b-2 font-medium transition-colors text-sm ${activeTab === 'info' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}>Info</button>
+                </div>
+
+                <div className="h-64 overflow-y-auto px-6 py-4 custom-scrollbar">
+                  {activeTab === 'bio' ? (
+                    <div className="text-sm text-zinc-300">
+                      {bioData.text ? (
+                        <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+                          {bioData.text}
+                        </Markdown>
+                      ) : (
+                        <p className="text-zinc-500">No bio provided yet.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
+                        <span className="text-zinc-400 text-sm">Last online</span>
+                        <span className="text-zinc-200 text-sm">{profile!.updated_at ? format(new Date(profile!.updated_at), 'dd MMM yyyy, HH:mm') : 'Online Now'}</span>
+                      </div>
+                      <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
+                        <span className="text-zinc-400 text-sm">Gender</span>
+                        <span className="text-zinc-200 text-sm">{profile!.gender}</span>
+                      </div>
+                      <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
+                        <span className="text-zinc-400 text-sm">Age</span>
+                        <span className="text-zinc-200 text-sm">{profile!.age}</span>
+                      </div>
+                      <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
+                        <span className="text-zinc-400 text-sm">Current Room</span>
+                        <span className="text-emerald-500 font-medium text-sm">Main</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="px-6 pb-6 pt-2">
+                <div className="flex flex-col gap-2">
+                  <button onClick={() => setActiveEditModal('mood')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Mood</button>
+                  <button onClick={() => setActiveEditModal('bio')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Bio</button>
+                  <button onClick={() => setActiveEditModal('info')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Age & Gender</button>
+                  <button onClick={() => setActiveEditModal('username')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Username</button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -371,8 +463,19 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
         </EditModal>
       )}
       {activeEditModal === 'bio' && (
-        <EditModal title="Edit Bio" onClose={() => setActiveEditModal(null)} onSave={(val) => updateProfileData(val)}>
+        <EditModal title="Edit Bio" onClose={() => setActiveEditModal(null)} onSave={(val) => {
+          const newBio = stringifyBio({ ...bioData, text: val.bio });
+          updateProfileData({ bio: newBio });
+        }}>
           {(props) => <BioEditForm profile={profile!} {...props} />}
+        </EditModal>
+      )}
+      {activeEditModal === 'mood' && (
+        <EditModal title="Edit Mood" onClose={() => setActiveEditModal(null)} onSave={(val) => {
+          const newBio = stringifyBio({ ...bioData, mood: val.mood });
+          updateProfileData({ bio: newBio });
+        }}>
+          {(props) => <MoodEditForm profile={profile!} {...props} />}
         </EditModal>
       )}
     </div>
@@ -433,11 +536,27 @@ function UsernameEditForm({ profile, data, setData }: any) {
 }
 
 function BioEditForm({ profile, data, setData }: any) {
-  useEffect(() => { setData({ bio: profile.bio || '' }) }, []);
+  useEffect(() => { 
+    const bioData = parseBio(profile.bio);
+    setData({ bio: bioData.text });
+  }, []);
   return (
     <div>
-      <label className="text-xs text-zinc-400 mb-1 block">Bio</label>
-      <textarea rows={4} value={data.bio || ''} onChange={e => setData({...data, bio: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-white resize-none" />
+      <label className="text-xs text-zinc-400 mb-1 block">Bio (Supports Markdown)</label>
+      <textarea rows={10} value={data.bio ?? ''} onChange={e => setData({...data, bio: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-white resize-none font-mono text-sm leading-relaxed custom-scrollbar" placeholder="Type *bold*, _italic_, or Spotify links here..." />
+    </div>
+  )
+}
+
+function MoodEditForm({ profile, data, setData }: any) {
+  useEffect(() => { 
+    const bioData = parseBio(profile.bio);
+    setData({ mood: bioData.mood });
+  }, []);
+  return (
+    <div>
+      <label className="text-xs text-zinc-400 mb-1 block">Mood</label>
+      <input type="text" maxLength={45} value={data.mood ?? ''} placeholder="e.g. feeling great today!" onChange={e => setData({...data, mood: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-white" />
     </div>
   )
 }
