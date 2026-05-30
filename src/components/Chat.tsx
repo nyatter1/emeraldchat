@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile, Message, News, ProfileLike } from '../types';
-import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh } from 'lucide-react';
+import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, Home, Film, Tv, Youtube, ListVideo } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import Markdown from 'react-markdown';
@@ -185,7 +185,8 @@ export function injectCustomFonts(customFonts?: Record<string, string>) {
 export function parseComplexStyles(text: string): React.ReactNode[] {
   if (!text || typeof text !== 'string') return [text];
 
-  const regex = /\[style(?: font="([^"]*)")?(?: effect="([^"]*)")?(?: color="([^"]*)")?\]([\s\S]*?)\[\/style\]/g;
+  // Match [style ...]content[/style] order-independently
+  const regex = /\[style([^\]]*)\]([\s\S]*?)\[\/style\]/g;
   
   const result: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -198,10 +199,17 @@ export function parseComplexStyles(text: string): React.ReactNode[] {
       result.push(text.substring(lastIndex, matchIndex));
     }
 
-    const font = match[1] || '';
-    const effect = match[2] || '';
-    const color = match[3] || '';
-    const content = match[4] || '';
+    const attrStr = match[1] || '';
+    const content = match[2] || '';
+
+    // Extract individual attributes order-independently
+    const fontMatch = /font="([^"]*)"/.exec(attrStr);
+    const effectMatch = /effect="([^"]*)"/.exec(attrStr);
+    const colorMatch = /color="([^"]*)"/.exec(attrStr);
+
+    const font = fontMatch ? fontMatch[1] : '';
+    const effect = effectMatch ? effectMatch[1] : '';
+    const color = colorMatch ? colorMatch[1] : '';
 
     if (font) {
       ensureFontLoaded(font);
@@ -311,6 +319,91 @@ const TEST_BOT: Profile = {
   updated_at: new Date().toISOString()
 };
 
+const VIDEO_BOT: Profile = {
+  id: 'video-bot-0000-0000',
+  username: 'Video Bot',
+  email: 'videobot@emerald.chat',
+  age: 9999,
+  gender: 'Cinema Host',
+  bio: '{"text":"I play and manage YouTube videos in the Cinema Room! Enter or paste your YouTube links below...","mood":"Popping cinema popcorn 🍿"}',
+  avatar_url: 'https://api.dicebear.com/7.x/bottts/svg?seed=VideoBot&backgroundColor=10b981',
+  banner_url: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=2070&auto=format&fit=crop',
+  updated_at: new Date().toISOString()
+};
+
+function getYouTubeId(url: string): string | null {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+}
+
+function CinemaPlayer({ videoId, onEnded }: { videoId: string; onEnded: () => void }) {
+  const playerRef = useRef<any>(null);
+
+  useEffect(() => {
+    // Load YouTube API if not already present
+    if (!(window as any).YT) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+    }
+
+    const checkAndInit = () => {
+      if ((window as any).YT && (window as any).YT.Player) {
+        if (playerRef.current) {
+          try {
+            playerRef.current.destroy();
+          } catch (e) {}
+        }
+        playerRef.current = new (window as any).YT.Player('cinema-iframe', {
+          videoId,
+          playerVars: {
+            autoplay: 1,
+            controls: 1,
+            rel: 0,
+            showinfo: 0,
+            mute: 0,
+            enablejsapi: 1
+          },
+          events: {
+            onStateChange: (event: any) => {
+              // 0 means ended
+              if (event.data === 0) {
+                onEnded();
+              }
+            },
+            onError: () => {
+              // Skip broken videos
+              onEnded();
+            }
+          }
+        });
+      } else {
+        setTimeout(checkAndInit, 150);
+      }
+    };
+
+    checkAndInit();
+
+    return () => {
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy();
+        } catch (e) {}
+        playerRef.current = null;
+      }
+    };
+  }, [videoId, onEnded]);
+
+  return (
+    <div className="w-full aspect-video bg-black rounded-xl overflow-hidden border border-zinc-800 shadow-2xl relative">
+      <div id="cinema-iframe" className="w-full h-full" />
+    </div>
+  );
+}
+
 function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, handleDeleteNews, handleCommentNews, isDev }: any) {
   const [commentText, setCommentText] = useState('');
   const [showComments, setShowComments] = useState(false);
@@ -415,6 +508,10 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [onlineUsers, setOnlineUsers] = useState<Profile[]>([TEST_BOT]);
+  const [currentRoom, setCurrentRoom] = useState<'main' | 'cinema'>('main');
+  const [showRooms, setShowRooms] = useState(true);
+  const [localPlayedVideoIds, setLocalPlayedVideoIds] = useState<Set<string>>(new Set());
+  const [cinemaVideoInput, setCinemaVideoInput] = useState('');
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [leftPanelMode, setLeftPanelMode] = useState<'none' | 'menu' | 'news' | 'rules'>('none');
   const [newsFeed, setNewsFeed] = useState<News[]>([]);
@@ -812,6 +909,56 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     }
   };
 
+  const handleSendCinemaVideo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cinemaVideoInput.trim()) return;
+
+    let input = cinemaVideoInput.trim();
+    let url = input;
+    if (input.toLowerCase().startsWith('/video ')) {
+      url = input.substring('/video '.length).trim();
+    }
+
+    setCinemaVideoInput('');
+
+    // Insert user command message
+    const cmdId = crypto.randomUUID();
+    const cmdMsgText = `[cinema]/video ${url}`;
+    
+    // Add optimistically so it feels instant
+    const tempCmdMsg: Message = {
+      id: cmdId,
+      content: cmdMsgText,
+      created_at: new Date().toISOString(),
+      user_id: currentUserProfile.id,
+      profiles: currentUserProfile
+    };
+    setMessages(prev => [...prev, tempCmdMsg]);
+
+    const { error: cmdError } = await supabase.from('messages').insert({
+      id: cmdId,
+      content: cmdMsgText,
+      user_id: currentUserProfile.id
+    });
+
+    if (cmdError) {
+      console.error("Failed to queue video message:", cmdError);
+      setMessages(prev => prev.filter(m => m.id !== cmdId));
+      toast.error("Failed to queue video. Please try again.");
+      return;
+    }
+
+    // Insert Video Bot announcement [cinema-bot] so all clients render it in chat logs
+    const botId = crypto.randomUUID();
+    const botMsgText = `[cinema-bot]🎬 Video Bot: Registered a new movie in the queue requested by **${currentUserProfile.username}**! Grab your 🍿 popcorn!`;
+    
+    await supabase.from('messages').insert({
+      id: botId,
+      content: botMsgText,
+      user_id: currentUserProfile.id
+    });
+  };
+
   const handleLikeNews = async (newsId: string, hasLiked: boolean) => {
     setNewsFeed(prev => prev.map(news => {
       if (news.id !== newsId) return news;
@@ -928,6 +1075,84 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     }
   };
 
+  const isCinemaMessage = (content: string) => {
+    return content.startsWith('[cinema]') || content.startsWith('[cinema-bot]');
+  };
+
+  const visibleMessages = messages.filter(msg => {
+    const isCinema = isCinemaMessage(msg.content);
+    return currentRoom === 'cinema' ? isCinema : !isCinema;
+  });
+
+  const transformMessage = (msg: Message) => {
+    let displayContent = msg.content;
+    let displayProfile = msg.profiles;
+
+    if (msg.content.startsWith('[cinema-bot]')) {
+      displayContent = msg.content.substring('[cinema-bot]'.length);
+      displayProfile = {
+        ...VIDEO_BOT,
+        email: msg.profiles?.email || VIDEO_BOT.email,
+        id: VIDEO_BOT.id
+      };
+    } else if (msg.content.startsWith('[cinema]/video ')) {
+      const rawUrl = msg.content.substring('[cinema]/video '.length).trim();
+      displayContent = `🎬 **Queued YouTube Video:** ${rawUrl}`;
+    } else if (msg.content.startsWith('[cinema]')) {
+      displayContent = msg.content.substring('[cinema]'.length);
+    }
+
+    return {
+      ...msg,
+      profiles: displayProfile,
+      content: displayContent
+    };
+  };
+
+  const cinemaQueue = messages
+    .filter(m => m.content.startsWith('[cinema]/video '))
+    .map(m => {
+      const url = m.content.substring('[cinema]/video '.length).trim();
+      const videoId = getYouTubeId(url) || url;
+      return {
+        messageId: m.id,
+        videoId,
+        originalUrl: url,
+        username: m.profiles?.username || 'User',
+        userId: m.user_id,
+        createdAt: m.created_at
+      };
+    })
+    .filter(v => !localPlayedVideoIds.has(v.messageId));
+
+  const activeVideo = cinemaQueue[0];
+
+  const handleVideoEnded = async () => {
+    if (!activeVideo) return;
+    const finishedId = activeVideo.messageId;
+
+    // Advance locally first to guarantee a smooth transition
+    setLocalPlayedVideoIds(prev => {
+      const updated = new Set(prev);
+      updated.add(finishedId);
+      return updated;
+    });
+
+    // Clean up from database
+    try {
+      await supabase.from('messages').delete().eq('id', finishedId);
+    } catch (e) {
+      console.warn("Database deletion skipped or failed:", e);
+    }
+  };
+
+  const displayOnlineUsers = onlineUsers.map(user => {
+    if (currentRoom === 'cinema' && user.id === TEST_BOT.id) {
+      return VIDEO_BOT;
+    }
+    return user;
+  });
+
   const isDev = ['test@gmail.com', 'dev@gmail.com'].includes(currentUserProfile.email || '');
 
   return (
@@ -951,6 +1176,48 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                        <span className="font-bold text-zinc-200">Server Rules</span>
                        <ShieldCheck className="w-5 h-5 text-emerald-500" />
                      </button>
+
+                     {/* Room Switcher for Mobile/General */}
+                     <div className="mt-4 border-t border-zinc-800/60 pt-4">
+                       <span className="text-[10px] font-bold tracking-wider text-zinc-500 uppercase px-1.5 block mb-2">Switch Rooms</span>
+                       <div className="space-y-2">
+                         <button
+                           onClick={() => {
+                             setCurrentRoom('main');
+                             setLeftPanelMode('none');
+                           }}
+                           className={`w-full flex items-center justify-between p-3.5 rounded-xl text-sm font-semibold transition-all ${
+                             currentRoom === 'main'
+                               ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                               : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                           }`}
+                         >
+                           <div className="flex items-center gap-2.5">
+                             <Menu className="w-4 h-4" />
+                             <span>🌐 Main Chat</span>
+                           </div>
+                           {currentRoom === 'main' && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                         </button>
+
+                         <button
+                           onClick={() => {
+                             setCurrentRoom('cinema');
+                             setLeftPanelMode('none');
+                           }}
+                           className={`w-full flex items-center justify-between p-3.5 rounded-xl text-sm font-semibold transition-all ${
+                             currentRoom === 'cinema'
+                               ? 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-400'
+                               : 'bg-zinc-900 border border-zinc-805 text-zinc-400 hover:text-zinc-200'
+                           }`}
+                         >
+                           <div className="flex items-center gap-2.5">
+                             <Film className="w-4 h-4 text-cyan-500" />
+                             <span>🎬 Cinema Room</span>
+                           </div>
+                           {currentRoom === 'cinema' && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />}
+                         </button>
+                       </div>
+                     </div>
                   </div>
                 </>
               )}
@@ -1097,38 +1364,101 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           </div>
         </header>
 
+        {/* Cinema Stage */}
+        {currentRoom === 'cinema' && (
+          <div className="bg-[#111113] border-b border-zinc-800 p-4 shrink-0 flex flex-col gap-4 max-w-4xl mx-auto w-full">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-xs font-mono tracking-wider font-bold text-zinc-300 uppercase">EMERALD CINEMA — CURRENT PLAYING</span>
+              </div>
+              <span className="text-xs font-mono text-zinc-500 tracking-wider">
+                {cinemaQueue.length} video{cinemaQueue.length !== 1 ? 's' : ''} in playlist queue
+              </span>
+            </div>
+
+            {activeVideo ? (
+              <div className="space-y-3">
+                <CinemaPlayer videoId={activeVideo.videoId} onEnded={handleVideoEnded} />
+                <div className="flex items-center justify-between bg-zinc-900/50 p-2.5 rounded-lg border border-zinc-800/80">
+                  <div className="flex items-center gap-2.5 overflow-hidden">
+                    <Youtube className="w-5 h-5 text-red-500 shrink-0" />
+                    <div className="text-xs truncate">
+                      <span className="font-bold text-zinc-300">Playing: </span>
+                      <span className="text-zinc-400 select-all">{activeVideo.originalUrl}</span>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-zinc-500 font-mono shrink-0">
+                    Requested by <span className="text-emerald-400 font-bold">{activeVideo.username}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="w-full aspect-video bg-[#0d0d0f] rounded-xl border border-zinc-850 shadow-2xl flex flex-col items-center justify-center p-6 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-0" />
+                <Film className="w-12 h-12 text-zinc-750 mb-3 animate-pulse relative z-10" />
+                <h3 className="text-zinc-300 font-bold text-sm relative z-10">The Cinema Screen is Dark</h3>
+                <p className="text-zinc-500 text-xs text-center max-w-sm mt-1 relative z-10">
+                  Enter a YouTube link in the input bar at the bottom to start queuing movies!
+                </p>
+              </div>
+            )}
+
+            {/* Up next drawer */}
+            {cinemaQueue.length > 1 && (
+              <div className="border border-zinc-800/40 bg-zinc-900/10 p-2.5 rounded-lg">
+                <div className="flex items-center gap-2 text-xs text-zinc-400 mb-2 font-semibold">
+                  <ListVideo className="w-4 h-4 text-emerald-500" />
+                  <span>Up Next ({cinemaQueue.length - 1}):</span>
+                </div>
+                <div className="max-h-24 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
+                  {cinemaQueue.slice(1).map((v, i) => (
+                    <div key={v.messageId} className="flex justify-between text-[11px] bg-zinc-900/60 p-1.5 rounded border border-zinc-800/50 text-zinc-400 gap-4">
+                      <span className="truncate max-w-[200px] sm:max-w-md">{v.originalUrl}</span>
+                      <span className="shrink-0 text-zinc-500 italic">Queued by {v.username}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Message List */}
         <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
           <div className="space-y-2">
-            {messages.map((msg, index) => {
+            {visibleMessages.map((msg, index) => {
+              const renderMsg = transformMessage(msg);
               return (
                 <div 
-                  key={msg.id || index} 
+                  key={renderMsg.id || index} 
                   className={`flex flex-col group py-1.5 hover:bg-zinc-900/50 transition-colors -mx-4 px-4 rounded-lg ${
-                    msg.content.toLowerCase().includes(currentUserProfile.username.toLowerCase()) && msg.user_id !== currentUserProfile.id 
+                    renderMsg.content.toLowerCase().includes(currentUserProfile.username.toLowerCase()) && renderMsg.user_id !== currentUserProfile.id 
                     ? 'bg-emerald-500/5 border-l-2 border-emerald-500' 
                     : ''
                   }`}
                 >
-                  <UserProfileFontsLoader bio={msg.profiles?.bio} />
+                  <UserProfileFontsLoader bio={renderMsg.profiles?.bio} />
                   <div className="flex items-start gap-3">
                     <img 
-                      src={msg.profiles?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=default'} 
+                      src={renderMsg.profiles?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=default'} 
                       alt="Avatar" 
                       className="h-[42px] w-[42px] rounded-md object-cover shrink-0 mt-0.5 border border-zinc-800 cursor-pointer"
-                      onClick={() => setSelectedProfileId(msg.user_id)}
+                      onClick={() => setSelectedProfileId(renderMsg.user_id)}
                     />
                     <div className="flex flex-col w-full">
                       <div className="flex items-baseline justify-between mb-0.5">
                         <div className="flex items-center gap-2 leading-none">
-                          <img src={getRank(msg.profiles?.email, msg.profiles?.id, msg.profiles?.rank).icon} alt={getRank(msg.profiles?.email, msg.profiles?.id, msg.profiles?.rank).name} className="h-4 object-contain" />
-                          <span className="font-bold text-[15px] hover:underline cursor-pointer" onClick={() => setSelectedProfileId(msg.user_id)} style={{ color: msg.user_id === currentUserProfile.id ? '#10b981' : 'white' }}>{msg.profiles?.username || 'Unknown'}</span>
-                          <span className="text-xs text-zinc-500">{format(new Date(msg.created_at), 'dd/MM HH:mm')}</span>
+                          {renderMsg.profiles && (
+                            <img src={getRank(renderMsg.profiles.email, renderMsg.profiles.id, renderMsg.profiles.rank).icon} alt={getRank(renderMsg.profiles.email, renderMsg.profiles.id, renderMsg.profiles.rank).name} className="h-4 object-contain" />
+                          )}
+                          <span className="font-bold text-[15px] hover:underline cursor-pointer" onClick={() => setSelectedProfileId(renderMsg.user_id)} style={{ color: renderMsg.user_id === currentUserProfile.id ? '#10b981' : 'white' }}>{renderMsg.profiles?.username || 'Unknown'}</span>
+                          <span className="text-xs text-zinc-500">{format(new Date(renderMsg.created_at), 'dd/MM HH:mm')}</span>
                         </div>
                       </div>
                       <div className="text-zinc-200 text-[15px] leading-relaxed break-words relative pr-12">
                         <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
-                          {scrubContent(msg.content)}
+                          {scrubContent(renderMsg.content)}
                         </Markdown>
                       </div>
                     </div>
@@ -1142,36 +1472,104 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
         {/* Input Area */}
         <div className="border-t border-zinc-800 bg-zinc-950 p-4">
-          <form onSubmit={handleSendMessage} className="relative mx-auto max-w-4xl flex items-end gap-2 bg-[#1e1e22] border border-zinc-800 rounded-[8px] p-1.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all">
-            <textarea
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder="Message Emerald Chat..."
-              className="max-h-[50vh] min-h-[40px] w-full resize-none bg-transparent px-3 py-2 text-[15px] text-zinc-100 placeholder-zinc-500 focus:outline-none custom-scrollbar"
-              rows={1}
-            />
-            <button
-              type="submit"
-              disabled={!newMessage.trim()}
-              className="mb-0.5 mr-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-white transition-colors hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600"
-            >
-              <Send className="h-[18px] w-[18px] ml-0.5" />
-            </button>
-          </form>
+          {currentRoom === 'cinema' ? (
+            <form onSubmit={handleSendCinemaVideo} className="relative mx-auto max-w-4xl flex items-center gap-2 bg-[#141416] border border-zinc-800 rounded-[8px] p-2 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all">
+              <div className="pl-3 text-red-500 shrink-0">
+                <Youtube className="w-5 h-5 animate-pulse" />
+              </div>
+              <input
+                type="text"
+                value={cinemaVideoInput}
+                onChange={(e) => setCinemaVideoInput(e.target.value)}
+                placeholder="Enter YouTube link or type /video <link> here... "
+                className="w-full bg-transparent px-3 py-2 text-[14px] text-zinc-100 placeholder-zinc-500 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!cinemaVideoInput.trim()}
+                className="flex px-4 py-2 text-xs font-bold shrink-0 items-center justify-center rounded-md bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:bg-zinc-800 disabled:text-zinc-600 gap-1.5"
+              >
+                <span>Queue Video</span>
+                <Send className="h-3 w-3" />
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleSendMessage} className="relative mx-auto max-w-4xl flex items-end gap-2 bg-[#1e1e22] border border-zinc-800 rounded-[8px] p-1.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all">
+              <textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder="Message Emerald Chat..."
+                className="max-h-[50vh] min-h-[40px] w-full resize-none bg-transparent px-3 py-2 text-[15px] text-zinc-100 placeholder-zinc-500 focus:outline-none custom-scrollbar"
+                rows={1}
+              />
+              <button
+                type="submit"
+                disabled={!newMessage.trim()}
+                className="mb-0.5 mr-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-white transition-colors hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600"
+              >
+                <Send className="h-[18px] w-[18px] ml-0.5" />
+              </button>
+            </form>
+          )}
         </div>
       </div>
 
       {/* Right Sidebar */}
       <div className="hidden w-[280px] flex-col border-l border-zinc-800 bg-[#141416] lg:flex shrink-0">
-        <div className="px-4 py-4">
+        <div className="px-4 py-4 border-b border-zinc-800/40 flex items-center justify-between">
           <div className="flex items-center gap-2 px-1">
-            <span className="text-xs font-bold tracking-wider text-zinc-400 uppercase">Online — {onlineUsers.length}</span>
+            <span className="text-xs font-bold tracking-wider text-zinc-400 uppercase">Online — {displayOnlineUsers.length}</span>
           </div>
+          <button
+            onClick={() => setShowRooms(!showRooms)}
+            className={`p-1 text-zinc-400 hover:text-emerald-400 transition-colors rounded ${showRooms ? 'text-emerald-400 font-bold bg-[#1e1e22]' : ''}`}
+            title="Toggle Rooms List"
+          >
+            <Home className="w-4 h-4" />
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-3 pb-4 custom-scrollbar">
+
+        {showRooms && (
+          <div className="px-3 py-3 border-b border-zinc-800/40">
+            <span className="text-[10px] font-bold tracking-wider text-zinc-500 uppercase px-1.5 block mb-1.5">Chat Rooms</span>
+            <div className="space-y-1">
+              <button
+                onClick={() => setCurrentRoom('main')}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  currentRoom === 'main'
+                    ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                    : 'bg-zinc-900/30 border border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Menu className="w-3.5 h-3.5" />
+                  <span>🌐 Main Chat</span>
+                </div>
+                {currentRoom === 'main' && <div className="w-1 h-1 rounded-full bg-emerald-400" />}
+              </button>
+
+              <button
+                onClick={() => setCurrentRoom('cinema')}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  currentRoom === 'cinema'
+                    ? 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-400'
+                    : 'bg-zinc-900/30 border border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Film className="w-3.5 h-3.5 text-cyan-500" />
+                  <span>🎬 Cinema Room</span>
+                </div>
+                {currentRoom === 'cinema' && <div className="w-1 h-1 rounded-full bg-cyan-400 animate-pulse" />}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto px-3 pb-4 pt-2 custom-scrollbar">
           <div className="space-y-1">
-            {onlineUsers.map(user => (
+            {displayOnlineUsers.map(user => (
               <button
                 key={user.id}
                 onClick={() => setSelectedProfileId(user.id)}
@@ -1228,6 +1626,11 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
       setLoading(true);
       if (profileId === TEST_BOT.id) {
         setProfile(TEST_BOT);
+        setLoading(false);
+        return;
+      }
+      if (profileId === VIDEO_BOT.id) {
+        setProfile(VIDEO_BOT);
         setLoading(false);
         return;
       }
@@ -1430,7 +1833,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-xl font-bold text-white">{profile!.username}</h3>
-                      {!isSelf && profile!.id !== TEST_BOT.id && (
+                      {!isSelf && profile!.id !== TEST_BOT.id && profile!.id !== VIDEO_BOT.id && (
                         <button onClick={handleLikeProfile} className="flex items-center gap-1.5 focus:outline-none transition-transform hover:scale-110 active:scale-95 group" title="Like Profile">
                           <Heart className={`w-5 h-5 transition-colors ${profile.profile_likes?.some((l: any) => l.user_id === currentUserId) ? 'fill-emerald-500 text-emerald-500' : 'text-zinc-500 group-hover:text-emerald-400'}`} />
                           <span className="text-sm font-bold text-zinc-400">{profile.profile_likes?.length || 0}</span>
