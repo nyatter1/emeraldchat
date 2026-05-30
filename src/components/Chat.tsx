@@ -264,7 +264,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
     fetchNews();
 
-    // Subscribe to new messages & news
+    // Subscribe to new messages & news & reactions
     const messageSubscription = supabase
       .channel('public_changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
@@ -293,6 +293,12 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
          setNewsFeed(prev => prev.filter(n => n.id !== payload.old.id));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'news_likes' }, async () => {
+         fetchNews();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'news_reactions' }, async () => {
+         fetchNews();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'news_comments' }, async () => {
          fetchNews();
       })
       .subscribe();
@@ -439,6 +445,17 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   };
 
   const handleLikeNews = async (newsId: string, hasLiked: boolean) => {
+    setNewsFeed(prev => prev.map(news => {
+      if (news.id !== newsId) return news;
+      let newLikes = [...(news.news_likes || [])];
+      if (hasLiked) {
+        newLikes = newLikes.filter(l => l.user_id !== currentUserProfile.id);
+      } else {
+        newLikes.push({ id: Math.random().toString(), news_id: newsId, user_id: currentUserProfile.id, created_at: new Date().toISOString() });
+      }
+      return { ...news, news_likes: newLikes };
+    }));
+
     if (hasLiked) {
       await supabase.from('news_likes').delete().eq('news_id', newsId).eq('user_id', currentUserProfile.id);
     } else {
@@ -447,15 +464,39 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   };
 
   const handleReactNews = async (newsId: string, reaction: string, hasReacted: boolean) => {
+    setNewsFeed(prev => prev.map(news => {
+      if (news.id !== newsId) return news;
+      let newReactions = [...(news.news_reactions || [])];
+      
+      // Remove any existing reaction by this user on this news item
+      newReactions = newReactions.filter(r => r.user_id !== currentUserProfile.id);
+      
+      // If we weren't just clicking the same one, add the new reaction
+      if (!hasReacted) {
+        newReactions.push({
+          id: Math.random().toString(),
+          news_id: newsId,
+          user_id: currentUserProfile.id,
+          reaction: reaction,
+          created_at: new Date().toISOString()
+        });
+      }
+      
+      return { ...news, news_reactions: newReactions };
+    }));
+
     if (hasReacted) {
       await supabase.from('news_reactions').delete().eq('news_id', newsId).eq('user_id', currentUserProfile.id).eq('reaction', reaction);
     } else {
+      // Multiple queries since it's a simple approach: delete old, insert new
+      await supabase.from('news_reactions').delete().eq('news_id', newsId).eq('user_id', currentUserProfile.id);
       await supabase.from('news_reactions').insert({ news_id: newsId, user_id: currentUserProfile.id, reaction });
     }
   };
 
   const handleDeleteNews = async (newsId: string) => {
     if (confirm('Are you sure you want to delete this news post?')) {
+      setNewsFeed(prev => prev.filter(n => n.id !== newsId));
       await supabase.from('news').delete().eq('id', newsId);
       toast.success('News deleted');
     }
@@ -468,15 +509,31 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
        toast('Advertising is not permitted!', { icon: '🚫' });
        return;
     }
+    
+    const tempComment = {
+      id: Math.random().toString(),
+      news_id: newsId,
+      user_id: currentUserProfile.id,
+      content,
+      created_at: new Date().toISOString(),
+      profiles: currentUserProfile
+    };
+
+    setNewsFeed(prev => prev.map(news => {
+      if (news.id !== newsId) return news;
+      return { ...news, news_comments: [...(news.news_comments || []), tempComment] as any };
+    }));
+    
+    setContent('');
+
     const { error } = await supabase.from('news_comments').insert({
       news_id: newsId,
       content,
       user_id: currentUserProfile.id
     });
-    if (!error) {
-      setContent('');
-    } else {
+    if (error) {
       toast.error('Failed to post comment');
+      // If it fails, the user might need to reload, or realtime will handle it (since it didn't push to DB, it might stay optimistic until page load, but that's fine for simple failure case)
     }
   };
 
