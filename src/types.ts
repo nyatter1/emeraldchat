@@ -33,6 +33,23 @@ export interface NewsLike {
   created_at: string;
 }
 
+export interface NewsReaction {
+  id: string;
+  news_id: string;
+  user_id: string;
+  reaction: string;
+  created_at: string;
+}
+
+export interface NewsComment {
+  id: string;
+  news_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profiles?: Profile;
+}
+
 export interface News {
   id: string;
   created_at: string;
@@ -40,4 +57,6 @@ export interface News {
   user_id: string;
   profiles?: Profile;
   news_likes?: NewsLike[];
+  news_reactions?: NewsReaction[];
+  news_comments?: NewsComment[];
 }

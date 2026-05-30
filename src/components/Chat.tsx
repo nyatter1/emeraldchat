@@ -54,6 +54,9 @@ const MarkdownComponents = {
     }
 
     if (isSafeUrl(href)) {
+      if (IMAGE_EXT_REGEX.test(lowerHref)) {
+        return <img src={href} alt={children?.toString() || 'Image'} className="max-w-full rounded-lg my-2 border border-zinc-800" loading="lazy" />;
+      }
       return <a href={href} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline break-all" {...props}>{children}</a>;
     }
 
@@ -107,6 +110,101 @@ const TEST_BOT: Profile = {
   updated_at: new Date().toISOString()
 };
 
+function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, handleDeleteNews, handleCommentNews, isDev }: any) {
+  const [commentText, setCommentText] = useState('');
+  const [showComments, setShowComments] = useState(false);
+  const hasLiked = news.news_likes?.some((l: any) => l.user_id === currentUserProfile.id) || false;
+  
+  const reactionsList = ['👍', '👎', '❤️', '😂'];
+  
+  return (
+    <div className="bg-[#141416] border border-zinc-800 rounded-xl p-4 flex flex-col gap-3 relative group">
+       {isDev && (
+         <button onClick={() => handleDeleteNews(news.id)} className="absolute top-4 right-4 text-zinc-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Delete News">
+           <X className="w-5 h-5"/>
+         </button>
+       )}
+       <div className="flex items-center gap-3 pr-8">
+         <img src={news.profiles?.avatar_url} className="w-10 h-10 rounded-full object-cover border border-zinc-700" alt="" />
+         <div className="flex flex-col">
+           <div className="flex items-center gap-1.5">
+             <span className="font-bold text-sm text-zinc-100">{news.profiles?.username}</span>
+             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+           </div>
+           <span className="text-xs text-zinc-500">{format(new Date(news.created_at), 'MMM d, HH:mm')}</span>
+         </div>
+       </div>
+       <div className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap break-words">
+          <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+            {scrubContent(news.content)}
+          </Markdown>
+       </div>
+       <div className="flex flex-col gap-3 mt-1 pt-3 border-t border-zinc-800/50">
+         <div className="flex items-center justify-between">
+           <div className="flex items-center gap-2 flex-wrap">
+             {reactionsList.map(r => {
+               const count = news.news_reactions?.filter((rx: any) => rx.reaction === r).length || 0;
+               const hasReacted = news.news_reactions?.some((rx: any) => rx.user_id === currentUserProfile.id && rx.reaction === r) || false;
+               return (
+                 <button key={r} onClick={() => handleReactNews(news.id, r, hasReacted)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold leading-none ${hasReacted ? 'bg-[#3b82f6]/20 text-white' : 'bg-[#1e1e22] text-white hover:bg-zinc-800'} transition-colors shadow-sm`} title={r}>
+                   <span className="text-[17px]">{r}</span>
+                   <span>{count}</span>
+                 </button>
+               )
+             })}
+           </div>
+           
+           <button onClick={() => setShowComments(!showComments)} className="flex items-center gap-2 text-[15px] text-white font-bold px-2 py-1 transition-colors group focus:outline-none">
+             <span>{news.news_comments?.length || 0}</span>
+             <div className="bg-[#052e2e] text-emerald-500 rounded-full w-7 h-7 flex items-center justify-center">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+             </div>
+           </button>
+         </div>
+
+         {showComments && (
+           <div className="flex flex-col gap-3 mt-1 animate-in fade-in slide-in-from-top-1 duration-200">
+             <div className="space-y-3 max-h-[250px] overflow-y-auto custom-scrollbar pr-1">
+               {news.news_comments?.map((comment: any) => (
+                 <div key={comment.id} className="flex gap-2.5">
+                   <img src={comment.profiles?.avatar_url} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" alt="" />
+                   <div className="flex flex-col bg-[#1e1e22] rounded-2xl px-3 py-2 w-fit max-w-[90%]">
+                     <span className="text-[13px] font-bold text-zinc-200 leading-tight mb-0.5">{comment.profiles?.username} <span className="font-normal text-[10px] text-zinc-500 ml-1">{format(new Date(comment.created_at), 'MM/dd HH:mm')}</span></span>
+                     <span className="text-[14px] text-zinc-300 break-words leading-snug">{comment.content}</span>
+                   </div>
+                 </div>
+               ))}
+               {(!news.news_comments || news.news_comments.length === 0) && (
+                 <span className="text-sm text-zinc-600 italic px-1">No comments yet. Be the first to share your thoughts!</span>
+               )}
+             </div>
+             
+             <form onSubmit={(e) => handleCommentNews(e, news.id, commentText, setCommentText)} className="flex items-center mt-1">
+               <input 
+                 type="text" 
+                 value={commentText} 
+                 onChange={(e) => setCommentText(e.target.value)} 
+                 placeholder="Type your comment" 
+                 className="flex-1 bg-[#1e1e22] border border-transparent rounded-[20px] px-4 py-2.5 text-[15px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-700/50 shadow-sm"
+               />
+             </form>
+           </div>
+         )}
+         
+         {!showComments && (
+           <div className="mt-1">
+             <form onClick={() => setShowComments(true)} className="flex items-center cursor-text">
+               <div className="flex-1 bg-[#1e1e22] border border-transparent rounded-[20px] px-4 py-2.5 text-[15px] text-zinc-600 shadow-sm text-left">
+                 Type your comment
+               </div>
+             </form>
+           </div>
+         )}
+       </div>
+    </div>
+  )
+}
+
 export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { currentUserProfile: Profile, onSignOut: () => void, onProfileUpdate: (p: Profile) => void }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -152,7 +250,9 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         .select(`
           *,
           profiles ( id, username, avatar_url, banner_url, age, gender, bio, email ),
-          news_likes ( id, news_id, user_id, created_at )
+          news_likes ( id, news_id, user_id, created_at ),
+          news_reactions ( id, news_id, user_id, reaction, created_at ),
+          news_comments ( id, news_id, user_id, content, created_at, profiles ( id, username, avatar_url ) )
         `)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -346,6 +446,40 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     }
   };
 
+  const handleReactNews = async (newsId: string, reaction: string, hasReacted: boolean) => {
+    if (hasReacted) {
+      await supabase.from('news_reactions').delete().eq('news_id', newsId).eq('user_id', currentUserProfile.id).eq('reaction', reaction);
+    } else {
+      await supabase.from('news_reactions').insert({ news_id: newsId, user_id: currentUserProfile.id, reaction });
+    }
+  };
+
+  const handleDeleteNews = async (newsId: string) => {
+    if (confirm('Are you sure you want to delete this news post?')) {
+      await supabase.from('news').delete().eq('id', newsId);
+      toast.success('News deleted');
+    }
+  };
+
+  const handleCommentNews = async (e: React.FormEvent, newsId: string, content: string, setContent: (c: string) => void) => {
+    e.preventDefault();
+    if (!content.trim()) return;
+    if (FORBIDDEN_TLDS.test(content.toLowerCase())) {
+       toast('Advertising is not permitted!', { icon: '🚫' });
+       return;
+    }
+    const { error } = await supabase.from('news_comments').insert({
+      news_id: newsId,
+      content,
+      user_id: currentUserProfile.id
+    });
+    if (!error) {
+      setContent('');
+    } else {
+      toast.error('Failed to post comment');
+    }
+  };
+
   const handleSendNews = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNewsContent.trim()) return;
@@ -433,35 +567,19 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                        </div>
                      )}
 
-                     <div className="p-4 flex flex-col gap-4">
-                        {newsFeed.map(news => {
-                          const hasLiked = news.news_likes?.some(l => l.user_id === currentUserProfile.id) || false;
-                          return (
-                            <div key={news.id} className="bg-[#141416] border border-zinc-800 rounded-xl p-4 flex flex-col gap-3">
-                               <div className="flex items-center gap-3">
-                                 <img src={news.profiles?.avatar_url} className="w-10 h-10 rounded-full object-cover border border-zinc-700" alt="" />
-                                 <div className="flex flex-col">
-                                   <div className="flex items-center gap-1.5">
-                                     <span className="font-bold text-sm text-zinc-100">{news.profiles?.username}</span>
-                                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                                   </div>
-                                   <span className="text-xs text-zinc-500">{format(new Date(news.created_at), 'MMM d, HH:mm')}</span>
-                                 </div>
-                               </div>
-                               <div className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap break-words">
-                                  <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
-                                    {scrubContent(news.content)}
-                                  </Markdown>
-                               </div>
-                               <div className="flex items-center justify-between mt-1 pt-3 border-t border-zinc-800/50">
-                                 <button onClick={() => handleLikeNews(news.id, hasLiked)} className={`flex items-center gap-1.5 text-xs font-semibold ${hasLiked ? 'text-emerald-500' : 'text-zinc-500 hover:text-zinc-300'} transition-colors`}>
-                                   <Heart className={`w-4 h-4 ${hasLiked ? 'fill-emerald-500' : ''}`} />
-                                   <span>{news.news_likes?.length || 0}</span>
-                                 </button>
-                               </div>
-                            </div>
-                          )
-                        })}
+                     <div className="p-4 flex flex-col gap-4 pb-20">
+                        {newsFeed.map(news => (
+                          <NewsItem 
+                            key={news.id} 
+                            news={news} 
+                            currentUserProfile={currentUserProfile} 
+                            handleLikeNews={handleLikeNews} 
+                            handleReactNews={handleReactNews} 
+                            handleDeleteNews={handleDeleteNews} 
+                            handleCommentNews={handleCommentNews} 
+                            isDev={isDev} 
+                          />
+                        ))}
                         {newsFeed.length === 0 && <p className="text-zinc-500 text-sm text-center mt-4">No news yet.</p>}
                      </div>
                   </div>
@@ -669,8 +787,16 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
         setLoading(false);
         return;
       }
-      const { data } = await supabase.from('profiles').select('*, profile_likes(id, user_id)').eq('id', profileId).single();
-      setProfile(data as any);
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', profileId).single();
+      if (error) {
+        console.error('Error fetching profile:', error);
+        onClose();
+        return;
+      }
+      
+      const { data: likesData } = await supabase.from('profile_likes').select('id, user_id').eq('target_profile_id', profileId);
+      
+      setProfile({ ...data, profile_likes: likesData || [] } as any);
       setLoading(false);
     };
     fetchProfile();
