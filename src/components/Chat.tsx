@@ -12,6 +12,38 @@ const SPOTIFY_URL_REGEX = /https:\/\/open\.spotify\.com\/(track|album|playlist|e
 const IMAGE_EXT_REGEX = /\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i;
 const FORBIDDEN_TLDS = /\.(online|site|indevs\.in)(\/.*)?$/i;
 
+export const DEV_EMAILS = ['test@gmail.com', 'dev@gmail.com', 'haydensixseven@gmail.com'];
+export const FOUNDER_EMAILS: string[] = []; // Add emails here
+export const MOP_EMAILS: string[] = []; // Add emails here
+export const SUPERADMIN_EMAILS: string[] = [];
+export const ADMIN_EMAILS: string[] = [];
+export const MOD_EMAILS: string[] = [];
+
+export const RANK_ORDER = ['Developer', 'Founder', 'MoP', 'SuperAdmin', 'Admin', 'Mod', 'VIP'];
+
+export function getRank(email?: string | null) {
+  const e = email || '';
+  if (DEV_EMAILS.includes(e)) {
+    return { name: 'Developer', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/verified.gif', level: 0 };
+  }
+  if (FOUNDER_EMAILS.includes(e)) {
+    return { name: 'Founder', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/founder.gif', level: 1 };
+  }
+  if (MOP_EMAILS.includes(e)) {
+    return { name: 'MoP', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/MoP.gif', level: 2 };
+  }
+  if (SUPERADMIN_EMAILS.includes(e)) {
+    return { name: 'SuperAdmin', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/superadmin.png', level: 3 };
+  }
+  if (ADMIN_EMAILS.includes(e)) {
+    return { name: 'Admin', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/admin.png', level: 4 };
+  }
+  if (MOD_EMAILS.includes(e)) {
+    return { name: 'Mod', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/mod.png', level: 5 };
+  }
+  return { name: 'VIP', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/vip.gif', level: 6 };
+}
+
 function isSafeUrl(url: string | undefined): boolean {
   if (!url) return false;
   const lowerUrl = url.toLowerCase();
@@ -128,8 +160,8 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
          <img src={news.profiles?.avatar_url} className="w-10 h-10 rounded-full object-cover border border-zinc-700" alt="" />
          <div className="flex flex-col">
            <div className="flex items-center gap-1.5">
+             <img src={getRank(news.profiles?.email).icon} alt={getRank(news.profiles?.email).name} className="h-4 object-contain" />
              <span className="font-bold text-sm text-zinc-100">{news.profiles?.username}</span>
-             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
            </div>
            <span className="text-xs text-zinc-500">{format(new Date(news.created_at), 'MMM d, HH:mm')}</span>
          </div>
@@ -169,7 +201,11 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
                  <div key={comment.id} className="flex gap-2.5">
                    <img src={comment.profiles?.avatar_url} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" alt="" />
                    <div className="flex flex-col bg-[#1e1e22] rounded-2xl px-3 py-2 w-fit max-w-[90%]">
-                     <span className="text-[13px] font-bold text-zinc-200 leading-tight mb-0.5">{comment.profiles?.username} <span className="font-normal text-[10px] text-zinc-500 ml-1">{format(new Date(comment.created_at), 'MM/dd HH:mm')}</span></span>
+                     <span className="flex items-center gap-1.5 text-[13px] font-bold text-zinc-200 leading-tight mb-0.5">
+                       <img src={getRank(comment.profiles?.email).icon} alt={getRank(comment.profiles?.email).name} className="h-3.5 object-contain" />
+                       {comment.profiles?.username} 
+                       <span className="font-normal text-[10px] text-zinc-500 ml-1">{format(new Date(comment.created_at), 'MM/dd HH:mm')}</span>
+                     </span>
                      <span className="text-[14px] text-zinc-300 break-words leading-snug">{comment.content}</span>
                    </div>
                  </div>
@@ -213,8 +249,18 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [leftPanelMode, setLeftPanelMode] = useState<'none' | 'menu' | 'news' | 'rules'>('none');
   const [newsFeed, setNewsFeed] = useState<News[]>([]);
   const [newNewsContent, setNewNewsContent] = useState('');
+  const [hasNewNews, setHasNewNews] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const audioNewMsg = useRef<HTMLAudioElement | null>(null);
+  const audioQuote = useRef<HTMLAudioElement | null>(null);
+  const audioNewNews = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    audioNewMsg.current = new Audio('/new_messages.mp3');
+    audioQuote.current = new Audio('/quote.mp3');
+    audioNewNews.current = new Audio('/new_news.mp3');
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -252,7 +298,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           profiles ( id, username, avatar_url, banner_url, age, gender, bio, email ),
           news_likes ( id, news_id, user_id, created_at ),
           news_reactions ( id, news_id, user_id, reaction, created_at ),
-          news_comments ( id, news_id, user_id, content, created_at, profiles ( id, username, avatar_url ) )
+          news_comments ( id, news_id, user_id, content, created_at, profiles ( id, username, avatar_url, email ) )
         `)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -271,6 +317,19 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         // Fetch the user profile for the new message to append properly
         const { data: profileData } = await supabase.from('profiles').select('*').eq('id', payload.new.user_id).single();
         if (profileData) {
+          if (payload.new.user_id !== currentUserProfile.id) {
+            // Check if user is mentioned
+            const mentionText = currentUserProfile.username.toLowerCase();
+            const messageText = payload.new.content.toLowerCase();
+            const isMentioned = messageText.includes(mentionText);
+            
+            if (isMentioned) {
+              audioQuote.current?.play().catch(() => {});
+            } else {
+              audioNewMsg.current?.play().catch(() => {});
+            }
+          }
+
          setMessages(prev => {
            if (prev.some(m => m.id === payload.new.id)) return prev;
            return [...prev, { ...payload.new, profiles: profileData } as any];
@@ -281,6 +340,8 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
          setMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news' }, async (payload) => {
+        audioNewNews.current?.play().catch(() => {});
+        setHasNewNews(true);
         const { data: profileData } = await supabase.from('profiles').select('*').eq('id', payload.new.user_id).single();
         if (profileData) {
          setNewsFeed(prev => {
@@ -309,7 +370,6 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     room
       .on('presence', { event: 'sync' }, () => {
         const newState = room.presenceState();
-        const DEV_EMAILS = ['test@gmail.com', 'dev@gmail.com'];
         const users = Object.values(newState).flat().map((p: any) => p.profile) as Profile[];
         // Filter unique by id just in case
         let uniqueUsers = Array.from(new Map(users.map(u => [u.id, u])).values());
@@ -319,18 +379,16 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         }
         
         uniqueUsers.sort((a, b) => {
-          const isA_Dev = DEV_EMAILS.includes(a.email || '');
-          const isB_Dev = DEV_EMAILS.includes(b.email || '');
+          const rankA = getRank(a.email).level;
+          const rankB = getRank(b.email).level;
           const isA_Bot = a.id === TEST_BOT.id;
           const isB_Bot = b.id === TEST_BOT.id;
 
-          if (isA_Dev && !isB_Dev) return -1;
-          if (!isA_Dev && isB_Dev) return 1;
-          
           if (isA_Bot && !isB_Bot) return -1;
-          if (!isA_Bot && isB_Bot) return 1;
+          if (isB_Bot && !isA_Bot) return 1;
 
-          return 0;
+          if (rankA !== rankB) return rankA - rankB;
+          return a.username.localeCompare(b.username);
         });
 
         setOnlineUsers(uniqueUsers);
@@ -547,9 +605,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
        return;
     }
 
-    const tempId = crypto.randomUUID();
     const { error } = await supabase.from('news').insert({
-      id: tempId,
       content: newNewsContent,
       user_id: currentUserProfile.id
     });
@@ -695,8 +751,17 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         {/* Header */}
         <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 sm:px-6 py-4">
           <div className="flex items-center gap-3">
-             <button onClick={() => setLeftPanelMode(prev => prev === 'none' ? 'menu' : 'none')} className="p-1.5 text-zinc-400 hover:text-emerald-500 hover:bg-zinc-800/80 rounded-lg transition-colors focus:outline-none active:scale-95">
+             <button 
+               onClick={() => {
+                 setLeftPanelMode(prev => prev === 'none' ? 'menu' : 'none');
+                 setHasNewNews(false);
+               }} 
+               className="p-1.5 text-zinc-400 hover:text-emerald-500 hover:bg-zinc-800/80 rounded-lg transition-colors focus:outline-none active:scale-95 relative"
+             >
                <Menu className="w-5 h-5"/>
+               {hasNewNews && (
+                 <div className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-600 rounded-full border border-zinc-950" />
+               )}
              </button>
              <h1 className="text-lg font-bold tracking-tight text-emerald-500">Emerald Chat</h1>
           </div>
@@ -727,7 +792,14 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           <div className="space-y-2">
             {messages.map((msg, index) => {
               return (
-                <div key={msg.id || index} className="flex flex-col group py-1.5 hover:bg-zinc-900/50 transition-colors -mx-4 px-4 rounded-lg">
+                <div 
+                  key={msg.id || index} 
+                  className={`flex flex-col group py-1.5 hover:bg-zinc-900/50 transition-colors -mx-4 px-4 rounded-lg ${
+                    msg.content.toLowerCase().includes(currentUserProfile.username.toLowerCase()) && msg.user_id !== currentUserProfile.id 
+                    ? 'bg-emerald-500/5 border-l-2 border-emerald-500' 
+                    : ''
+                  }`}
+                >
                   <div className="flex items-start gap-3">
                     <img 
                       src={msg.profiles?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=default'} 
@@ -737,7 +809,8 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                     />
                     <div className="flex flex-col w-full">
                       <div className="flex items-baseline justify-between mb-0.5">
-                        <div className="flex items-baseline gap-2 leading-none">
+                        <div className="flex items-center gap-2 leading-none">
+                          <img src={getRank(msg.profiles?.email).icon} alt={getRank(msg.profiles?.email).name} className="h-4 object-contain" />
                           <span className="font-bold text-[15px] hover:underline cursor-pointer" onClick={() => setSelectedProfileId(msg.user_id)} style={{ color: msg.user_id === currentUserProfile.id ? '#10b981' : 'white' }}>{msg.profiles?.username || 'Unknown'}</span>
                           <span className="text-xs text-zinc-500">{format(new Date(msg.created_at), 'dd/MM HH:mm')}</span>
                         </div>
@@ -799,6 +872,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                 </div>
                 <div className="flex flex-col items-start overflow-hidden w-full">
                   <div className="flex items-center gap-1.5 max-w-full">
+                    <img src={getRank(user.email).icon} alt={getRank(user.email).name} className="h-4 object-contain" />
                     <span className="truncate text-[14px] font-bold text-zinc-200" style={{ color: user.id === currentUserProfile.id ? '#10b981' : '' }}>{user.username}</span>
                   </div>
                 </div>
@@ -971,6 +1045,10 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                        <span className="text-sm font-bold">{profile.profile_likes?.length || 0}</span>
                      </div>
                   )}
+                </div>
+                <div className="flex items-center gap-1.5 mt-1 mb-1">
+                  <img src={getRank(profile!.email).icon} alt={getRank(profile!.email).name} className="h-4 object-contain" />
+                  <span className="text-[13px] font-bold text-zinc-300">{getRank(profile!.email).name}</span>
                 </div>
                 {bioData.mood && (
                   <p className="text-sm mt-1 mb-1 text-emerald-400 font-medium">{bioData.mood}</p>
