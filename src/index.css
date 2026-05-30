@@ -1,11 +1,17 @@
 @import "tailwindcss";
 
-@theme {
-  --animate-visualizer: visualizer 0.8s ease-in-out infinite;
-  @keyframes visualizer {
-    0%, 100% { height: 30%; }
-    50% { height: 100%; }
+@keyframes bounce-bar {
+  0%, 100% {
+    transform: scaleY(0.3);
   }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.animate-bounce-bar {
+  animation: bounce-bar 0.8s ease-in-out infinite;
+  transform-origin: bottom;
 }
 
 @layer utilities {

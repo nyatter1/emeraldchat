@@ -19,30 +19,42 @@ export const SUPERADMIN_EMAILS: string[] = [];
 export const ADMIN_EMAILS: string[] = [];
 export const MOD_EMAILS: string[] = [];
 
-export const RANK_DATA: Record<string, { name: string, icon: string, level: number }> = {
-  'Developer': { name: 'Developer', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/verified.gif', level: 0 },
-  'Founder': { name: 'Founder', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/founder.gif', level: 1 },
-  'MoP': { name: 'MoP', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/MoP.gif', level: 2 },
-  'SuperAdmin': { name: 'SuperAdmin', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/superadmin.png', level: 3 },
-  'Admin': { name: 'Admin', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/admin.png', level: 4 },
-  'Mod': { name: 'Mod', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/mod.png', level: 5 },
-  'VIP': { name: 'VIP', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/vip.gif', level: 6 }
-};
+export const RANK_ORDER = ['Developer', 'Founder', 'MoP', 'SuperAdmin', 'Admin', 'Mod', 'VIP'];
 
-export const RANK_ORDER = Object.keys(RANK_DATA);
+export let globalRankOverrides: Record<string, string> = {};
 
-export function getRank(email?: string | null, storedRank?: string | null) {
-  if (storedRank && RANK_DATA[storedRank]) {
-    return RANK_DATA[storedRank];
-  }
+export function getRank(email?: string | null, userId?: string | null, dbRank?: string | null) {
   const e = email || '';
-  if (DEV_EMAILS.includes(e)) return RANK_DATA['Developer'];
-  if (FOUNDER_EMAILS.includes(e)) return RANK_DATA['Founder'];
-  if (MOP_EMAILS.includes(e)) return RANK_DATA['MoP'];
-  if (SUPERADMIN_EMAILS.includes(e)) return RANK_DATA['SuperAdmin'];
-  if (ADMIN_EMAILS.includes(e)) return RANK_DATA['Admin'];
-  if (MOD_EMAILS.includes(e)) return RANK_DATA['Mod'];
-  return RANK_DATA['VIP'];
+  const uid = userId || '';
+  
+  const rankFromSource = (dbRank || '').trim() || (uid ? globalRankOverrides[uid] : '') || '';
+  
+  const rankName = rankFromSource || (
+    DEV_EMAILS.includes(e) ? 'Developer' :
+    FOUNDER_EMAILS.includes(e) ? 'Founder' :
+    MOP_EMAILS.includes(e) ? 'MoP' :
+    SUPERADMIN_EMAILS.includes(e) ? 'SuperAdmin' :
+    ADMIN_EMAILS.includes(e) ? 'Admin' :
+    MOD_EMAILS.includes(e) ? 'Mod' : 'VIP'
+  );
+
+  const icons: { [key: string]: string } = {
+    'Developer': 'https://raw.githubusercontent.com/nyatter1/ranks/main/verified.gif',
+    'Founder': 'https://raw.githubusercontent.com/nyatter1/ranks/main/founder.gif',
+    'MoP': 'https://raw.githubusercontent.com/nyatter1/ranks/main/MoP.gif',
+    'SuperAdmin': 'https://raw.githubusercontent.com/nyatter1/ranks/main/superadmin.png',
+    'Admin': 'https://raw.githubusercontent.com/nyatter1/ranks/main/admin.png',
+    'Mod': 'https://raw.githubusercontent.com/nyatter1/ranks/main/mod.png',
+    'VIP': 'https://raw.githubusercontent.com/nyatter1/ranks/main/vip.gif'
+  };
+
+  const levels: { [key: string]: number } = {
+    'Developer': 0, 'Founder': 1, 'MoP': 2, 'SuperAdmin': 3, 'Admin': 4, 'Mod': 5, 'VIP': 6
+  };
+
+  const exactRank = Object.keys(icons).find(k => k.toLowerCase() === rankName.toLowerCase()) || 'VIP';
+
+  return { name: exactRank, icon: icons[exactRank], level: levels[exactRank] };
 }
 
 function isSafeUrl(url: string | undefined): boolean {
@@ -114,15 +126,24 @@ const MarkdownComponents = {
 export interface BioData {
   text: string;
   mood: string;
+  profile_music_type?: 'mp3' | 'youtube' | '';
+  profile_music_source?: string;
+  profile_card_bg?: string;
+  assigned_ranks?: Record<string, string>;
 }
 
 export function parseBio(bioStr: string | null | undefined): BioData {
   if (!bioStr) return { text: '', mood: '' };
   try {
     const data = JSON.parse(bioStr);
-    if (data.text !== undefined && data.mood !== undefined) {
-      return data;
-    }
+    return {
+      text: data.text !== undefined ? data.text : (data.bio !== undefined ? data.bio : ''),
+      mood: data.mood || '',
+      profile_music_type: data.profile_music_type || '',
+      profile_music_source: data.profile_music_source || '',
+      profile_card_bg: data.profile_card_bg || '',
+      assigned_ranks: data.assigned_ranks || {}
+    };
   } catch (e) {}
   return { text: bioStr, mood: '' };
 }
@@ -161,7 +182,7 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
          <img src={news.profiles?.avatar_url} className="w-10 h-10 rounded-full object-cover border border-zinc-700" alt="" />
          <div className="flex flex-col">
            <div className="flex items-center gap-1.5">
-             <img src={getRank(news.profiles?.email, news.profiles?.rank).icon} alt={getRank(news.profiles?.email, news.profiles?.rank).name} className="h-4 object-contain" />
+             <img src={getRank(news.profiles?.email, news.profiles?.id, news.profiles?.rank).icon} alt={getRank(news.profiles?.email, news.profiles?.id, news.profiles?.rank).name} className="h-4 object-contain" />
              <span className="font-bold text-sm text-zinc-100">{news.profiles?.username}</span>
            </div>
            <span className="text-xs text-zinc-500">{format(new Date(news.created_at), 'MMM d, HH:mm')}</span>
@@ -203,7 +224,7 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
                    <img src={comment.profiles?.avatar_url} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" alt="" />
                    <div className="flex flex-col bg-[#1e1e22] rounded-2xl px-3 py-2 w-fit max-w-[90%]">
                      <span className="flex items-center gap-1.5 text-[13px] font-bold text-zinc-200 leading-tight mb-0.5">
-                       <img src={getRank(comment.profiles?.email, comment.profiles?.rank).icon} alt={getRank(comment.profiles?.email, comment.profiles?.rank).name} className="h-3.5 object-contain" />
+                       <img src={getRank(comment.profiles?.email, comment.profiles?.id, comment.profiles?.rank).icon} alt={getRank(comment.profiles?.email, comment.profiles?.id, comment.profiles?.rank).name} className="h-3.5 object-contain" />
                        {comment.profiles?.username} 
                        <span className="font-normal text-[10px] text-zinc-500 ml-1">{format(new Date(comment.created_at), 'MM/dd HH:mm')}</span>
                      </span>
@@ -251,6 +272,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [newsFeed, setNewsFeed] = useState<News[]>([]);
   const [newNewsContent, setNewNewsContent] = useState('');
   const [hasNewNews, setHasNewNews] = useState(false);
+  const [rankOverrides, setRankOverrides] = useState<Record<string, string>>({});
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioNewMsg = useRef<HTMLAudioElement | null>(null);
@@ -288,7 +310,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         .from('messages')
         .select(`
           *,
-          profiles ( id, username, avatar_url, banner_url, age, gender, bio, email, rank, profile_music_url, profile_music_type, profile_card_bg_url )
+          profiles ( id, username, avatar_url, banner_url, age, gender, bio, email, rank )
         `)
         .order('created_at', { ascending: true })
         .limit(100);
@@ -300,16 +322,35 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
     fetchMessages();
 
+    // Fetch rank overrides from test@gmail.com on mount
+    const fetchRankOverrides = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('bio')
+          .eq('email', 'test@gmail.com')
+          .single();
+        if (!error && data) {
+          const bio = parseBio(data.bio);
+          if (bio.assigned_ranks) {
+            setRankOverrides(bio.assigned_ranks);
+            globalRankOverrides = bio.assigned_ranks;
+          }
+        }
+      } catch (err) {}
+    };
+    fetchRankOverrides();
+
     // Initial fetch of news
     const fetchNews = async () => {
       const { data, error } = await supabase
         .from('news')
         .select(`
           *,
-          profiles ( id, username, avatar_url, banner_url, age, gender, bio, email ),
+          profiles ( id, username, avatar_url, banner_url, age, gender, bio, email, rank ),
           news_likes ( id, news_id, user_id, created_at ),
           news_reactions ( id, news_id, user_id, reaction, created_at ),
-          news_comments ( id, news_id, user_id, content, created_at, profiles ( id, username, avatar_url, email ) )
+          news_comments ( id, news_id, user_id, content, created_at, profiles ( id, username, avatar_url, email, rank ) )
         `)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -373,6 +414,16 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       .on('postgres_changes', { event: '*', schema: 'public', table: 'news_comments' }, async () => {
          fetchNews();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async (payload: any) => {
+         fetchNews();
+         if (payload.new && payload.new.email === 'test@gmail.com') {
+           const bio = parseBio(payload.new.bio);
+           if (bio.assigned_ranks) {
+             setRankOverrides(bio.assigned_ranks);
+             globalRankOverrides = bio.assigned_ranks;
+           }
+         }
+      })
       .subscribe();
 
     // Setup Presence for online users
@@ -390,8 +441,8 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         }
         
         uniqueUsers.sort((a, b) => {
-          const rankA = getRank(a.email, a.rank).level;
-          const rankB = getRank(b.email, b.rank).level;
+          const rankA = getRank(a.email, a.id, a.rank).level;
+          const rankB = getRank(b.email, b.id, b.rank).level;
           const isA_Bot = a.id === TEST_BOT.id;
           const isB_Bot = b.id === TEST_BOT.id;
 
@@ -429,59 +480,6 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     const content = newMessage.trim();
     const isDev = ['test@gmail.com', 'dev@gmail.com'].includes(currentUserProfile.email || '');
 
-    if (content.startsWith('/ranks')) {
-      setNewMessage('');
-      const ranksList = RANK_ORDER.join(', ');
-      toast(`Ranks: ${ranksList}`, { icon: 'ℹ️' });
-      return;
-    }
-
-    if (content.startsWith('/rank ')) {
-      setNewMessage('');
-      if (currentUserProfile.email !== 'test@gmail.com') {
-        toast.error('You do not have permission to use /rank');
-        return;
-      }
-      
-      const parts = content.split(' ').filter(p => p.length > 0);
-      if (parts.length < 3) {
-        toast.error('Usage: /rank {user/email} {rank}');
-        return;
-      }
-      
-      const targetIdentifier = parts[1];
-      const rankName = parts[2];
-      
-      const matchedRank = Object.keys(RANK_DATA).find(r => r.toLowerCase() === rankName.toLowerCase());
-      if (!matchedRank) {
-        toast.error(`Invalid rank. Available: ${RANK_ORDER.join(', ')}`);
-        return;
-      }
-      
-      const { data: targetUser, error: findError } = await supabase
-        .from('profiles')
-        .select('*')
-        .or(`username.eq.${targetIdentifier},email.eq.${targetIdentifier}`)
-        .maybeSingle();
-        
-      if (findError || !targetUser) {
-        toast.error('User not found');
-        return;
-      }
-      
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ rank: matchedRank })
-        .eq('id', targetUser.id);
-        
-      if (updateError) {
-        toast.error('Failed to update rank');
-      } else {
-        toast.success(`Success! ${targetUser.username} is now a ${matchedRank}`);
-      }
-      return;
-    }
-
     // Check for /clear command (Dev only)
     if (content.toLowerCase() === '/clear') {
       if (isDev) {
@@ -505,7 +503,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         // Refetch to ensure client is perfectly in sync with the database
         const { data } = await supabase
           .from('messages')
-          .select(`*, profiles ( id, username, avatar_url, banner_url, age, gender, bio, email, rank, profile_music_url, profile_music_type, profile_card_bg_url )`)
+          .select(`*, profiles ( id, username, avatar_url, banner_url, age, gender, bio, email, rank )`)
           .order('created_at', { ascending: true })
           .limit(100);
           
@@ -516,6 +514,96 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         }
       } else {
         toast.error('You do not have permission to use /clear');
+      }
+      return;
+    }
+
+    const args = content.split(' ');
+    const commandName = args[0].toLowerCase();
+
+    if (commandName === '/ranks') {
+      setNewMessage('');
+      if (currentUserProfile.email !== 'test@gmail.com') {
+        toast.error('You do not have permission to use /ranks');
+        return;
+      }
+      toast.success(`Available Ranks: ${RANK_ORDER.join(', ')}`, { duration: 6000 });
+      return;
+    }
+
+    if (commandName === '/rank') {
+      setNewMessage('');
+      if (currentUserProfile.email !== 'test@gmail.com') {
+        toast.error('You do not have permission to use /rank');
+        return;
+      }
+      
+      if (args.length < 3) {
+        toast.error('Usage: /rank {username or email} {rank_name}');
+        return;
+      }
+
+      const targetInput = args[1].trim();
+      const rankInput = args[2].trim();
+
+      const exactRankName = RANK_ORDER.find(r => r.toLowerCase() === rankInput.toLowerCase());
+      if (!exactRankName) {
+        toast.error(`Invalid rank. Available: ${RANK_ORDER.join(', ')}`);
+        return;
+      }
+
+      const isEmail = targetInput.includes('@');
+      try {
+        const { error: rpcError } = await supabase.rpc('update_user_rank_db', {
+          target_id: targetInput,
+          is_email: isEmail,
+          rank_name: exactRankName
+        });
+        if (rpcError) {
+          console.warn('DB Rank RPC skipped / failed:', rpcError.message);
+        }
+      } catch (err) {
+        console.warn('DB Rank RPC exception:', err);
+      }
+
+      try {
+        let profileQuery = supabase.from('profiles').select('*');
+        if (isEmail) {
+          profileQuery = profileQuery.ilike('email', targetInput);
+        } else {
+          profileQuery = profileQuery.ilike('username', targetInput);
+        }
+        
+        const { data: targetProfile } = await profileQuery.single();
+        if (targetProfile) {
+          await supabase.from('profiles').update({ rank: exactRankName }).eq('id', targetProfile.id);
+
+          const { data: testProfile } = await supabase.from('profiles').select('*').eq('email', 'test@gmail.com').single();
+          if (testProfile) {
+            const bioObj = parseBio(testProfile.bio);
+            const currentAssignments = bioObj.assigned_ranks || {};
+            const updatedAssignments = { ...currentAssignments, [targetProfile.id]: exactRankName };
+            const updatedBio = JSON.stringify({ ...bioObj, assigned_ranks: updatedAssignments });
+            await supabase.from('profiles').update({ bio: updatedBio }).eq('id', testProfile.id);
+          }
+          toast.success(`Successfully set rank for "${targetProfile.username}" to ${exactRankName}!`);
+        } else {
+          // Fallback key mapping inside test@gmail.com profile
+          const { data: testProfile } = await supabase.from('profiles').select('*').eq('email', 'test@gmail.com').single();
+          if (testProfile) {
+            const bioObj = parseBio(testProfile.bio);
+            const currentAssignments = bioObj.assigned_ranks || {};
+            const updatedAssignments = { ...currentAssignments, [targetInput.toLowerCase()]: exactRankName };
+            const updatedBio = JSON.stringify({ ...bioObj, assigned_ranks: updatedAssignments });
+            await supabase.from('profiles').update({ bio: updatedBio }).eq('id', testProfile.id);
+            toast.success(`Fallback mapping persisted for: "${targetInput}" to ${exactRankName}`);
+          } else {
+            toast.error('Database match or administrator record could not be located.');
+          }
+        }
+      } catch (err) {
+        console.error('Rank change processing error:', err);
+        toast.error('An error occurred during command processing.');
       }
       return;
     }
@@ -880,7 +968,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                     <div className="flex flex-col w-full">
                       <div className="flex items-baseline justify-between mb-0.5">
                         <div className="flex items-center gap-2 leading-none">
-                          <img src={getRank(msg.profiles?.email, msg.profiles?.rank).icon} alt={getRank(msg.profiles?.email, msg.profiles?.rank).name} className="h-4 object-contain" />
+                          <img src={getRank(msg.profiles?.email, msg.profiles?.id, msg.profiles?.rank).icon} alt={getRank(msg.profiles?.email, msg.profiles?.id, msg.profiles?.rank).name} className="h-4 object-contain" />
                           <span className="font-bold text-[15px] hover:underline cursor-pointer" onClick={() => setSelectedProfileId(msg.user_id)} style={{ color: msg.user_id === currentUserProfile.id ? '#10b981' : 'white' }}>{msg.profiles?.username || 'Unknown'}</span>
                           <span className="text-xs text-zinc-500">{format(new Date(msg.created_at), 'dd/MM HH:mm')}</span>
                         </div>
@@ -942,7 +1030,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                 </div>
                 <div className="flex flex-col items-start overflow-hidden w-full">
                   <div className="flex items-center gap-1.5 max-w-full">
-                    <img src={getRank(user.email, user.rank).icon} alt={getRank(user.email, user.rank).name} className="h-4 object-contain" />
+                    <img src={getRank(user.email, user.id, user.rank).icon} alt={getRank(user.email, user.id, user.rank).name} className="h-4 object-contain" />
                     <span className="truncate text-[14px] font-bold text-zinc-200" style={{ color: user.id === currentUserProfile.id ? '#10b981' : '' }}>{user.username}</span>
                   </div>
                 </div>
@@ -976,9 +1064,11 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
   const [editMode, setEditMode] = useState(false);
   const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'bio'>('bio');
+  const [isPlaying, setIsPlaying] = useState(false);
   
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const isSelf = profileId === currentUserId;
-  const bioData = profile ? parseBio(profile.bio) : { text: '', mood: '' };
+  const bioData: BioData = profile ? parseBio(profile.bio) : { text: '', mood: '', profile_music_type: '', profile_music_source: '', profile_card_bg: '', assigned_ranks: {} };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -1002,6 +1092,75 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
     };
     fetchProfile();
   }, [profileId]);
+
+  const musicType = bioData.profile_music_type;
+  const musicSource = bioData.profile_music_source;
+
+  const getYouTubeId = (url: string) => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
+
+  const ytVideoId = musicType === 'youtube' && musicSource ? getYouTubeId(musicSource) : null;
+
+  useEffect(() => {
+    if (!loading && profile && musicType && musicSource) {
+      if (musicType === 'mp3') {
+        // Clean up previous instance first
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
+        const audio = new Audio(musicSource);
+        audio.loop = true;
+        audioRef.current = audio;
+
+        audio.play()
+          .then(() => setIsPlaying(true))
+          .catch((err) => {
+            console.log("Audio autoplay blocked / waiting for interaction:", err);
+            setIsPlaying(false);
+          });
+      } else if (musicType === 'youtube') {
+        setIsPlaying(true);
+      }
+    }
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setIsPlaying(false);
+    };
+  }, [loading, profileId, musicType, musicSource]);
+
+  const togglePlay = () => {
+    if (musicType === 'mp3') {
+      if (!audioRef.current && musicSource) {
+        const audio = new Audio(musicSource);
+        audio.loop = true;
+        audioRef.current = audio;
+      }
+      if (audioRef.current) {
+        if (isPlaying) {
+          audioRef.current.pause();
+          setIsPlaying(false);
+        } else {
+          audioRef.current.play()
+            .then(() => setIsPlaying(true))
+            .catch((err) => {
+              console.error("Playback failed or blocked:", err);
+              toast.error("Playback failed. Please interact with the page first.");
+            });
+        }
+      }
+    } else if (musicType === 'youtube') {
+      setIsPlaying(!isPlaying);
+    }
+  };
 
   const handleLikeProfile = async () => {
     if (!profile) return;
@@ -1077,120 +1236,164 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
               )}
             </div>
             
-            <div className="px-6 pb-4 relative shrink-0">
-              <div className="flex justify-between items-end">
-                <div className="relative group -mt-12 mb-4 border-4 border-[#141416] rounded-full h-24 w-24 bg-zinc-800">
-                   <img src={profile!.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
-                   {editMode && (
-                    <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity rounded-full">
-                      <Upload className="h-6 w-6 text-white" />
-                      <input type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'avatars')} />
-                    </label>
-                  )}
+            <div 
+              style={bioData.profile_card_bg ? {
+                backgroundImage: `url(${bioData.profile_card_bg})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+              } : undefined}
+              className="flex-1 flex flex-col relative overflow-hidden"
+            >
+              {bioData.profile_card_bg && (
+                <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-[1px] z-0 pointer-events-none" />
+              )}
+              
+              <div className="relative z-10 flex flex-col h-full overflow-y-auto pb-4 custom-scrollbar">
+                <div className="px-6 pb-4 relative shrink-0">
+                  <div className="flex justify-between items-end">
+                    <div className="relative group mt-4 mb-4 border-4 border-[#141416] rounded-full h-24 w-24 bg-zinc-800">
+                       <img src={profile!.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
+                       {editMode && (
+                        <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity rounded-full">
+                          <Upload className="h-6 w-6 text-white" />
+                          <input type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'avatars')} />
+                        </label>
+                      )}
+                    </div>
+                    {isSelf && (
+                      <div className="flex gap-2 mb-4">
+                        <button 
+                          onClick={() => setEditMode(!editMode)}
+                          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${editMode ? 'bg-emerald-600 text-white' : 'bg-[#1e1e22] text-white hover:bg-zinc-800 border border-zinc-800'}`}
+                        >
+                          {editMode ? 'Done' : 'Edit Profile'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-bold text-white">{profile!.username}</h3>
+                      {!isSelf && profile!.id !== TEST_BOT.id && (
+                        <button onClick={handleLikeProfile} className="flex items-center gap-1.5 focus:outline-none transition-transform hover:scale-110 active:scale-95 group" title="Like Profile">
+                          <Heart className={`w-5 h-5 transition-colors ${profile.profile_likes?.some((l: any) => l.user_id === currentUserId) ? 'fill-emerald-500 text-emerald-500' : 'text-zinc-500 group-hover:text-emerald-400'}`} />
+                          <span className="text-sm font-bold text-zinc-400">{profile.profile_likes?.length || 0}</span>
+                        </button>
+                      )}
+                      {isSelf && (
+                         <div className="flex items-center gap-1.5 cursor-default text-emerald-500 ml-1" title="Profile Likes">
+                           <Heart className="w-5 h-5 fill-emerald-500" />
+                           <span className="text-sm font-bold">{profile.profile_likes?.length || 0}</span>
+                         </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1 mb-1">
+                      <img src={getRank(profile!.email, profile!.id, profile!.rank).icon} alt={getRank(profile!.email, profile!.id, profile!.rank).name} className="h-4 object-contain" />
+                      <span className="text-[13px] font-bold text-zinc-300">{getRank(profile!.email, profile!.id, profile!.rank).name}</span>
+                    </div>
+                    {bioData.mood && (
+                      <p className="text-sm mt-1 mb-1 text-emerald-400 font-medium">{bioData.mood}</p>
+                    )}
+                  </div>
                 </div>
-                {isSelf && (
-                  <div className="flex gap-2 mb-4">
+
+                {/* Visualizer centered above About Me and under the mood */}
+                {musicType && musicSource && (
+                  <div className="flex flex-col items-center justify-center my-2 w-full shrink-0 z-10 relative px-6">
                     <button 
-                      onClick={() => setEditMode(!editMode)}
-                      className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${editMode ? 'bg-emerald-600 text-white' : 'bg-[#1e1e22] text-white hover:bg-zinc-800 border border-zinc-800'}`}
+                      onClick={togglePlay}
+                      className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 hover:text-emerald-300 flex items-center gap-2 bg-black/75 px-3 py-1.5 rounded-full transition-all hover:bg-black/90 cursor-pointer border border-[#10b981]/25 active:scale-95 text-center justify-center shadow-md select-none"
                     >
-                      {editMode ? 'Done' : 'Edit Profile'}
+                      {isPlaying ? (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                          <span>Pause Music</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-zinc-500" />
+                          <span>Play Music</span>
+                        </>
+                      )}
                     </button>
+                    
+                    <div className="flex items-end justify-center gap-1.5 h-8 px-4 py-1.5 bg-zinc-950/55 border border-zinc-800/40 rounded-xl shadow-lg mt-2 w-32">
+                      <div className={`w-1 h-5 bg-emerald-500 rounded-full ${isPlaying ? 'animate-bounce-bar' : 'opacity-40'}`} style={{ animationDelay: '0.1s', animationDuration: '0.6s' }}></div>
+                      <div className={`w-1 h-5 bg-emerald-500 rounded-full ${isPlaying ? 'animate-bounce-bar' : 'opacity-40'}`} style={{ animationDelay: '0.3s', animationDuration: '0.8s' }}></div>
+                      <div className={`w-1 h-5 bg-[#10b981] rounded-full ${isPlaying ? 'animate-bounce-bar' : 'opacity-40'}`} style={{ animationDelay: '0.0s', animationDuration: '0.5s' }}></div>
+                      <div className={`w-1 h-5 bg-emerald-400 rounded-full ${isPlaying ? 'animate-bounce-bar' : 'opacity-40'}`} style={{ animationDelay: '0.5s', animationDuration: '0.7s' }}></div>
+                      <div className={`w-1 h-5 bg-[#10b981] rounded-full ${isPlaying ? 'animate-bounce-bar' : 'opacity-40'}`} style={{ animationDelay: '0.2s', animationDuration: '0.65s' }}></div>
+                      <div className={`w-1 h-5 bg-[#059669] rounded-full ${isPlaying ? 'animate-bounce-bar' : 'opacity-40'}`} style={{ animationDelay: '0.4s', animationDuration: '0.55s' }}></div>
+                      <div className={`w-1 h-5 bg-emerald-500 rounded-full ${isPlaying ? 'animate-bounce-bar' : 'opacity-40'}`} style={{ animationDelay: '0.15s', animationDuration: '0.75s' }}></div>
+                      <div className={`w-1 h-5 bg-[#10b981] rounded-full ${isPlaying ? 'animate-bounce-bar' : 'opacity-40'}`} style={{ animationDelay: '0.35s', animationDuration: '0.85s' }}></div>
+                    </div>
+
+                    {ytVideoId && isPlaying && (
+                      <iframe
+                        className="w-0 h-0 opacity-0 pointer-events-none absolute"
+                        src={`https://www.youtube.com/embed/${ytVideoId}?autoplay=1&enablejsapi=1&loop=1&playlist=${ytVideoId}`}
+                        allow="autoplay animate-bounce-bar"
+                      />
+                    )}
+                  </div>
+                )}
+
+                {!editMode ? (
+                  <div className="flex flex-col flex-1 pb-4 shadow-inner">
+                    <div className="flex gap-6 border-b border-zinc-800 px-6 shrink-0 h-10">
+                      <button onClick={() => setActiveTab('bio')} className={`pb-1 flex items-center border-b-2 font-medium transition-colors text-sm ${activeTab === 'bio' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}>About Me</button>
+                      <button onClick={() => setActiveTab('info')} className={`pb-1 flex items-center border-b-2 font-medium transition-colors text-sm ${activeTab === 'info' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}>Info</button>
+                    </div>
+
+                    <div className="h-64 overflow-y-auto px-6 py-4 custom-scrollbar z-10 relative">
+                      {activeTab === 'bio' ? (
+                        <div className="text-sm text-zinc-300">
+                          {bioData.text ? (
+                            <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+                              {scrubContent(bioData.text)}
+                            </Markdown>
+                          ) : (
+                            <p className="text-zinc-500">No bio provided yet.</p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-4">
+                          <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
+                            <span className="text-zinc-400 text-sm">Last online</span>
+                            <span className="text-zinc-200 text-sm">{profile!.updated_at ? format(new Date(profile!.updated_at), 'dd MMM yyyy, HH:mm') : 'Online Now'}</span>
+                          </div>
+                          <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
+                            <span className="text-zinc-400 text-sm">Gender</span>
+                            <span className="text-zinc-200 text-sm">{profile!.gender}</span>
+                          </div>
+                          <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
+                            <span className="text-zinc-400 text-sm">Age</span>
+                            <span className="text-zinc-200 text-sm">{profile!.age}</span>
+                          </div>
+                          <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
+                            <span className="text-zinc-400 text-sm">Current Room</span>
+                            <span className="text-emerald-500 font-medium text-sm">Main</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-6 pb-6 pt-2 z-10 relative">
+                    <div className="flex flex-col gap-2">
+                      <button onClick={() => setActiveEditModal('mood')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Mood</button>
+                      <button onClick={() => setActiveEditModal('bio')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Bio</button>
+                      <button onClick={() => setActiveEditModal('info')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Age & Gender</button>
+                      <button onClick={() => setActiveEditModal('username')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Username</button>
+                      <button onClick={() => setActiveEditModal('music')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Music className="w-4 h-4 text-emerald-500" /> Edit Profile Music</button>
+                      <button onClick={() => setActiveEditModal('card_bg')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><ImageIcon className="w-4 h-4 text-emerald-500" /> Edit Profile Card Background</button>
+                    </div>
                   </div>
                 )}
               </div>
-
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-bold text-white">{profile!.username}</h3>
-                  {!isSelf && profile!.id !== TEST_BOT.id && (
-                    <button onClick={handleLikeProfile} className="flex items-center gap-1.5 focus:outline-none transition-transform hover:scale-110 active:scale-95 group" title="Like Profile">
-                      <Heart className={`w-5 h-5 transition-colors ${profile.profile_likes?.some((l: any) => l.user_id === currentUserId) ? 'fill-emerald-500 text-emerald-500' : 'text-zinc-500 group-hover:text-emerald-400'}`} />
-                      <span className="text-sm font-bold text-zinc-400">{profile.profile_likes?.length || 0}</span>
-                    </button>
-                  )}
-                  {isSelf && (
-                     <div className="flex items-center gap-1.5 cursor-default text-emerald-500 ml-1" title="Profile Likes">
-                       <Heart className="w-5 h-5 fill-emerald-500" />
-                       <span className="text-sm font-bold">{profile.profile_likes?.length || 0}</span>
-                     </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 mt-1 mb-1">
-                  <img src={getRank(profile!.email, profile!.rank).icon} alt={getRank(profile!.email, profile!.rank).name} className="h-4 object-contain" />
-                  <span className="text-[13px] font-bold text-zinc-300">{getRank(profile!.email, profile!.rank).name}</span>
-                </div>
-                {profile!.profile_music_url && <MusicVisualizer />}
-                {bioData.mood && (
-                  <p className="text-sm mt-1 text-emerald-400 font-medium">{bioData.mood}</p>
-                )}
-              </div>
             </div>
-
-            {profile!.profile_music_url && (
-              <ProfileMusicPlayer url={profile!.profile_music_url} type={profile!.profile_music_type} />
-            )}
-
-            {!editMode ? (
-              <div className="flex flex-col flex-1 pb-4 shadow-inner relative overflow-hidden" 
-                   style={{ 
-                     backgroundImage: profile!.profile_card_bg_url ? `url(${profile!.profile_card_bg_url})` : 'none', 
-                     backgroundSize: 'cover', 
-                     backgroundPosition: 'center' 
-                   }}>
-                {profile!.profile_card_bg_url && <div className="absolute inset-0 bg-black/60 z-0" />}
-                <div className="relative z-10 flex flex-col flex-1">
-                  <div className="flex gap-6 border-b border-zinc-800 px-6 shrink-0 h-10">
-                  <button onClick={() => setActiveTab('bio')} className={`pb-1 flex items-center border-b-2 font-medium transition-colors text-sm ${activeTab === 'bio' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}>About Me</button>
-                  <button onClick={() => setActiveTab('info')} className={`pb-1 flex items-center border-b-2 font-medium transition-colors text-sm ${activeTab === 'info' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}>Info</button>
-                </div>
-
-                <div className="h-64 overflow-y-auto px-6 py-4 custom-scrollbar">
-                  {activeTab === 'bio' ? (
-                    <div className="text-sm text-zinc-300">
-                      {bioData.text ? (
-                        <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
-                          {scrubContent(bioData.text)}
-                        </Markdown>
-                      ) : (
-                        <p className="text-zinc-500">No bio provided yet.</p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-4">
-                      <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
-                        <span className="text-zinc-400 text-sm">Last online</span>
-                        <span className="text-zinc-200 text-sm">{profile!.updated_at ? format(new Date(profile!.updated_at), 'dd MMM yyyy, HH:mm') : 'Online Now'}</span>
-                      </div>
-                      <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
-                        <span className="text-zinc-400 text-sm">Gender</span>
-                        <span className="text-zinc-200 text-sm">{profile!.gender}</span>
-                      </div>
-                      <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
-                        <span className="text-zinc-400 text-sm">Age</span>
-                        <span className="text-zinc-200 text-sm">{profile!.age}</span>
-                      </div>
-                      <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
-                        <span className="text-zinc-400 text-sm">Current Room</span>
-                        <span className="text-emerald-500 font-medium text-sm">Main</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-              <div className="px-6 pb-6 pt-2">
-                <div className="flex flex-col gap-2">
-                  <button onClick={() => setActiveEditModal('mood')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Mood</button>
-                  <button onClick={() => setActiveEditModal('bio')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Bio</button>
-                  <button onClick={() => setActiveEditModal('info')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Age & Gender</button>
-                  <button onClick={() => setActiveEditModal('username')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Username</button>
-                  <button onClick={() => setActiveEditModal('music')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Add Profile Music</button>
-                  <button onClick={() => setActiveEditModal('card_bg')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Profile Background</button>
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>
@@ -1222,13 +1425,26 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
         </EditModal>
       )}
       {activeEditModal === 'music' && (
-        <EditModal title="Profile Music" onClose={() => setActiveEditModal(null)} onSave={(val) => updateProfileData(val)}>
+        <EditModal title="Edit Profile Music" onClose={() => setActiveEditModal(null)} onSave={(val) => {
+          const newBio = stringifyBio({ 
+            ...bioData, 
+            profile_music_type: val.profile_music_type,
+            profile_music_source: val.profile_music_source
+          });
+          updateProfileData({ bio: newBio });
+        }}>
           {(props) => <MusicEditForm profile={profile!} {...props} />}
         </EditModal>
       )}
       {activeEditModal === 'card_bg' && (
-        <EditModal title="Profile Background" onClose={() => setActiveEditModal(null)} onSave={(val) => updateProfileData(val)}>
-          {(props) => <BackgroundEditForm profile={profile!} {...props} />}
+        <EditModal title="Edit Profile Card Background" onClose={() => setActiveEditModal(null)} onSave={(val) => {
+          const newBio = stringifyBio({ 
+            ...bioData, 
+            profile_card_bg: val.profile_card_bg
+          });
+          updateProfileData({ bio: newBio });
+        }}>
+          {(props) => <CardBgEditForm profile={profile!} {...props} />}
         </EditModal>
       )}
     </div>
@@ -1415,137 +1631,256 @@ function MoodEditForm({ profile, data, setData }: any) {
   )
 }
 
-function MusicVisualizer() {
-  return (
-    <div className="flex items-center gap-1 h-3 mt-1">
-      {[...Array(4)].map((_, i) => (
-        <div key={i} className="w-0.5 bg-emerald-500 rounded-full animate-visualizer" style={{ animationDelay: `${i * 0.15}s` }} />
-      ))}
-    </div>
-  );
-}
-
-function ProfileMusicPlayer({ url, type }: { url: string, type?: string }) {
-  if (type === 'youtube') {
-    const videoId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([a-zA-Z0-9_-]{11})/)?.[1];
-    if (!videoId) return null;
-    return (
-      <div className="hidden">
-        <iframe 
-          width="0" height="0" 
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}`} 
-          allow="autoplay"
-        ></iframe>
-      </div>
-    );
-  }
-  return (
-    <audio src={url} autoPlay loop className="hidden" />
-  );
-}
-
 function MusicEditForm({ profile, data, setData }: any) {
+  const [type, setType] = useState<'mp3' | 'youtube'>('mp3');
+  const [source, setSource] = useState('');
   const [uploading, setUploading] = useState(false);
-  useEffect(() => { 
-    setData({ 
-      profile_music_url: profile.profile_music_url,
-      profile_music_type: profile.profile_music_type || 'youtube'
-    }) 
+
+  useEffect(() => {
+    const bioData = parseBio(profile.bio);
+    setType(bioData.profile_music_type || 'mp3');
+    setSource(bioData.profile_music_source || '');
+    setData({
+      profile_music_type: bioData.profile_music_type || 'mp3',
+      profile_music_source: bioData.profile_music_source || ''
+    });
   }, []);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTypeChange = (newType: 'mp3' | 'youtube') => {
+    setType(newType);
+    setSource('');
+    setData({
+      profile_music_type: newType,
+      profile_music_source: ''
+    });
+  };
+
+  const handleSourceChange = (val: string) => {
+    setSource(val);
+    setData({
+      profile_music_type: type,
+      profile_music_source: val
+    });
+  };
+
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.includes('audio') && !file.name.endsWith('.mp3')) {
-      toast.error('Please upload an MP3 file');
+
+    if (!file.name.toLowerCase().endsWith('.mp3')) {
+      toast.error("Please upload a file that ends with .mp3");
       return;
     }
-    
+
     setUploading(true);
-    const fileExt = file.name.split('.').pop();
-    const fileName = `music_${Math.random()}.${fileExt}`;
+    const fileName = `${Math.random()}.mp3`;
     const filePath = `${profile.id}/${fileName}`;
-    
-    const { error: uploadError } = await supabase.storage.from('music').upload(filePath, file);
-    if (!uploadError) {
-      const { data: { publicUrl } } = supabase.storage.from('music').getPublicUrl(filePath);
-      setData({ ...data, profile_music_url: publicUrl, profile_music_type: 'file' });
-      toast.success('Music uploaded');
-    } else {
-      toast.error('Upload failed');
+
+    try {
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
+      if (uploadError) {
+        const { error: bannerError } = await supabase.storage.from('banners').upload(filePath, file);
+        if (bannerError) throw bannerError;
+      }
+      const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      handleSourceChange(publicData.publicUrl);
+      toast.success("MP3 file uploaded successfully!");
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Failed to upload MP3 file.");
+    } finally {
+      setUploading(false);
     }
-    setUploading(false);
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-4 p-1 bg-black/20 rounded-lg">
-        <button 
-          onClick={() => setData({ ...data, profile_music_type: 'youtube' })}
-          className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${data.profile_music_type === 'youtube' ? 'bg-emerald-500 text-white' : 'text-zinc-400 hover:text-white'}`}
-        >YouTube Link</button>
-        <button 
-          onClick={() => setData({ ...data, profile_music_type: 'file' })}
-          className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${data.profile_music_type === 'file' ? 'bg-emerald-500 text-white' : 'text-zinc-400 hover:text-white'}`}
-        >MP3 File</button>
+    <div className="space-y-4 text-left">
+      <div>
+        <label className="text-xs text-zinc-400 mb-1.5 block font-bold uppercase tracking-wider">Music Type Selection</label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => handleTypeChange('mp3')}
+            className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${type === 'mp3' ? 'bg-emerald-600/25 border-emerald-500 text-emerald-400' : 'bg-zinc-805 bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'}`}
+          >
+            MP3 (Direct URL / Upload)
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTypeChange('youtube')}
+            className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${type === 'youtube' ? 'bg-emerald-600/25 border-emerald-500 text-emerald-400' : 'bg-zinc-805 bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'}`}
+          >
+            YouTube Video URL
+          </button>
+        </div>
       </div>
 
-      {data.profile_music_type === 'youtube' ? (
-        <div>
-          <label className="text-xs text-zinc-400 mb-1 block">YouTube URL</label>
-          <input 
-            type="text" 
-            placeholder="https://youtube.com/watch?v=..."
-            value={data.profile_music_url || ''} 
-            onChange={e => setData({...data, profile_music_url: e.target.value})} 
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-white text-sm" 
-          />
+      {type === 'mp3' ? (
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-zinc-400 mb-1 block">MP3 Direct URL (ending with .mp3)</label>
+            <input
+              type="text"
+              placeholder="https://example.com/song.mp3"
+              value={source}
+              onChange={e => handleSourceChange(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+              <div className="w-full border-t border-zinc-800"></div>
+            </div>
+            <div className="relative flex justify-center text-[10px] uppercase">
+              <span className="bg-zinc-900 px-2 text-zinc-500 font-bold">OR</span>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-zinc-400 mb-1 block">Upload .mp3 file</label>
+            <div className="mt-1 flex justify-center px-4 pt-4 pb-4 border border-zinc-800 border-dashed rounded-lg hover:border-zinc-700 transition-colors">
+              <div className="space-y-1 text-center">
+                <Music className="mx-auto h-6 w-6 text-zinc-500" />
+                <div className="text-xs text-zinc-400">
+                  <label className="relative cursor-pointer bg-transparent rounded-md font-medium text-emerald-500 hover:text-emerald-400">
+                    <span>{uploading ? "Uploading..." : "Click to select MP3 file"}</span>
+                    <input
+                      type="file"
+                      accept=".mp3,audio/mpeg"
+                      className="sr-only"
+                      onChange={handleAudioUpload}
+                      disabled={uploading}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center border-2 border-dashed border-zinc-800 rounded-xl p-6 hover:border-emerald-500/50 transition-colors cursor-pointer relative">
-          {uploading ? <Loader2 className="h-6 w-6 animate-spin text-emerald-500" /> : <Music className="h-6 w-6 text-zinc-400" />}
-          <span className="text-xs text-zinc-500 mt-2">{data.profile_music_url ? 'Change MP3 File' : 'Upload MP3 File'}</span>
-          <input type="file" accept="audio/*,.mp3" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-          {data.profile_music_url && data.profile_music_type === 'file' && <p className="text-[10px] text-emerald-500 mt-1 truncate max-w-full italic text-center">MP3 Ready</p>}
+        <div>
+          <label className="text-xs text-zinc-400 mb-1 block">YouTube Video/Music URL</label>
+          <input
+            type="text"
+            placeholder="https://www.youtube.com/watch?v=..."
+            value={source}
+            onChange={e => handleSourceChange(e.target.value)}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+          />
+          <p className="text-[10px] text-zinc-500 mt-1.5 leading-normal">Allows any YouTube link. Will stop playing immediately when exiting the profile.</p>
         </div>
       )}
-      <p className="text-[10px] text-zinc-500 text-center italic">Only one can be active: File or YouTube</p>
     </div>
   );
 }
 
-function BackgroundEditForm({ profile, data, setData }: any) {
+function CardBgEditForm({ profile, data, setData }: any) {
+  const [bgUrl, setBgUrl] = useState('');
   const [uploading, setUploading] = useState(false);
-  useEffect(() => { setData({ profile_card_bg_url: profile.profile_card_bg_url }) }, []);
+
+  useEffect(() => {
+    const bioData = parseBio(profile.bio);
+    setBgUrl(bioData.profile_card_bg || '');
+    setData({ profile_card_bg: bioData.profile_card_bg || '' });
+  }, []);
+
+  const handleBgChange = (url: string) => {
+    setBgUrl(url);
+    setData({ profile_card_bg: url });
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     setUploading(true);
     const fileExt = file.name.split('.').pop();
-    const fileName = `bg_${Math.random()}.${fileExt}`;
+    const fileName = `${Math.random()}.${fileExt}`;
     const filePath = `${profile.id}/${fileName}`;
-    
-    const { error: uploadError } = await supabase.storage.from('banners').upload(filePath, file);
-    if (!uploadError) {
-      const { data: { publicUrl } } = supabase.storage.from('banners').getPublicUrl(filePath);
-      setData({ profile_card_bg_url: publicUrl });
-      toast.success('Background updated');
+
+    try {
+      const { error: uploadError } = await supabase.storage.from('banners').upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      const { data: publicData } = supabase.storage.from('banners').getPublicUrl(filePath);
+      handleBgChange(publicData.publicUrl);
+      toast.success("Background uploaded!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to upload background image.");
+    } finally {
+      setUploading(false);
     }
-    setUploading(false);
   };
 
+  const presets = [
+    { name: 'None / Default Background', url: '' },
+    { name: 'Deep Space Nebula', url: 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?q=80&w=600' },
+    { name: 'Dark Carbon Fiber', url: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=600' },
+    { name: 'Matrix Digital Rain', url: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=600' },
+    { name: 'Cyberpunk Grid', url: 'https://images.unsplash.com/photo-1515621061946-eff1c2a352bd?q=80&w=600' },
+    { name: 'Abstract Smooth Satin', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600' }
+  ];
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col items-center justify-center border-2 border-dashed border-zinc-800 rounded-xl p-6 hover:border-emerald-500/50 transition-colors cursor-pointer relative">
-        {uploading ? <Loader2 className="h-6 w-6 animate-spin text-emerald-500" /> : <ImageIcon className="h-6 w-6 text-zinc-400" />}
-        <span className="text-xs text-zinc-500 mt-2">Upload Texture/Image</span>
-        <input type="file" accept="image/*" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-      </div>
+    <div className="space-y-4 text-left">
       <div>
-        <label className="text-xs text-zinc-400 mb-1 block">Or Image URL</label>
-        <input type="text" value={data.profile_card_bg_url || ''} onChange={e => setData({...data, profile_card_bg_url: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-white text-sm" />
+        <label className="text-xs text-zinc-400 mb-1.5 block font-bold uppercase tracking-wider">Background image/texture URL</label>
+        <input
+          type="text"
+          placeholder="https://example.com/texture.jpg"
+          value={bgUrl}
+          onChange={e => handleBgChange(e.target.value)}
+          className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+        />
+      </div>
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+          <div className="w-full border-t border-zinc-800"></div>
+        </div>
+        <div className="relative flex justify-center text-[10px] uppercase">
+          <span className="bg-zinc-900 px-2 text-zinc-500 font-bold">OR</span>
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-zinc-400 mb-1 block">Upload background / texture</label>
+        <div className="flex items-center gap-2">
+          <label className="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 text-xs rounded-lg border border-zinc-700 font-semibold transition-colors">
+            <span>{uploading ? "Uploading..." : "Choose Image"}</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileUpload}
+              disabled={uploading}
+            />
+          </label>
+          {bgUrl && (
+            <button
+              onClick={() => handleBgChange('')}
+              className="text-[10px] text-red-400 hover:text-red-300 transition-colors font-semibold"
+            >
+              Clear Current
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-zinc-400 mb-1.5 block font-bold uppercase tracking-wider">Quick Preset Textures</label>
+        <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto custom-scrollbar p-1">
+          {presets.map(p => (
+            <button
+              key={p.name}
+              type="button"
+              onClick={() => handleBgChange(p.url)}
+              className={`text-left p-1.5 text-[10px] rounded-lg border transition-all ${bgUrl === p.url ? 'bg-emerald-600/25 border-emerald-500 text-emerald-400 font-bold' : 'bg-zinc-805 bg-zinc-800/50 border-zinc-800/70 text-zinc-400 hover:bg-zinc-805 hover:bg-zinc-800'}`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

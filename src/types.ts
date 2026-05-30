@@ -8,9 +8,6 @@ export interface Profile {
   avatar_url: string;
   banner_url: string;
   rank?: string;
-  profile_music_url?: string;
-  profile_music_type?: 'file' | 'youtube';
-  profile_card_bg_url?: string;
   updated_at?: string;
   profile_likes?: ProfileLike[];
 }

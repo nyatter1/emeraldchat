@@ -8,10 +8,6 @@ CREATE TABLE IF NOT EXISTS profiles (
   bio TEXT,
   avatar_url TEXT DEFAULT 'https://api.dicebear.com/7.x/identicon/svg?seed=default',
   banner_url TEXT DEFAULT 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=2070&auto=format&fit=crop',
-  rank TEXT DEFAULT 'VIP',
-  profile_music_url TEXT,
-  profile_music_type TEXT,
-  profile_card_bg_url TEXT,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -223,13 +219,35 @@ BEGIN
 END;
 ' LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Alter profiles table to add rank column
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS rank TEXT DEFAULT 'VIP';
+
+-- RPC to update ranks by admin (for test@gmail.com)
+CREATE OR REPLACE FUNCTION public.update_user_rank_db(target_id TEXT, is_email BOOLEAN, rank_name TEXT)
+RETURNS void AS '
+BEGIN
+  -- Authenticated user must be test@gmail.com
+  IF EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND email = ''test@gmail.com''
+  ) THEN
+    IF is_email THEN
+      UPDATE public.profiles SET rank = rank_name WHERE LOWER(email) = LOWER(target_id);
+    ELSE
+      UPDATE public.profiles SET rank = rank_name WHERE LOWER(username) = LOWER(target_id);
+    END IF;
+  ELSE
+    RAISE EXCEPTION ''Unauthorized: Only test@gmail.com can set ranks'';
+  END IF;
+END;
+' LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Force PostgREST to reload schema
 NOTIFY pgrst, 'reload schema';
 
 -- Setup Storage for avatars and banners
 INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true) ON CONFLICT DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('banners', 'banners', true) ON CONFLICT DO NOTHING;
-INSERT INTO storage.buckets (id, name, public) VALUES ('music', 'music', true) ON CONFLICT DO NOTHING;
 
 DROP POLICY IF EXISTS "Avatar images are publicly accessible." ON storage.objects;
 CREATE POLICY "Avatar images are publicly accessible." ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
@@ -248,12 +266,3 @@ CREATE POLICY "Anyone can upload a banner." ON storage.objects FOR INSERT WITH C
 
 DROP POLICY IF EXISTS "Anyone can update their banner." ON storage.objects;
 CREATE POLICY "Anyone can update their banner." ON storage.objects FOR UPDATE USING (bucket_id = 'banners');
-
-DROP POLICY IF EXISTS "Music files are publicly accessible." ON storage.objects;
-CREATE POLICY "Music files are publicly accessible." ON storage.objects FOR SELECT USING (bucket_id = 'music');
-
-DROP POLICY IF EXISTS "Anyone can upload music." ON storage.objects;
-CREATE POLICY "Anyone can upload music." ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'music');
-
-DROP POLICY IF EXISTS "Anyone can update their music." ON storage.objects;
-CREATE POLICY "Anyone can update their music." ON storage.objects FOR UPDATE USING (bucket_id = 'music');
