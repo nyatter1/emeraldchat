@@ -1,13 +1,33 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile, Message } from '../types';
-import { LogOut, Send, MoreVertical, X, Upload, Loader2 } from 'lucide-react';
+import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'react-hot-toast';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 
 const SPOTIFY_URL_REGEX = /https:\/\/open\.spotify\.com\/(track|album|playlist|episode)\/([a-zA-Z0-9]+)(\?.*)?/;
+const IMAGE_EXT_REGEX = /\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i;
+const FORBIDDEN_TLDS = /\.(online|site|indevs\.in)(\/.*)?$/i;
+
+function isSafeUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  const lowerUrl = url.toLowerCase();
+  
+  // Explicitly check forbidden TLDs first
+  if (FORBIDDEN_TLDS.test(lowerUrl)) return false;
+  
+  // Whitelist: Spotify or direct image links
+  return SPOTIFY_URL_REGEX.test(url) || IMAGE_EXT_REGEX.test(url);
+}
+
+function scrubContent(text: string): string {
+  if (!text) return '';
+  // Mask any plain text that looks like a forbidden domain
+  return text.replace(/([a-zA-Z0-9-]+\.(online|site|indevs\.in))/gi, '[blocked]');
+}
 
 function SpotifyEmbed({ url }: { url: string }) {
   const match = url.match(SPOTIFY_URL_REGEX);
@@ -21,22 +41,37 @@ function SpotifyEmbed({ url }: { url: string }) {
 
 const MarkdownComponents = {
   a: ({ node, href, children, ...props }: any) => {
-    if (href && SPOTIFY_URL_REGEX.test(href)) {
+    if (!href) return <span>{children}</span>;
+    
+    const lowerHref = href.toLowerCase();
+    
+    if (SPOTIFY_URL_REGEX.test(href)) {
       return (
         <div className="flex flex-col gap-1 w-full max-w-sm mt-1">
           <SpotifyEmbed url={href} />
         </div>
       );
     }
-    return <a href={href} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline break-all" {...props}>{children}</a>;
+
+    if (isSafeUrl(href)) {
+      return <a href={href} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline break-all" {...props}>{children}</a>;
+    }
+
+    // Block other domains
+    return <span className="text-zinc-500 line-through decoration-zinc-700 cursor-not-allowed" title="Link blocked for security">{children}</span>;
   },
   img: ({ src, alt }: any) => <img src={src} alt={alt} className="max-w-full rounded-lg my-2 border border-zinc-800" loading="lazy" />,
-  p: ({ children }: any) => <p className="mb-2 last:mb-0 leading-relaxed text-zinc-300 break-words">{children}</p>,
+  p: ({ children }: any) => <div className="mb-2 last:mb-0 leading-relaxed text-zinc-300 break-words">{children}</div>,
   strong: ({ children }: any) => <strong className="font-bold text-zinc-100">{children}</strong>,
   em: ({ children }: any) => <em className="italic text-zinc-400">{children}</em>,
   h1: ({ children }: any) => <h1 className="text-xl font-bold text-white mt-4 mb-2">{children}</h1>,
   h2: ({ children }: any) => <h2 className="text-lg font-bold text-white mt-3 mb-2">{children}</h2>,
   h3: ({ children }: any) => <h3 className="text-base font-bold text-white mt-2 mb-1">{children}</h3>,
+  ul: ({ children }: any) => <ul className="list-disc list-inside mb-3 space-y-1 text-zinc-300">{children}</ul>,
+  ol: ({ children }: any) => <ol className="list-decimal list-inside mb-3 space-y-1 text-zinc-300">{children}</ol>,
+  li: ({ children }: any) => <li className="text-sm">{children}</li>,
+  blockquote: ({ children }: any) => <blockquote className="border-l-4 border-emerald-500/50 bg-emerald-500/5 pl-4 py-2 my-3 rounded-r-lg italic text-zinc-400">{children}</blockquote>,
+  hr: () => <hr className="border-zinc-800 my-4" />,
   code: ({ inline, children }: any) => inline ? <code className="bg-zinc-800/50 text-emerald-400 px-1 py-0.5 rounded text-sm font-mono">{children}</code> : <code className="block bg-zinc-900 border border-zinc-800 text-zinc-300 p-3 rounded-lg text-sm font-mono my-2 overflow-x-auto whitespace-pre-wrap">{children}</code>
 };
 
@@ -131,14 +166,30 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     room
       .on('presence', { event: 'sync' }, () => {
         const newState = room.presenceState();
+        const DEV_EMAILS = ['test@gmail.com', 'dev@gmail.com'];
         const users = Object.values(newState).flat().map((p: any) => p.profile) as Profile[];
         // Filter unique by id just in case
-        const uniqueUsers = Array.from(new Map(users.map(u => [u.id, u])).values());
+        let uniqueUsers = Array.from(new Map(users.map(u => [u.id, u])).values());
         
         if (!uniqueUsers.find(u => u.id === TEST_BOT.id)) {
           uniqueUsers.unshift(TEST_BOT);
         }
         
+        uniqueUsers.sort((a, b) => {
+          const isA_Dev = DEV_EMAILS.includes(a.email || '');
+          const isB_Dev = DEV_EMAILS.includes(b.email || '');
+          const isA_Bot = a.id === TEST_BOT.id;
+          const isB_Bot = b.id === TEST_BOT.id;
+
+          if (isA_Dev && !isB_Dev) return -1;
+          if (!isA_Dev && isB_Dev) return 1;
+          
+          if (isA_Bot && !isB_Bot) return -1;
+          if (!isA_Bot && isB_Bot) return 1;
+
+          return 0;
+        });
+
         setOnlineUsers(uniqueUsers);
       })
       .subscribe(async (status) => {
@@ -158,6 +209,36 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     if (!newMessage.trim()) return;
 
     const content = newMessage.trim();
+    const isDev = ['test@gmail.com', 'dev@gmail.com'].includes(currentUserProfile.email || '');
+
+    // Check for /clear command (Dev only)
+    if (content.toLowerCase() === '/clear') {
+      if (isDev) {
+        setNewMessage('');
+        const { error } = await supabase.rpc('clear_messages');
+        if (error) {
+          toast.error('Failed to clear chat. Did you run the latest SQL?');
+          console.error(error);
+        } else {
+          setMessages([]);
+          toast.success('Chat cleared by administrator');
+        }
+      } else {
+        toast.error('You do not have permission to use /clear');
+      }
+      return;
+    }
+
+    // Hard block for forbidden links
+    if (FORBIDDEN_TLDS.test(content.toLowerCase())) {
+      setNewMessage('');
+      toast('You can\'t type this in chat! Its advertising', {
+        icon: '🚫',
+        duration: 4000,
+      });
+      return;
+    }
+
     setNewMessage('');
 
     // Optimistic UI update
@@ -183,11 +264,10 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     } else {
       // If we crossed a threshold and RPC exists, clear them
       if (messages.length >= 500) {
-         try {
-           await supabase.rpc('clear_messages');
-         } catch (err) {
-           // User needs to execute the new sql to create the function
-         }
+        const { error: rpcError } = await supabase.rpc('clear_messages');
+        if (!rpcError) {
+          setMessages([]);
+        }
       }
     }
   };
@@ -246,8 +326,10 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                         <span className="font-bold text-[15px] hover:underline" style={{ color: msg.user_id === currentUserProfile.id ? '#10b981' : 'white' }}>{msg.profiles?.username || 'Unknown'}</span>
                         <span className="text-xs text-zinc-500">{format(new Date(msg.created_at), 'dd/MM HH:mm')}</span>
                       </div>
-                      <div className="text-zinc-200 text-[15px] leading-relaxed whitespace-pre-wrap break-words">
-                        {msg.content}
+                      <div className="text-zinc-200 text-[15px] leading-relaxed break-words">
+                        <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+                          {scrubContent(msg.content)}
+                        </Markdown>
                       </div>
                     </div>
                   </div>
@@ -300,7 +382,9 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                   <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#1e1e22] bg-emerald-500"></div>
                 </div>
                 <div className="flex flex-col items-start overflow-hidden w-full">
-                  <span className="max-w-full truncate text-[14px] font-bold text-zinc-200" style={{ color: user.id === currentUserProfile.id ? '#10b981' : '' }}>{user.username}</span>
+                  <div className="flex items-center gap-1.5 max-w-full">
+                    <span className="truncate text-[14px] font-bold text-zinc-200" style={{ color: user.id === currentUserProfile.id ? '#10b981' : '' }}>{user.username}</span>
+                  </div>
                 </div>
               </button>
             ))}
@@ -370,6 +454,17 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
 
   const updateProfileData = async (updates: Partial<Profile>) => {
     if (!profile) return;
+    
+    // Check for forbidden TLDs in fields that might contains text (bio, username, etc)
+    const checkFields = ['bio', 'username'];
+    for (const field of checkFields) {
+      const val = (updates as any)[field];
+      if (typeof val === 'string' && FORBIDDEN_TLDS.test(val.toLowerCase())) {
+        toast('Advertising is not permitted!', { icon: '🚫' });
+        return;
+      }
+    }
+
     await supabase.from('profiles').update(updates).eq('id', currentUserId);
     setProfile({ ...profile, ...updates });
     onProfileUpdate({ ...profile, ...updates });
@@ -443,7 +538,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                     <div className="text-sm text-zinc-300">
                       {bioData.text ? (
                         <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
-                          {bioData.text}
+                          {scrubContent(bioData.text)}
                         </Markdown>
                       ) : (
                         <p className="text-zinc-500">No bio provided yet.</p>
@@ -569,14 +664,115 @@ function UsernameEditForm({ profile, data, setData }: any) {
 }
 
 function BioEditForm({ profile, data, setData }: any) {
+  const [uploading, setUploading] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   useEffect(() => { 
     const bioData = parseBio(profile.bio);
     setData({ bio: bioData.text });
   }, []);
+
+  const insertText = (before: string, after: string = '') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentText = data.bio ?? '';
+    
+    const selectedText = currentText.substring(start, end);
+    const newText = currentText.substring(0, start) + before + selectedText + after + currentText.substring(end);
+    
+    setData({ ...data, bio: newText });
+    
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + before.length, end + before.length + (selectedText ? before.length + after.length : 0));
+    }, 0);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploading(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `bio_${Math.random()}.${fileExt}`;
+    const filePath = `${profile.id}/${fileName}`;
+    
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
+    if (!uploadError) {
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      insertText(`![image](${publicUrl})`, '');
+    }
+    setUploading(false);
+  };
+
+  const addSpotify = () => {
+    const url = prompt("Enter Spotify Track/Album/Playlist URL:");
+    if (url) {
+      insertText(`[Spotify](${url})`, '');
+    }
+  }
+
+  const addImageLink = () => {
+    const url = prompt("Enter Image URL (ends with .png, .jpg, etc.):");
+    if (url) {
+      if (IMAGE_EXT_REGEX.test(url)) {
+        insertText(`![image](${url})`, '');
+      } else {
+        alert("Only direct image links (ending in .png, .jpg, etc.) are allowed.");
+      }
+    }
+  }
+
   return (
-    <div>
-      <label className="text-xs text-zinc-400 mb-1 block">Bio (Supports Markdown)</label>
-      <textarea rows={10} value={data.bio ?? ''} onChange={e => setData({...data, bio: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-white resize-none font-mono text-sm leading-relaxed custom-scrollbar" placeholder="Type *bold*, _italic_, or Spotify links here..." />
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
+         <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Edit Bio</label>
+         <div className="flex bg-[#141416] rounded-lg p-1 gap-0.5 border border-zinc-800 flex-wrap">
+           <button title="Bold" type="button" onClick={() => insertText('**', '**')} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded font-bold text-zinc-300">B</button>
+           <button title="Italic" type="button" onClick={() => insertText('_', '_')} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded italic text-zinc-300 font-serif">I</button>
+           <button title="Divider" type="button" onClick={() => insertText('\n---\n', '')} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded text-zinc-300">
+             <Minus className="w-4 h-4" />
+           </button>
+           <div className="w-px bg-zinc-800 mx-0.5 h-4 my-auto"></div>
+           <button title="Bullet List" type="button" onClick={() => insertText('- ', '')} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded text-zinc-300">
+             <List className="w-4 h-4" />
+           </button>
+           <button title="Numbered List" type="button" onClick={() => insertText('1. ', '')} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded text-zinc-300">
+             <ListOrdered className="w-4 h-4" />
+           </button>
+           <button title="Quote" type="button" onClick={() => insertText('> ', '')} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded text-zinc-300">
+             <Quote className="w-4 h-4" />
+           </button>
+           <div className="w-px bg-zinc-800 mx-0.5 h-4 my-auto"></div>
+           <button title="Link" type="button" onClick={() => { 
+             const url = prompt("Enter URL (Only Spotify or direct image links allowed):"); 
+             if(url) {
+               if (isSafeUrl(url)) {
+                 insertText(`[link text](${url})`); 
+               } else {
+                 alert("Blocked: Only Spotify links and direct image links are permitted.");
+               }
+             }
+           }} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded text-zinc-300">
+             <LinkIcon className="w-4 h-4" />
+           </button>
+           <button title="Spotify" type="button" onClick={addSpotify} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded text-emerald-500">
+             <Music className="w-4 h-4" />
+           </button>
+           <div className="w-px bg-zinc-800 mx-0.5 h-4 my-auto"></div>
+           <button title="Image URL" type="button" onClick={addImageLink} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded text-zinc-300">
+             <ImageIcon className="w-4 h-4" />
+           </button>
+           <label title="Upload Image" className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded text-emerald-400 cursor-pointer">
+             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+             <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
+           </label>
+         </div>
+      </div>
+      <textarea ref={textareaRef} rows={8} value={data.bio ?? ''} onChange={e => setData({...data, bio: e.target.value})} className="w-full bg-[#1e1e22] border border-zinc-800 rounded-md px-3 py-2 text-white resize-none font-mono text-sm leading-relaxed custom-scrollbar focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none" placeholder="Type *bold*, _italic_, or Spotify links here..." />
     </div>
   )
 }

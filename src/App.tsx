@@ -9,6 +9,7 @@ import { Auth } from './components/Auth';
 import { Chat } from './components/Chat';
 import { Profile } from './types';
 import { Loader2 } from 'lucide-react';
+import { Toaster } from 'react-hot-toast';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -73,5 +74,16 @@ export default function App() {
     return <Auth onAuthSuccess={() => {}} />;
   }
 
-  return <Chat currentUserProfile={profile} onSignOut={handleSignOut} onProfileUpdate={setProfile} />;
+  return (
+    <>
+      <Toaster position="top-center" toastOptions={{
+        style: {
+          background: '#18181b',
+          color: '#fff',
+          border: '1px solid #27272a',
+        },
+      }} />
+      <Chat currentUserProfile={profile} onSignOut={handleSignOut} onProfileUpdate={setProfile} />
+    </>
+  );
 }
