@@ -84,8 +84,13 @@ export function Auth({ onAuthSuccess }: { onAuthSuccess: () => void }) {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-4 font-sans text-zinc-100">
-      <div className="w-full max-w-md rounded-xl bg-zinc-900 border border-zinc-800 p-8 shadow-2xl">
-        <h2 className="mb-6 text-2xl font-semibold tracking-tight text-white">
+      <div className="w-full max-w-md rounded-xl bg-zinc-900 border border-zinc-800 p-8 shadow-2xl relative">
+        <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-3">
+          <img src="/falcion.png" alt="Emerald Chat" className="h-10 w-10 object-contain drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+          <h1 className="text-2xl font-bold tracking-tight text-emerald-500 drop-shadow-sm">Emerald Chat</h1>
+        </div>
+        
+        <h2 className="mb-6 mt-2 text-xl font-semibold tracking-tight text-white text-center">
           {isLogin ? 'Welcome back' : 'Create an account'}
         </h2>
         
@@ -167,7 +172,7 @@ export function Auth({ onAuthSuccess }: { onAuthSuccess: () => void }) {
           <button
             type="submit"
             disabled={loading}
-            className="mt-6 flex w-full items-center justify-center rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-zinc-950 transition-colors hover:bg-zinc-200 disabled:opacity-50"
+            className="mt-6 flex w-full items-center justify-center rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
           >
             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : (isLogin ? 'Sign In' : 'Sign Up')}
           </button>
@@ -178,7 +183,7 @@ export function Auth({ onAuthSuccess }: { onAuthSuccess: () => void }) {
           <button
             type="button"
             onClick={() => setIsLogin(!isLogin)}
-            className="text-white hover:underline focus:outline-none"
+            className="text-emerald-500 hover:text-emerald-400 hover:underline focus:outline-none"
           >
             {isLogin ? 'Sign up' : 'Sign in'}
           </button>
