@@ -19,29 +19,30 @@ export const SUPERADMIN_EMAILS: string[] = [];
 export const ADMIN_EMAILS: string[] = [];
 export const MOD_EMAILS: string[] = [];
 
-export const RANK_ORDER = ['Developer', 'Founder', 'MoP', 'SuperAdmin', 'Admin', 'Mod', 'VIP'];
+export const RANK_DATA: Record<string, { name: string, icon: string, level: number }> = {
+  'Developer': { name: 'Developer', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/verified.gif', level: 0 },
+  'Founder': { name: 'Founder', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/founder.gif', level: 1 },
+  'MoP': { name: 'MoP', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/MoP.gif', level: 2 },
+  'SuperAdmin': { name: 'SuperAdmin', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/superadmin.png', level: 3 },
+  'Admin': { name: 'Admin', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/admin.png', level: 4 },
+  'Mod': { name: 'Mod', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/mod.png', level: 5 },
+  'VIP': { name: 'VIP', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/vip.gif', level: 6 }
+};
 
-export function getRank(email?: string | null) {
+export const RANK_ORDER = Object.keys(RANK_DATA);
+
+export function getRank(email?: string | null, storedRank?: string | null) {
+  if (storedRank && RANK_DATA[storedRank]) {
+    return RANK_DATA[storedRank];
+  }
   const e = email || '';
-  if (DEV_EMAILS.includes(e)) {
-    return { name: 'Developer', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/verified.gif', level: 0 };
-  }
-  if (FOUNDER_EMAILS.includes(e)) {
-    return { name: 'Founder', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/founder.gif', level: 1 };
-  }
-  if (MOP_EMAILS.includes(e)) {
-    return { name: 'MoP', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/MoP.gif', level: 2 };
-  }
-  if (SUPERADMIN_EMAILS.includes(e)) {
-    return { name: 'SuperAdmin', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/superadmin.png', level: 3 };
-  }
-  if (ADMIN_EMAILS.includes(e)) {
-    return { name: 'Admin', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/admin.png', level: 4 };
-  }
-  if (MOD_EMAILS.includes(e)) {
-    return { name: 'Mod', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/mod.png', level: 5 };
-  }
-  return { name: 'VIP', icon: 'https://raw.githubusercontent.com/nyatter1/ranks/main/vip.gif', level: 6 };
+  if (DEV_EMAILS.includes(e)) return RANK_DATA['Developer'];
+  if (FOUNDER_EMAILS.includes(e)) return RANK_DATA['Founder'];
+  if (MOP_EMAILS.includes(e)) return RANK_DATA['MoP'];
+  if (SUPERADMIN_EMAILS.includes(e)) return RANK_DATA['SuperAdmin'];
+  if (ADMIN_EMAILS.includes(e)) return RANK_DATA['Admin'];
+  if (MOD_EMAILS.includes(e)) return RANK_DATA['Mod'];
+  return RANK_DATA['VIP'];
 }
 
 function isSafeUrl(url: string | undefined): boolean {
@@ -160,7 +161,7 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
          <img src={news.profiles?.avatar_url} className="w-10 h-10 rounded-full object-cover border border-zinc-700" alt="" />
          <div className="flex flex-col">
            <div className="flex items-center gap-1.5">
-             <img src={getRank(news.profiles?.email).icon} alt={getRank(news.profiles?.email).name} className="h-4 object-contain" />
+             <img src={getRank(news.profiles?.email, news.profiles?.rank).icon} alt={getRank(news.profiles?.email, news.profiles?.rank).name} className="h-4 object-contain" />
              <span className="font-bold text-sm text-zinc-100">{news.profiles?.username}</span>
            </div>
            <span className="text-xs text-zinc-500">{format(new Date(news.created_at), 'MMM d, HH:mm')}</span>
@@ -202,7 +203,7 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
                    <img src={comment.profiles?.avatar_url} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" alt="" />
                    <div className="flex flex-col bg-[#1e1e22] rounded-2xl px-3 py-2 w-fit max-w-[90%]">
                      <span className="flex items-center gap-1.5 text-[13px] font-bold text-zinc-200 leading-tight mb-0.5">
-                       <img src={getRank(comment.profiles?.email).icon} alt={getRank(comment.profiles?.email).name} className="h-3.5 object-contain" />
+                       <img src={getRank(comment.profiles?.email, comment.profiles?.rank).icon} alt={getRank(comment.profiles?.email, comment.profiles?.rank).name} className="h-3.5 object-contain" />
                        {comment.profiles?.username} 
                        <span className="font-normal text-[10px] text-zinc-500 ml-1">{format(new Date(comment.created_at), 'MM/dd HH:mm')}</span>
                      </span>
@@ -287,7 +288,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         .from('messages')
         .select(`
           *,
-          profiles ( id, username, avatar_url, banner_url, age, gender, bio, email )
+          profiles ( id, username, avatar_url, banner_url, age, gender, bio, email, rank, profile_music_url, profile_music_type, profile_card_bg_url )
         `)
         .order('created_at', { ascending: true })
         .limit(100);
@@ -389,8 +390,8 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         }
         
         uniqueUsers.sort((a, b) => {
-          const rankA = getRank(a.email).level;
-          const rankB = getRank(b.email).level;
+          const rankA = getRank(a.email, a.rank).level;
+          const rankB = getRank(b.email, b.rank).level;
           const isA_Bot = a.id === TEST_BOT.id;
           const isB_Bot = b.id === TEST_BOT.id;
 
@@ -428,6 +429,59 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     const content = newMessage.trim();
     const isDev = ['test@gmail.com', 'dev@gmail.com'].includes(currentUserProfile.email || '');
 
+    if (content.startsWith('/ranks')) {
+      setNewMessage('');
+      const ranksList = RANK_ORDER.join(', ');
+      toast(`Ranks: ${ranksList}`, { icon: 'ℹ️' });
+      return;
+    }
+
+    if (content.startsWith('/rank ')) {
+      setNewMessage('');
+      if (currentUserProfile.email !== 'test@gmail.com') {
+        toast.error('You do not have permission to use /rank');
+        return;
+      }
+      
+      const parts = content.split(' ').filter(p => p.length > 0);
+      if (parts.length < 3) {
+        toast.error('Usage: /rank {user/email} {rank}');
+        return;
+      }
+      
+      const targetIdentifier = parts[1];
+      const rankName = parts[2];
+      
+      const matchedRank = Object.keys(RANK_DATA).find(r => r.toLowerCase() === rankName.toLowerCase());
+      if (!matchedRank) {
+        toast.error(`Invalid rank. Available: ${RANK_ORDER.join(', ')}`);
+        return;
+      }
+      
+      const { data: targetUser, error: findError } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`username.eq.${targetIdentifier},email.eq.${targetIdentifier}`)
+        .maybeSingle();
+        
+      if (findError || !targetUser) {
+        toast.error('User not found');
+        return;
+      }
+      
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ rank: matchedRank })
+        .eq('id', targetUser.id);
+        
+      if (updateError) {
+        toast.error('Failed to update rank');
+      } else {
+        toast.success(`Success! ${targetUser.username} is now a ${matchedRank}`);
+      }
+      return;
+    }
+
     // Check for /clear command (Dev only)
     if (content.toLowerCase() === '/clear') {
       if (isDev) {
@@ -451,7 +505,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         // Refetch to ensure client is perfectly in sync with the database
         const { data } = await supabase
           .from('messages')
-          .select(`*, profiles ( id, username, avatar_url, banner_url, age, gender, bio, email )`)
+          .select(`*, profiles ( id, username, avatar_url, banner_url, age, gender, bio, email, rank, profile_music_url, profile_music_type, profile_card_bg_url )`)
           .order('created_at', { ascending: true })
           .limit(100);
           
@@ -826,7 +880,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                     <div className="flex flex-col w-full">
                       <div className="flex items-baseline justify-between mb-0.5">
                         <div className="flex items-center gap-2 leading-none">
-                          <img src={getRank(msg.profiles?.email).icon} alt={getRank(msg.profiles?.email).name} className="h-4 object-contain" />
+                          <img src={getRank(msg.profiles?.email, msg.profiles?.rank).icon} alt={getRank(msg.profiles?.email, msg.profiles?.rank).name} className="h-4 object-contain" />
                           <span className="font-bold text-[15px] hover:underline cursor-pointer" onClick={() => setSelectedProfileId(msg.user_id)} style={{ color: msg.user_id === currentUserProfile.id ? '#10b981' : 'white' }}>{msg.profiles?.username || 'Unknown'}</span>
                           <span className="text-xs text-zinc-500">{format(new Date(msg.created_at), 'dd/MM HH:mm')}</span>
                         </div>
@@ -888,7 +942,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                 </div>
                 <div className="flex flex-col items-start overflow-hidden w-full">
                   <div className="flex items-center gap-1.5 max-w-full">
-                    <img src={getRank(user.email).icon} alt={getRank(user.email).name} className="h-4 object-contain" />
+                    <img src={getRank(user.email, user.rank).icon} alt={getRank(user.email, user.rank).name} className="h-4 object-contain" />
                     <span className="truncate text-[14px] font-bold text-zinc-200" style={{ color: user.id === currentUserProfile.id ? '#10b981' : '' }}>{user.username}</span>
                   </div>
                 </div>
@@ -920,7 +974,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
-  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | null>(null);
+  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'bio'>('bio');
   
   const isSelf = profileId === currentUserId;
@@ -1063,18 +1117,30 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                   )}
                 </div>
                 <div className="flex items-center gap-1.5 mt-1 mb-1">
-                  <img src={getRank(profile!.email).icon} alt={getRank(profile!.email).name} className="h-4 object-contain" />
-                  <span className="text-[13px] font-bold text-zinc-300">{getRank(profile!.email).name}</span>
+                  <img src={getRank(profile!.email, profile!.rank).icon} alt={getRank(profile!.email, profile!.rank).name} className="h-4 object-contain" />
+                  <span className="text-[13px] font-bold text-zinc-300">{getRank(profile!.email, profile!.rank).name}</span>
                 </div>
+                {profile!.profile_music_url && <MusicVisualizer />}
                 {bioData.mood && (
-                  <p className="text-sm mt-1 mb-1 text-emerald-400 font-medium">{bioData.mood}</p>
+                  <p className="text-sm mt-1 text-emerald-400 font-medium">{bioData.mood}</p>
                 )}
               </div>
             </div>
 
+            {profile!.profile_music_url && (
+              <ProfileMusicPlayer url={profile!.profile_music_url} type={profile!.profile_music_type} />
+            )}
+
             {!editMode ? (
-              <div className="flex flex-col flex-1 pb-4 shadow-inner">
-                <div className="flex gap-6 border-b border-zinc-800 px-6 shrink-0 h-10">
+              <div className="flex flex-col flex-1 pb-4 shadow-inner relative overflow-hidden" 
+                   style={{ 
+                     backgroundImage: profile!.profile_card_bg_url ? `url(${profile!.profile_card_bg_url})` : 'none', 
+                     backgroundSize: 'cover', 
+                     backgroundPosition: 'center' 
+                   }}>
+                {profile!.profile_card_bg_url && <div className="absolute inset-0 bg-black/60 z-0" />}
+                <div className="relative z-10 flex flex-col flex-1">
+                  <div className="flex gap-6 border-b border-zinc-800 px-6 shrink-0 h-10">
                   <button onClick={() => setActiveTab('bio')} className={`pb-1 flex items-center border-b-2 font-medium transition-colors text-sm ${activeTab === 'bio' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}>About Me</button>
                   <button onClick={() => setActiveTab('info')} className={`pb-1 flex items-center border-b-2 font-medium transition-colors text-sm ${activeTab === 'info' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}>Info</button>
                 </div>
@@ -1112,13 +1178,16 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                   )}
                 </div>
               </div>
-            ) : (
+            </div>
+          ) : (
               <div className="px-6 pb-6 pt-2">
                 <div className="flex flex-col gap-2">
                   <button onClick={() => setActiveEditModal('mood')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Mood</button>
                   <button onClick={() => setActiveEditModal('bio')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Bio</button>
                   <button onClick={() => setActiveEditModal('info')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Age & Gender</button>
                   <button onClick={() => setActiveEditModal('username')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Username</button>
+                  <button onClick={() => setActiveEditModal('music')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Add Profile Music</button>
+                  <button onClick={() => setActiveEditModal('card_bg')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Profile Background</button>
                 </div>
               </div>
             )}
@@ -1150,6 +1219,16 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
           updateProfileData({ bio: newBio });
         }}>
           {(props) => <MoodEditForm profile={profile!} {...props} />}
+        </EditModal>
+      )}
+      {activeEditModal === 'music' && (
+        <EditModal title="Profile Music" onClose={() => setActiveEditModal(null)} onSave={(val) => updateProfileData(val)}>
+          {(props) => <MusicEditForm profile={profile!} {...props} />}
+        </EditModal>
+      )}
+      {activeEditModal === 'card_bg' && (
+        <EditModal title="Profile Background" onClose={() => setActiveEditModal(null)} onSave={(val) => updateProfileData(val)}>
+          {(props) => <BackgroundEditForm profile={profile!} {...props} />}
         </EditModal>
       )}
     </div>
@@ -1334,5 +1413,141 @@ function MoodEditForm({ profile, data, setData }: any) {
       <input type="text" maxLength={45} value={data.mood ?? ''} placeholder="e.g. feeling great today!" onChange={e => setData({...data, mood: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-white" />
     </div>
   )
+}
+
+function MusicVisualizer() {
+  return (
+    <div className="flex items-center gap-1 h-3 mt-1">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="w-0.5 bg-emerald-500 rounded-full animate-visualizer" style={{ animationDelay: `${i * 0.15}s` }} />
+      ))}
+    </div>
+  );
+}
+
+function ProfileMusicPlayer({ url, type }: { url: string, type?: string }) {
+  if (type === 'youtube') {
+    const videoId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([a-zA-Z0-9_-]{11})/)?.[1];
+    if (!videoId) return null;
+    return (
+      <div className="hidden">
+        <iframe 
+          width="0" height="0" 
+          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}`} 
+          allow="autoplay"
+        ></iframe>
+      </div>
+    );
+  }
+  return (
+    <audio src={url} autoPlay loop className="hidden" />
+  );
+}
+
+function MusicEditForm({ profile, data, setData }: any) {
+  const [uploading, setUploading] = useState(false);
+  useEffect(() => { 
+    setData({ 
+      profile_music_url: profile.profile_music_url,
+      profile_music_type: profile.profile_music_type || 'youtube'
+    }) 
+  }, []);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.includes('audio') && !file.name.endsWith('.mp3')) {
+      toast.error('Please upload an MP3 file');
+      return;
+    }
+    
+    setUploading(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `music_${Math.random()}.${fileExt}`;
+    const filePath = `${profile.id}/${fileName}`;
+    
+    const { error: uploadError } = await supabase.storage.from('music').upload(filePath, file);
+    if (!uploadError) {
+      const { data: { publicUrl } } = supabase.storage.from('music').getPublicUrl(filePath);
+      setData({ ...data, profile_music_url: publicUrl, profile_music_type: 'file' });
+      toast.success('Music uploaded');
+    } else {
+      toast.error('Upload failed');
+    }
+    setUploading(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-4 p-1 bg-black/20 rounded-lg">
+        <button 
+          onClick={() => setData({ ...data, profile_music_type: 'youtube' })}
+          className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${data.profile_music_type === 'youtube' ? 'bg-emerald-500 text-white' : 'text-zinc-400 hover:text-white'}`}
+        >YouTube Link</button>
+        <button 
+          onClick={() => setData({ ...data, profile_music_type: 'file' })}
+          className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${data.profile_music_type === 'file' ? 'bg-emerald-500 text-white' : 'text-zinc-400 hover:text-white'}`}
+        >MP3 File</button>
+      </div>
+
+      {data.profile_music_type === 'youtube' ? (
+        <div>
+          <label className="text-xs text-zinc-400 mb-1 block">YouTube URL</label>
+          <input 
+            type="text" 
+            placeholder="https://youtube.com/watch?v=..."
+            value={data.profile_music_url || ''} 
+            onChange={e => setData({...data, profile_music_url: e.target.value})} 
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-white text-sm" 
+          />
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center border-2 border-dashed border-zinc-800 rounded-xl p-6 hover:border-emerald-500/50 transition-colors cursor-pointer relative">
+          {uploading ? <Loader2 className="h-6 w-6 animate-spin text-emerald-500" /> : <Music className="h-6 w-6 text-zinc-400" />}
+          <span className="text-xs text-zinc-500 mt-2">{data.profile_music_url ? 'Change MP3 File' : 'Upload MP3 File'}</span>
+          <input type="file" accept="audio/*,.mp3" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+          {data.profile_music_url && data.profile_music_type === 'file' && <p className="text-[10px] text-emerald-500 mt-1 truncate max-w-full italic text-center">MP3 Ready</p>}
+        </div>
+      )}
+      <p className="text-[10px] text-zinc-500 text-center italic">Only one can be active: File or YouTube</p>
+    </div>
+  );
+}
+
+function BackgroundEditForm({ profile, data, setData }: any) {
+  const [uploading, setUploading] = useState(false);
+  useEffect(() => { setData({ profile_card_bg_url: profile.profile_card_bg_url }) }, []);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploading(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `bg_${Math.random()}.${fileExt}`;
+    const filePath = `${profile.id}/${fileName}`;
+    
+    const { error: uploadError } = await supabase.storage.from('banners').upload(filePath, file);
+    if (!uploadError) {
+      const { data: { publicUrl } } = supabase.storage.from('banners').getPublicUrl(filePath);
+      setData({ profile_card_bg_url: publicUrl });
+      toast.success('Background updated');
+    }
+    setUploading(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col items-center justify-center border-2 border-dashed border-zinc-800 rounded-xl p-6 hover:border-emerald-500/50 transition-colors cursor-pointer relative">
+        {uploading ? <Loader2 className="h-6 w-6 animate-spin text-emerald-500" /> : <ImageIcon className="h-6 w-6 text-zinc-400" />}
+        <span className="text-xs text-zinc-500 mt-2">Upload Texture/Image</span>
+        <input type="file" accept="image/*" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+      </div>
+      <div>
+        <label className="text-xs text-zinc-400 mb-1 block">Or Image URL</label>
+        <input type="text" value={data.profile_card_bg_url || ''} onChange={e => setData({...data, profile_card_bg_url: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-white text-sm" />
+      </div>
+    </div>
+  );
 }
 

@@ -8,6 +8,10 @@ CREATE TABLE IF NOT EXISTS profiles (
   bio TEXT,
   avatar_url TEXT DEFAULT 'https://api.dicebear.com/7.x/identicon/svg?seed=default',
   banner_url TEXT DEFAULT 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=2070&auto=format&fit=crop',
+  rank TEXT DEFAULT 'VIP',
+  profile_music_url TEXT,
+  profile_music_type TEXT,
+  profile_card_bg_url TEXT,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -225,6 +229,7 @@ NOTIFY pgrst, 'reload schema';
 -- Setup Storage for avatars and banners
 INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true) ON CONFLICT DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('banners', 'banners', true) ON CONFLICT DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('music', 'music', true) ON CONFLICT DO NOTHING;
 
 DROP POLICY IF EXISTS "Avatar images are publicly accessible." ON storage.objects;
 CREATE POLICY "Avatar images are publicly accessible." ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
@@ -243,3 +248,12 @@ CREATE POLICY "Anyone can upload a banner." ON storage.objects FOR INSERT WITH C
 
 DROP POLICY IF EXISTS "Anyone can update their banner." ON storage.objects;
 CREATE POLICY "Anyone can update their banner." ON storage.objects FOR UPDATE USING (bucket_id = 'banners');
+
+DROP POLICY IF EXISTS "Music files are publicly accessible." ON storage.objects;
+CREATE POLICY "Music files are publicly accessible." ON storage.objects FOR SELECT USING (bucket_id = 'music');
+
+DROP POLICY IF EXISTS "Anyone can upload music." ON storage.objects;
+CREATE POLICY "Anyone can upload music." ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'music');
+
+DROP POLICY IF EXISTS "Anyone can update their music." ON storage.objects;
+CREATE POLICY "Anyone can update their music." ON storage.objects FOR UPDATE USING (bucket_id = 'music');
