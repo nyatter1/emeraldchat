@@ -8,6 +8,14 @@ export interface Profile {
   avatar_url: string;
   banner_url: string;
   updated_at?: string;
+  profile_likes?: ProfileLike[];
+}
+
+export interface ProfileLike {
+  id: string;
+  target_profile_id: string;
+  user_id: string;
+  created_at: string;
 }
 
 export interface Message {
@@ -16,4 +24,20 @@ export interface Message {
   content: string;
   user_id: string;
   profiles?: Profile;
+}
+
+export interface NewsLike {
+  id: string;
+  news_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface News {
+  id: string;
+  created_at: string;
+  content: string;
+  user_id: string;
+  profiles?: Profile;
+  news_likes?: NewsLike[];
 }

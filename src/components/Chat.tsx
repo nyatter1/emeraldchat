@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Profile, Message } from '../types';
-import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck } from 'lucide-react';
+import { Profile, Message, News, ProfileLike } from '../types';
+import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import Markdown from 'react-markdown';
@@ -112,6 +112,9 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [newMessage, setNewMessage] = useState('');
   const [onlineUsers, setOnlineUsers] = useState<Profile[]>([TEST_BOT]);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [leftPanelMode, setLeftPanelMode] = useState<'none' | 'menu' | 'news' | 'rules'>('none');
+  const [newsFeed, setNewsFeed] = useState<News[]>([]);
+  const [newNewsContent, setNewNewsContent] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -142,9 +145,28 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
     fetchMessages();
 
-    // Subscribe to new messages
+    // Initial fetch of news
+    const fetchNews = async () => {
+      const { data, error } = await supabase
+        .from('news')
+        .select(`
+          *,
+          profiles ( id, username, avatar_url, banner_url, age, gender, bio, email ),
+          news_likes ( id, news_id, user_id, created_at )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (!error && data) {
+        setNewsFeed(data as any);
+      }
+    };
+
+    fetchNews();
+
+    // Subscribe to new messages & news
     const messageSubscription = supabase
-      .channel('public:messages')
+      .channel('public_changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
         // Fetch the user profile for the new message to append properly
         const { data: profileData } = await supabase.from('profiles').select('*').eq('id', payload.new.user_id).single();
@@ -157,6 +179,21 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, (payload) => {
          setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news' }, async (payload) => {
+        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', payload.new.user_id).single();
+        if (profileData) {
+         setNewsFeed(prev => {
+           if (prev.some(n => n.id === payload.new.id)) return prev;
+           return [{ ...payload.new, profiles: profileData, news_likes: [] } as any, ...prev];
+         });
+        }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'news' }, (payload) => {
+         setNewsFeed(prev => prev.filter(n => n.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'news_likes' }, async () => {
+         fetchNews();
       })
       .subscribe();
 
@@ -215,13 +252,33 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     if (content.toLowerCase() === '/clear') {
       if (isDev) {
         setNewMessage('');
-        const { error } = await supabase.rpc('clear_messages');
-        if (error) {
-          toast.error('Failed to clear chat. Did you run the latest SQL?');
-          console.error(error);
+        const { error: rpcError } = await supabase.rpc('wipe_all_messages');
+        const { error: rpcOldError } = await supabase.rpc('clear_messages');
+        
+        if (rpcError && rpcOldError) {
+          // Fallback to direct delete if RPC fails (e.g. if they didn't run SQL yet)
+          const { error: deleteError } = await supabase.from('messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          if (deleteError) {
+             toast.error('Failed to clear chat. Please run the SQL provided below!');
+             console.error('RPC Error:', rpcError, 'Delete Error:', deleteError);
+          } else {
+             toast.success('Chat cleared by administrator');
+          }
+        } else {
+          toast.success('Chat cleared by administrator');
+        }
+        
+        // Refetch to ensure client is perfectly in sync with the database
+        const { data } = await supabase
+          .from('messages')
+          .select(`*, profiles ( id, username, avatar_url, banner_url, age, gender, bio, email )`)
+          .order('created_at', { ascending: true })
+          .limit(100);
+          
+        if (data) {
+          setMessages(data as any);
         } else {
           setMessages([]);
-          toast.success('Chat cleared by administrator');
         }
       } else {
         toast.error('You do not have permission to use /clear');
@@ -264,9 +321,11 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     } else {
       // If we crossed a threshold and RPC exists, clear them
       if (messages.length >= 500) {
-        const { error: rpcError } = await supabase.rpc('clear_messages');
-        if (!rpcError) {
-          setMessages([]);
+        const { error: rpcError } = await supabase.rpc('wipe_all_messages');
+        const { error: rpcOldError } = await supabase.rpc('clear_messages');
+        if (rpcError && rpcOldError) {
+          // Fallback if RPC not yet created
+          await supabase.from('messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         }
       }
     }
@@ -279,14 +338,193 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     }
   };
 
+  const handleLikeNews = async (newsId: string, hasLiked: boolean) => {
+    if (hasLiked) {
+      await supabase.from('news_likes').delete().eq('news_id', newsId).eq('user_id', currentUserProfile.id);
+    } else {
+      await supabase.from('news_likes').insert({ news_id: newsId, user_id: currentUserProfile.id });
+    }
+  };
+
+  const handleSendNews = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newNewsContent.trim()) return;
+    
+    // Check for forbidden
+    if (FORBIDDEN_TLDS.test(newNewsContent.toLowerCase())) {
+       toast('Advertising is not permitted in news!', { icon: '🚫' });
+       return;
+    }
+
+    const tempId = crypto.randomUUID();
+    const { error } = await supabase.from('news').insert({
+      id: tempId,
+      content: newNewsContent,
+      user_id: currentUserProfile.id
+    });
+
+    if (!error) {
+      setNewNewsContent('');
+      toast.success('News posted!');
+    } else {
+      toast.error('Failed to post news');
+    }
+  };
+
+  const isDev = ['test@gmail.com', 'dev@gmail.com'].includes(currentUserProfile.email || '');
+
   return (
     <div className="flex h-screen bg-zinc-950 text-zinc-100 font-sans overflow-hidden">
       
+        {/* Left Drawer Menu */}
+        {leftPanelMode !== 'none' && (
+          <>
+            <div className="w-[320px] flex flex-col border-r border-zinc-800 bg-[#09090b] z-40 absolute lg:relative h-full transition-all shrink-0">
+              {leftPanelMode === 'menu' && (
+                <>
+                  <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-800 bg-[#141416]">
+                    <h2 className="font-bold text-lg text-emerald-500 tracking-tight flex items-center gap-2"><Menu className="w-5 h-5"/> Menu</h2>
+                  </div>
+                  <div className="flex-1 p-4 flex flex-col gap-3 bg-[#09090b]">
+                     <button onClick={() => setLeftPanelMode('news')} className="w-full text-left bg-zinc-900 border border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-800 rounded-xl p-4 transition-colors flex items-center justify-between group">
+                       <span className="font-bold text-zinc-200">Updates & News</span>
+                       <span className="bg-emerald-500 text-emerald-950 font-bold text-xs px-2 py-0.5 rounded-full">{newsFeed.length}</span>
+                     </button>
+                     <button onClick={() => setLeftPanelMode('rules')} className="w-full text-left bg-zinc-900 border border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-800 rounded-xl p-4 transition-colors flex items-center justify-between group">
+                       <span className="font-bold text-zinc-200">Server Rules</span>
+                       <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                     </button>
+                  </div>
+                </>
+              )}
+              {leftPanelMode === 'news' && (
+                <>
+                  <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-800 bg-[#141416]">
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => setLeftPanelMode('menu')} className="text-zinc-400 hover:text-white transition-colors">
+                        <X className="w-5 h-5"/>
+                      </button>
+                      <h2 className="font-bold text-lg text-emerald-500 tracking-tight">News</h2>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#09090b]">
+                     {isDev && (
+                       <div className="p-4 border-b border-zinc-800 bg-[#141416]">
+                         <form onSubmit={handleSendNews} className="flex flex-col gap-2 relative">
+                           <div className="flex items-center gap-1 p-1 mb-1 bg-[#1e1e22] border border-zinc-800 rounded-md">
+                             <button type="button" onClick={() => setNewNewsContent(newNewsContent + '**bold**')} className="p-1 px-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded font-bold" title="Bold">B</button>
+                             <button type="button" onClick={() => setNewNewsContent(newNewsContent + '_italic_')} className="p-1 px-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded italic" title="Italic">I</button>
+                             <button type="button" onClick={() => setNewNewsContent(newNewsContent + '~~strikethrough~~')} className="p-1 px-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded line-through" title="Strikethrough">S</button>
+                             <div className="w-px h-4 bg-zinc-800 mx-1"></div>
+                             <button type="button" onClick={() => setNewNewsContent(newNewsContent + '\n# Heading\n')} className="p-1 px-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded font-bold text-xs" title="Heading">H1</button>
+                             <button type="button" onClick={() => setNewNewsContent(newNewsContent + '\n- list item\n')} className="p-1 px-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded" title="Bullet List"><List className="w-4 h-4" /></button>
+                             <button type="button" onClick={() => setNewNewsContent(newNewsContent + '\n1. numbered list\n')} className="p-1 px-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded" title="Numbered List"><ListOrdered className="w-4 h-4" /></button>
+                             <div className="w-px h-4 bg-zinc-800 mx-1"></div>
+                             <button type="button" onClick={() => setNewNewsContent(newNewsContent + '[link](https://)')} className="p-1 px-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded" title="Link"><LinkIcon className="w-4 h-4" /></button>
+                           </div>
+                           <textarea
+                              value={newNewsContent}
+                              onChange={(e) => setNewNewsContent(e.target.value)}
+                              placeholder="Post an update (markdown supported)..."
+                              className="w-full bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-sm text-zinc-200 resize-none focus:outline-none focus:border-emerald-500 min-h-[80px] font-mono"
+                           />
+                           <button type="submit" disabled={!newNewsContent.trim()} className="self-end px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-md disabled:opacity-50 mt-1">Post News</button>
+                         </form>
+                       </div>
+                     )}
+
+                     <div className="p-4 flex flex-col gap-4">
+                        {newsFeed.map(news => {
+                          const hasLiked = news.news_likes?.some(l => l.user_id === currentUserProfile.id) || false;
+                          return (
+                            <div key={news.id} className="bg-[#141416] border border-zinc-800 rounded-xl p-4 flex flex-col gap-3">
+                               <div className="flex items-center gap-3">
+                                 <img src={news.profiles?.avatar_url} className="w-10 h-10 rounded-full object-cover border border-zinc-700" alt="" />
+                                 <div className="flex flex-col">
+                                   <div className="flex items-center gap-1.5">
+                                     <span className="font-bold text-sm text-zinc-100">{news.profiles?.username}</span>
+                                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                                   </div>
+                                   <span className="text-xs text-zinc-500">{format(new Date(news.created_at), 'MMM d, HH:mm')}</span>
+                                 </div>
+                               </div>
+                               <div className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                                  <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+                                    {scrubContent(news.content)}
+                                  </Markdown>
+                               </div>
+                               <div className="flex items-center justify-between mt-1 pt-3 border-t border-zinc-800/50">
+                                 <button onClick={() => handleLikeNews(news.id, hasLiked)} className={`flex items-center gap-1.5 text-xs font-semibold ${hasLiked ? 'text-emerald-500' : 'text-zinc-500 hover:text-zinc-300'} transition-colors`}>
+                                   <Heart className={`w-4 h-4 ${hasLiked ? 'fill-emerald-500' : ''}`} />
+                                   <span>{news.news_likes?.length || 0}</span>
+                                 </button>
+                               </div>
+                            </div>
+                          )
+                        })}
+                        {newsFeed.length === 0 && <p className="text-zinc-500 text-sm text-center mt-4">No news yet.</p>}
+                     </div>
+                  </div>
+                </>
+              )}
+              {leftPanelMode === 'rules' && (
+                <>
+                  <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-800 bg-[#141416]">
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => setLeftPanelMode('menu')} className="text-zinc-400 hover:text-white transition-colors">
+                        <X className="w-5 h-5"/>
+                      </button>
+                      <h2 className="font-bold text-lg text-emerald-500 tracking-tight">Rules</h2>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 bg-[#09090b]">
+                    <div className="flex flex-col gap-3 bg-[#141416] rounded-xl p-5 border border-zinc-800">
+                      <div className="flex items-center gap-2 text-zinc-200 font-bold mb-2">
+                        <ShieldCheck className="w-6 h-6 text-emerald-500" />
+                        <h3 className="text-lg">Server Rules</h3>
+                      </div>
+                      <ul className="space-y-4 text-zinc-300 text-sm leading-relaxed">
+                        <li className="flex items-start gap-3">
+                          <span className="text-emerald-500 mt-0.5">•</span>
+                          <span>Be respectful to all members.</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="text-emerald-500 mt-0.5">•</span>
+                          <span>No spamming or flooding the chat.</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="text-emerald-500 mt-0.5">•</span>
+                          <span>Do not advertise other websites or services.</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="text-emerald-500 mt-0.5">•</span>
+                          <span>No NSFW or illegal content.</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="text-emerald-500 mt-0.5">•</span>
+                          <span>Follow the instructions of the staff team.</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            {/* Backdrop for mobile */}
+            <div className="lg:hidden fixed inset-0 bg-black/60 z-30 backdrop-blur-sm" onClick={() => setLeftPanelMode('none')} />
+          </>
+        )}
+
       {/* Main Chat Area */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col relative">
         {/* Header */}
-        <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-6 py-4">
-          <h1 className="text-lg font-bold tracking-tight text-emerald-500">Emerald Chat</h1>
+        <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 sm:px-6 py-4">
+          <div className="flex items-center gap-3">
+             <button onClick={() => setLeftPanelMode(prev => prev === 'none' ? 'menu' : 'none')} className="p-1.5 text-zinc-400 hover:text-emerald-500 hover:bg-zinc-800/80 rounded-lg transition-colors focus:outline-none active:scale-95">
+               <Menu className="w-5 h-5"/>
+             </button>
+             <h1 className="text-lg font-bold tracking-tight text-emerald-500">Emerald Chat</h1>
+          </div>
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setSelectedProfileId(currentUserProfile.id)}
@@ -314,19 +552,22 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           <div className="space-y-2">
             {messages.map((msg, index) => {
               return (
-                <div key={msg.id || index} className="flex flex-col group py-1 hover:bg-zinc-900/50 transition-colors -mx-4 px-4 rounded-lg">
-                  <div className="flex items-start gap-3 cursor-pointer" onClick={() => setSelectedProfileId(msg.user_id)}>
+                <div key={msg.id || index} className="flex flex-col group py-1.5 hover:bg-zinc-900/50 transition-colors -mx-4 px-4 rounded-lg">
+                  <div className="flex items-start gap-3">
                     <img 
                       src={msg.profiles?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=default'} 
                       alt="Avatar" 
-                      className="h-[42px] w-[42px] rounded-md object-cover shrink-0 mt-0.5 border border-zinc-800"
+                      className="h-[42px] w-[42px] rounded-md object-cover shrink-0 mt-0.5 border border-zinc-800 cursor-pointer"
+                      onClick={() => setSelectedProfileId(msg.user_id)}
                     />
-                    <div className="flex flex-col">
-                      <div className="flex items-baseline gap-2 leading-none mb-1">
-                        <span className="font-bold text-[15px] hover:underline" style={{ color: msg.user_id === currentUserProfile.id ? '#10b981' : 'white' }}>{msg.profiles?.username || 'Unknown'}</span>
-                        <span className="text-xs text-zinc-500">{format(new Date(msg.created_at), 'dd/MM HH:mm')}</span>
+                    <div className="flex flex-col w-full">
+                      <div className="flex items-baseline justify-between mb-0.5">
+                        <div className="flex items-baseline gap-2 leading-none">
+                          <span className="font-bold text-[15px] hover:underline cursor-pointer" onClick={() => setSelectedProfileId(msg.user_id)} style={{ color: msg.user_id === currentUserProfile.id ? '#10b981' : 'white' }}>{msg.profiles?.username || 'Unknown'}</span>
+                          <span className="text-xs text-zinc-500">{format(new Date(msg.created_at), 'dd/MM HH:mm')}</span>
+                        </div>
                       </div>
-                      <div className="text-zinc-200 text-[15px] leading-relaxed break-words">
+                      <div className="text-zinc-200 text-[15px] leading-relaxed break-words relative pr-12">
                         <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
                           {scrubContent(msg.content)}
                         </Markdown>
@@ -362,8 +603,8 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         </div>
       </div>
 
-      {/* Sidebar */}
-      <div className="hidden w-[280px] flex-col border-l border-zinc-800 bg-[#141416] lg:flex">
+      {/* Right Sidebar */}
+      <div className="hidden w-[280px] flex-col border-l border-zinc-800 bg-[#141416] lg:flex shrink-0">
         <div className="px-4 py-4">
           <div className="flex items-center gap-2 px-1">
             <span className="text-xs font-bold tracking-wider text-zinc-400 uppercase">Online — {onlineUsers.length}</span>
@@ -428,12 +669,26 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
         setLoading(false);
         return;
       }
-      const { data } = await supabase.from('profiles').select('*').eq('id', profileId).single();
-      setProfile(data);
+      const { data } = await supabase.from('profiles').select('*, profile_likes(id, user_id)').eq('id', profileId).single();
+      setProfile(data as any);
       setLoading(false);
     };
     fetchProfile();
   }, [profileId]);
+
+  const handleLikeProfile = async () => {
+    if (!profile) return;
+    const hasLiked = profile.profile_likes?.some((l: any) => l.user_id === currentUserId);
+    if (hasLiked) {
+      await supabase.from('profile_likes').delete().eq('target_profile_id', profileId).eq('user_id', currentUserId);
+      setProfile({ ...profile, profile_likes: profile.profile_likes?.filter((l: any) => l.user_id !== currentUserId) });
+    } else {
+      const { data } = await supabase.from('profile_likes').insert({ target_profile_id: profileId, user_id: currentUserId }).select().single();
+      if (data) {
+        setProfile({ ...profile, profile_likes: [...(profile.profile_likes || []), data] });
+      }
+    }
+  };
 
   const handleImageUpload = async (file: File, bucket: 'avatars' | 'banners') => {
     if (!profile) return;
@@ -519,7 +774,21 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
               </div>
 
               <div>
-                <h3 className="text-xl font-bold text-white">{profile!.username}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-bold text-white">{profile!.username}</h3>
+                  {!isSelf && profile!.id !== TEST_BOT.id && (
+                    <button onClick={handleLikeProfile} className="flex items-center gap-1.5 focus:outline-none transition-transform hover:scale-110 active:scale-95 group" title="Like Profile">
+                      <Heart className={`w-5 h-5 transition-colors ${profile.profile_likes?.some((l: any) => l.user_id === currentUserId) ? 'fill-emerald-500 text-emerald-500' : 'text-zinc-500 group-hover:text-emerald-400'}`} />
+                      <span className="text-sm font-bold text-zinc-400">{profile.profile_likes?.length || 0}</span>
+                    </button>
+                  )}
+                  {isSelf && (
+                     <div className="flex items-center gap-1.5 cursor-default text-emerald-500 ml-1" title="Profile Likes">
+                       <Heart className="w-5 h-5 fill-emerald-500" />
+                       <span className="text-sm font-bold">{profile.profile_likes?.length || 0}</span>
+                     </div>
+                  )}
+                </div>
                 {bioData.mood && (
                   <p className="text-sm mt-1 mb-1 text-emerald-400 font-medium">{bioData.mood}</p>
                 )}
