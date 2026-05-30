@@ -13,7 +13,7 @@ const IMAGE_EXT_REGEX = /\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i;
 const FORBIDDEN_TLDS = /\.(online|site|indevs\.in)(\/.*)?$/i;
 
 export const DEV_EMAILS = ['test@gmail.com', 'dev@gmail.com', 'haydensixseven@gmail.com'];
-export const FOUNDER_EMAILS: string[] = []; // Add emails here
+export const FOUNDER_EMAILS: string[] = ['minlee214@gmail.com']; // Add emails here
 export const MOP_EMAILS: string[] = []; // Add emails here
 export const SUPERADMIN_EMAILS: string[] = [];
 export const ADMIN_EMAILS: string[] = [];
