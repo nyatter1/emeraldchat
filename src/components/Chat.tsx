@@ -257,10 +257,20 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const audioNewNews = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    audioNewMsg.current = new Audio('/new_messages.mp3');
+    audioNewMsg.current = new Audio('/new_message.mp3');
     audioQuote.current = new Audio('/quote.mp3');
-    audioNewNews.current = new Audio('/new_news.mp3');
+    audioNewNews.current = new Audio('/news.mp3');
   }, []);
+
+  const playSound = (audioRef: React.RefObject<HTMLAudioElement | null>) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(err => {
+        // Log error but don't crash
+        console.warn('Audio playback failed:', err);
+      });
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -324,9 +334,9 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
             const isMentioned = messageText.includes(mentionText);
             
             if (isMentioned) {
-              audioQuote.current?.play().catch(() => {});
+              playSound(audioQuote);
             } else {
-              audioNewMsg.current?.play().catch(() => {});
+              playSound(audioNewMsg);
             }
           }
 
@@ -340,7 +350,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
          setMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news' }, async (payload) => {
-        audioNewNews.current?.play().catch(() => {});
+        playSound(audioNewNews);
         setHasNewNews(true);
         const { data: profileData } = await supabase.from('profiles').select('*').eq('id', payload.new.user_id).single();
         if (profileData) {
