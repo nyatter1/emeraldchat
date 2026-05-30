@@ -27,7 +27,16 @@ export function getRank(email?: string | null, userId?: string | null, dbRank?: 
   const e = email || '';
   const uid = userId || '';
   
-  const rankFromSource = (dbRank || '').trim() || (uid ? globalRankOverrides[uid] : '') || '';
+  if (uid === 'test-bot-0000-0000' || e.toLowerCase() === 'testbot@emerald.chat') {
+    return {
+      name: 'Bot',
+      icon: 'https://img.icons8.com/fluency/48/bot.png',
+      level: 7
+    };
+  }
+
+  const lookupKey = uid ? globalRankOverrides[uid] : (e ? globalRankOverrides[e.toLowerCase()] : '');
+  const rankFromSource = lookupKey || (dbRank && dbRank !== 'VIP' ? dbRank : null) || (uid ? globalRankOverrides[uid] : '') || (dbRank || '').trim() || '';
   
   const rankName = rankFromSource || (
     DEV_EMAILS.includes(e) ? 'Developer' :
@@ -45,11 +54,12 @@ export function getRank(email?: string | null, userId?: string | null, dbRank?: 
     'SuperAdmin': 'https://raw.githubusercontent.com/nyatter1/ranks/main/superadmin.png',
     'Admin': 'https://raw.githubusercontent.com/nyatter1/ranks/main/admin.png',
     'Mod': 'https://raw.githubusercontent.com/nyatter1/ranks/main/mod.png',
-    'VIP': 'https://raw.githubusercontent.com/nyatter1/ranks/main/vip.gif'
+    'VIP': 'https://raw.githubusercontent.com/nyatter1/ranks/main/vip.gif',
+    'Bot': 'https://img.icons8.com/fluency/48/bot.png'
   };
 
   const levels: { [key: string]: number } = {
-    'Developer': 0, 'Founder': 1, 'MoP': 2, 'SuperAdmin': 3, 'Admin': 4, 'Mod': 5, 'VIP': 6
+    'Developer': 0, 'Founder': 1, 'MoP': 2, 'SuperAdmin': 3, 'Admin': 4, 'Mod': 5, 'VIP': 6, 'Bot': 7
   };
 
   const exactRank = Object.keys(icons).find(k => k.toLowerCase() === rankName.toLowerCase()) || 'VIP';
@@ -102,26 +112,161 @@ const MarkdownComponents = {
       if (IMAGE_EXT_REGEX.test(lowerHref)) {
         return <img src={href} alt={children?.toString() || 'Image'} className="max-w-full rounded-lg my-2 border border-zinc-800" loading="lazy" />;
       }
-      return <a href={href} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline break-all" {...props}>{children}</a>;
+      return <a href={href} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline break-all" {...props}>{processChildrenWithStyles(children)}</a>;
     }
 
     // Block other domains
-    return <span className="text-zinc-500 line-through decoration-zinc-700 cursor-not-allowed" title="Link blocked for security">{children}</span>;
+    return <span className="text-zinc-500 line-through decoration-zinc-700 cursor-not-allowed" title="Link blocked for security">{processChildrenWithStyles(children)}</span>;
   },
   img: ({ src, alt }: any) => <img src={src} alt={alt} className="max-w-full rounded-lg my-2 border border-zinc-800" loading="lazy" />,
-  p: ({ children }: any) => <div className="mb-2 last:mb-0 leading-relaxed text-zinc-300 break-words">{children}</div>,
-  strong: ({ children }: any) => <strong className="font-bold text-zinc-100">{children}</strong>,
-  em: ({ children }: any) => <em className="italic text-zinc-400">{children}</em>,
-  h1: ({ children }: any) => <h1 className="text-xl font-bold text-white mt-4 mb-2">{children}</h1>,
-  h2: ({ children }: any) => <h2 className="text-lg font-bold text-white mt-3 mb-2">{children}</h2>,
-  h3: ({ children }: any) => <h3 className="text-base font-bold text-white mt-2 mb-1">{children}</h3>,
+  p: ({ children }: any) => <div className="mb-2 last:mb-0 leading-relaxed text-zinc-300 break-words">{processChildrenWithStyles(children)}</div>,
+  strong: ({ children }: any) => <strong className="font-bold text-zinc-100">{processChildrenWithStyles(children)}</strong>,
+  em: ({ children }: any) => <em className="italic text-zinc-400">{processChildrenWithStyles(children)}</em>,
+  h1: ({ children }: any) => <h1 className="text-xl font-bold text-white mt-4 mb-2">{processChildrenWithStyles(children)}</h1>,
+  h2: ({ children }: any) => <h2 className="text-lg font-bold text-white mt-3 mb-2">{processChildrenWithStyles(children)}</h2>,
+  h3: ({ children }: any) => <h3 className="text-base font-bold text-white mt-2 mb-1">{processChildrenWithStyles(children)}</h3>,
   ul: ({ children }: any) => <ul className="list-disc list-inside mb-3 space-y-1 text-zinc-300">{children}</ul>,
   ol: ({ children }: any) => <ol className="list-decimal list-inside mb-3 space-y-1 text-zinc-300">{children}</ol>,
-  li: ({ children }: any) => <li className="text-sm">{children}</li>,
-  blockquote: ({ children }: any) => <blockquote className="border-l-4 border-emerald-500/50 bg-emerald-500/5 pl-4 py-2 my-3 rounded-r-lg italic text-zinc-400">{children}</blockquote>,
+  li: ({ children }: any) => <li className="text-sm">{processChildrenWithStyles(children)}</li>,
+  blockquote: ({ children }: any) => <blockquote className="border-l-4 border-emerald-500/50 bg-emerald-500/5 pl-4 py-2 my-3 rounded-r-lg italic text-zinc-400">{processChildrenWithStyles(children)}</blockquote>,
   hr: () => <hr className="border-zinc-800 my-4" />,
   code: ({ inline, children }: any) => inline ? <code className="bg-zinc-800/50 text-emerald-400 px-1 py-0.5 rounded text-sm font-mono">{children}</code> : <code className="block bg-zinc-900 border border-zinc-800 text-zinc-300 p-3 rounded-lg text-sm font-mono my-2 overflow-x-auto whitespace-pre-wrap">{children}</code>
 };
+
+export const GOOGLE_FONTS_PRESETS = [
+  'Creepster',
+  'Orbitron',
+  'Press Start 2P',
+  'Cinzel Decorative',
+  'Pacifico',
+  'Rubik Glitch',
+  'Nosifer',
+  'Special Elite',
+  'Bungee Spice',
+  'Monoton',
+  'Rye',
+  'Faster One',
+  'Eater'
+];
+
+export function ensureFontLoaded(fontName: string) {
+  if (!fontName) return;
+  if (GOOGLE_FONTS_PRESETS.includes(fontName)) {
+    const linkId = `gfont-${fontName.toLowerCase().replace(/\s+/g, '-')}`;
+    if (!document.getElementById(linkId)) {
+      const link = document.createElement('link');
+      link.id = linkId;
+      link.rel = 'stylesheet';
+      link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/\s+/g, '+')}&display=swap`;
+      document.head.appendChild(link);
+    }
+  }
+}
+
+export function injectCustomFonts(customFonts?: Record<string, string>) {
+  if (!customFonts) return;
+  Object.entries(customFonts).forEach(([fontName, fontUrl]) => {
+    const styleId = `custom-font-${fontName.toLowerCase()}`;
+    if (!document.getElementById(styleId)) {
+      const styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      styleEl.innerHTML = `
+        @font-face {
+          font-family: '${fontName}';
+          src: url('${fontUrl}') format('truetype');
+          font-display: swap;
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
+  });
+}
+
+export function parseComplexStyles(text: string): React.ReactNode[] {
+  if (!text || typeof text !== 'string') return [text];
+
+  const regex = /\[style(?: font="([^"]*)")?(?: effect="([^"]*)")?(?: color="([^"]*)")?\]([\s\S]*?)\[\/style\]/g;
+  
+  const result: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    const matchIndex = match.index;
+    
+    if (matchIndex > lastIndex) {
+      result.push(text.substring(lastIndex, matchIndex));
+    }
+
+    const font = match[1] || '';
+    const effect = match[2] || '';
+    const color = match[3] || '';
+    const content = match[4] || '';
+
+    if (font) {
+      ensureFontLoaded(font);
+    }
+
+    const style: React.CSSProperties = {};
+    if (font) {
+      style.fontFamily = `'${font}', sans-serif`;
+    }
+    if (color) {
+      style.color = color;
+    }
+
+    let effectClass = '';
+    if (effect) {
+      effectClass = `font-effect-${effect.toLowerCase()}`;
+    }
+
+    result.push(
+      <span 
+        key={matchIndex} 
+        className={`${effectClass} inline-block`} 
+        style={style}
+      >
+        {content}
+      </span>
+    );
+
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    result.push(text.substring(lastIndex));
+  }
+
+  return result.length > 0 ? result : [text];
+}
+
+export function processChildrenWithStyles(children: any): any {
+  if (typeof children === 'string') {
+    return parseComplexStyles(children);
+  }
+  if (Array.isArray(children)) {
+    return children.flatMap(child => {
+      if (typeof child === 'string') {
+        return parseComplexStyles(child);
+      }
+      return child;
+    });
+  }
+  return children;
+}
+
+export function UserProfileFontsLoader({ bio }: { bio: string | null | undefined }) {
+  useEffect(() => {
+    if (!bio) return;
+    try {
+      const bioData = parseBio(bio);
+      if (bioData.custom_fonts) {
+        injectCustomFonts(bioData.custom_fonts);
+      }
+    } catch (e) {}
+  }, [bio]);
+  return null;
+}
 
 export interface BioData {
   text: string;
@@ -130,6 +275,7 @@ export interface BioData {
   profile_music_source?: string;
   profile_card_bg?: string;
   assigned_ranks?: Record<string, string>;
+  custom_fonts?: Record<string, string>;
 }
 
 export function parseBio(bioStr: string | null | undefined): BioData {
@@ -142,7 +288,8 @@ export function parseBio(bioStr: string | null | undefined): BioData {
       profile_music_type: data.profile_music_type || '',
       profile_music_source: data.profile_music_source || '',
       profile_card_bg: data.profile_card_bg || '',
-      assigned_ranks: data.assigned_ranks || {}
+      assigned_ranks: data.assigned_ranks || {},
+      custom_fonts: data.custom_fonts || {}
     };
   } catch (e) {}
   return { text: bioStr, mood: '' };
@@ -173,6 +320,7 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
   
   return (
     <div className="bg-[#141416] border border-zinc-800 rounded-xl p-4 flex flex-col gap-3 relative group">
+       <UserProfileFontsLoader bio={news.profiles?.bio} />
        {isDev && (
          <button onClick={() => handleDeleteNews(news.id)} className="absolute top-4 right-4 text-zinc-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Delete News">
            <X className="w-5 h-5"/>
@@ -220,7 +368,7 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
            <div className="flex flex-col gap-3 mt-1 animate-in fade-in slide-in-from-top-1 duration-200">
              <div className="space-y-3 max-h-[250px] overflow-y-auto custom-scrollbar pr-1">
                {news.news_comments?.map((comment: any) => (
-                 <div key={comment.id} className="flex gap-2.5">
+                 <div key={comment.id} className="flex gap-2.5"><UserProfileFontsLoader bio={comment.profiles?.bio} />
                    <img src={comment.profiles?.avatar_url} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" alt="" />
                    <div className="flex flex-col bg-[#1e1e22] rounded-2xl px-3 py-2 w-fit max-w-[90%]">
                      <span className="flex items-center gap-1.5 text-[13px] font-bold text-zinc-200 leading-tight mb-0.5">
@@ -585,6 +733,8 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
             const updatedAssignments = { ...currentAssignments, [targetProfile.id]: exactRankName };
             const updatedBio = JSON.stringify({ ...bioObj, assigned_ranks: updatedAssignments });
             await supabase.from('profiles').update({ bio: updatedBio }).eq('id', testProfile.id);
+            setRankOverrides(updatedAssignments);
+            globalRankOverrides = updatedAssignments;
           }
           toast.success(`Successfully set rank for "${targetProfile.username}" to ${exactRankName}!`);
         } else {
@@ -596,6 +746,8 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
             const updatedAssignments = { ...currentAssignments, [targetInput.toLowerCase()]: exactRankName };
             const updatedBio = JSON.stringify({ ...bioObj, assigned_ranks: updatedAssignments });
             await supabase.from('profiles').update({ bio: updatedBio }).eq('id', testProfile.id);
+            setRankOverrides(updatedAssignments);
+            globalRankOverrides = updatedAssignments;
             toast.success(`Fallback mapping persisted for: "${targetInput}" to ${exactRankName}`);
           } else {
             toast.error('Database match or administrator record could not be located.');
@@ -958,6 +1110,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                     : ''
                   }`}
                 >
+                  <UserProfileFontsLoader bio={msg.profiles?.bio} />
                   <div className="flex items-start gap-3">
                     <img 
                       src={msg.profiles?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=default'} 
@@ -1216,6 +1369,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <UserProfileFontsLoader bio={profile?.bio} />
       <div className="w-full max-w-md overflow-hidden rounded-2xl bg-[#141416] border border-zinc-800 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
         
         <button onClick={onClose} className="absolute right-3 top-3 z-10 p-1.5 bg-black/40 text-white rounded-full hover:bg-black/60 transition-colors">
@@ -1410,7 +1564,11 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
       )}
       {activeEditModal === 'bio' && (
         <EditModal title="Edit Bio" onClose={() => setActiveEditModal(null)} onSave={(val) => {
-          const newBio = stringifyBio({ ...bioData, text: val.bio });
+          const newBio = stringifyBio({ 
+            ...bioData, 
+            text: val.bio, 
+            custom_fonts: val.custom_fonts || {} 
+          });
           updateProfileData({ bio: newBio });
         }}>
           {(props) => <BioEditForm profile={profile!} {...props} />}
@@ -1456,7 +1614,7 @@ function EditModal({ title, onClose, onSave, children }: any) {
   const [data, setData] = useState({});
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-sm rounded-xl bg-zinc-900 border border-zinc-700 p-6">
+      <div className={`w-full ${title === 'Edit Bio' ? 'max-w-lg md:max-w-xl' : 'max-w-sm'} rounded-xl bg-zinc-900 border border-zinc-700 p-6 transition-all`}>
         <h3 className="text-lg font-semibold text-white mb-4">{title}</h3>
         {children({ data, setData })}
         <div className="mt-6 flex justify-end gap-3">
@@ -1506,11 +1664,18 @@ function UsernameEditForm({ profile, data, setData }: any) {
 
 function BioEditForm({ profile, data, setData }: any) {
   const [uploading, setUploading] = useState(false);
+  const [fontUploading, setFontUploading] = useState(false);
+  const [selectedFont, setSelectedFont] = useState('');
+  const [selectedEffect, setSelectedEffect] = useState('');
+  const [selectedColor, setSelectedColor] = useState('#ffffff');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => { 
     const bioData = parseBio(profile.bio);
-    setData({ bio: bioData.text });
+    setData({ bio: bioData.text, custom_fonts: bioData.custom_fonts || {} });
+    if (bioData.custom_fonts) {
+      injectCustomFonts(bioData.custom_fonts);
+    }
   }, []);
 
   const insertText = (before: string, after: string = '') => {
@@ -1549,6 +1714,59 @@ function BioEditForm({ profile, data, setData }: any) {
     setUploading(false);
   };
 
+  const handleFontUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.name.toLowerCase().endsWith('.ttf')) {
+      alert("Only TrueType Font (.ttf) files are supported.");
+      return;
+    }
+
+    setFontUploading(true);
+    try {
+      const fileExt = 'ttf';
+      const cleanBase = file.name.substring(0, file.name.lastIndexOf('.')).replace(/[^a-zA-Z0-9]/g, '');
+      const uniqueFontName = `Font_${cleanBase}_${Math.floor(Math.random() * 1000)}`;
+      const fileName = `${uniqueFontName}.${fileExt}`;
+      const filePath = `${profile.id}/fonts/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
+      if (uploadError) {
+        alert("Font upload failed: " + uploadError.message);
+        return;
+      }
+
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+
+      const styleId = `custom-font-${uniqueFontName.toLowerCase()}`;
+      if (!document.getElementById(styleId)) {
+        const styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        styleEl.innerHTML = `
+          @font-face {
+            font-family: '${uniqueFontName}';
+            src: url('${publicUrl}') format('truetype');
+            font-display: swap;
+          }
+        `;
+        document.head.appendChild(styleEl);
+      }
+
+      const updatedFonts = { ...(data.custom_fonts || {}), [uniqueFontName]: publicUrl };
+      setData({
+        ...data,
+        custom_fonts: updatedFonts
+      });
+      
+      setSelectedFont(uniqueFontName);
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    } finally {
+      setFontUploading(false);
+    }
+  };
+
   const addSpotify = () => {
     const url = prompt("Enter Spotify Track/Album/Playlist URL:");
     if (url) {
@@ -1567,10 +1785,163 @@ function BioEditForm({ profile, data, setData }: any) {
     }
   }
 
+  const applyCustomFormatting = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentText = data.bio ?? '';
+    const selectedText = currentText.substring(start, end);
+
+    if (start === end) {
+      alert("Please highlight/select a word or sentence in the textarea below first!");
+      return;
+    }
+
+    let beforeTag = '[style';
+    if (selectedFont) {
+      beforeTag += ` font="${selectedFont}"`;
+    }
+    if (selectedEffect) {
+      beforeTag += ` effect="${selectedEffect}"`;
+    }
+    if (selectedColor && selectedColor !== '#ffffff') {
+      beforeTag += ` color="${selectedColor}"`;
+    }
+    beforeTag += ']';
+    const afterTag = '[/style]';
+
+    insertText(beforeTag, afterTag);
+  };
+
+  const customFontKeys = Object.keys(data.custom_fonts || {});
+
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
-         <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Edit Bio</label>
+      {/* Font & Effect Customizer Panel */}
+      <div className="bg-[#141416] border border-zinc-800 rounded-xl p-4 my-2 flex flex-col gap-3">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center justify-between">
+          <span>✨ Custom Font & Effect Stylist</span>
+          <span className="text-[10px] text-zinc-500 font-normal lowercase italic">Highlight text first</span>
+        </h4>
+
+        {/* Font Select and Upload */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+          <div>
+            <label className="text-[11px] text-zinc-400 font-medium mb-1 block">Choose Font</label>
+            <select 
+              value={selectedFont} 
+              onChange={e => {
+                const fontName = e.target.value;
+                setSelectedFont(fontName);
+                if (GOOGLE_FONTS_PRESETS.includes(fontName)) {
+                  ensureFontLoaded(fontName);
+                }
+              }} 
+              className="w-full bg-[#1e1e22] text-xs border border-zinc-800 rounded-lg px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-emerald-500"
+            >
+              <option value="">Default Font</option>
+              {customFontKeys.length > 0 && (
+                <optgroup label="Uploaded Fonts">
+                  {customFontKeys.map(fk => (
+                    <option key={fk} value={fk}>{fk}</option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Default Google Fonts">
+                {GOOGLE_FONTS_PRESETS.map(fp => (
+                  <option key={fp} value={fp}>{fp}</option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+
+          <div className="flex gap-2">
+            <label className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#1e1e22] hover:bg-[#25252a] border border-zinc-800 hover:border-emerald-500/50 text-[11px] font-medium text-zinc-200 rounded-lg cursor-pointer transition-all select-none h-[32px]">
+              {fontUploading ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                  <span>Uploading...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Upload .ttf Font</span>
+                </>
+              )}
+              <input type="file" className="hidden" accept=".ttf" onChange={handleFontUpload} disabled={fontUploading} />
+            </label>
+          </div>
+        </div>
+
+        {/* Effect Select & Color Select */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+          <div>
+            <label className="text-[11px] text-zinc-400 font-medium mb-1 block">Choose Effect & Animation</label>
+            <select 
+              value={selectedEffect} 
+              onChange={e => setSelectedEffect(e.target.value)} 
+              className="w-full bg-[#1e1e22] text-xs border border-zinc-800 rounded-lg px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-emerald-500"
+            >
+              <option value="">No Animation Effect</option>
+              <option value="rainbow">🌈 Rainbow Glow spectrum</option>
+              <option value="glow">🟢 Pulsing Neon Glow</option>
+              <option value="spin">🌀 Gentle Spin 3D</option>
+              <option value="bounce">🦘 Happy jumping bounce</option>
+              <option value="glitch">👾 Cyber Glitch analog</option>
+              <option value="shake">⚡ Hyper Jittery Shake</option>
+              <option value="flicker">💡 Flickering Neon Sign</option>
+              <option value="skew">〰️ Smooth Yaw Wobble</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[11px] text-zinc-400 font-medium mb-1 block">Text Color</label>
+            <div className="flex items-center gap-2">
+              <input 
+                type="color" 
+                value={selectedColor} 
+                onChange={e => setSelectedColor(e.target.value)}
+                className="w-8 h-8 rounded-md border border-zinc-800 bg-[#1e1e22] cursor-pointer"
+              />
+              <span className="text-xs text-zinc-400 uppercase font-mono">{selectedColor}</span>
+              <button 
+                type="button" 
+                onClick={() => setSelectedColor('#ffffff')} 
+                className="text-[10px] text-zinc-500 hover:text-white underline cursor-pointer"
+              >
+                Reset to White
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Style Preview Area */}
+        <div className="border border-zinc-800/60 bg-zinc-950/50 rounded-lg p-2.5 flex flex-col items-center justify-center overflow-hidden min-h-[50px] relative">
+          <span 
+            style={{ 
+              fontFamily: selectedFont ? `'${selectedFont}', sans-serif` : 'inherit',
+              color: selectedColor 
+            }}
+            className={`${selectedEffect ? `font-effect-${selectedEffect}` : ''} text-sm font-bold tracking-wide transition-all`}
+          >
+            Style Preview Text
+          </span>
+        </div>
+
+        {/* Action Button */}
+        <button 
+          type="button" 
+          onClick={applyCustomFormatting}
+          className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
+        >
+          <span>✨ Apply Customized Style to Selected Text</span>
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between pb-1 flex-wrap gap-2 mt-2">
+         <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Edit Bio Text</label>
          <div className="flex bg-[#141416] rounded-lg p-1 gap-0.5 border border-zinc-800 flex-wrap">
            <button title="Bold" type="button" onClick={() => insertText('**', '**')} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded font-bold text-zinc-300">B</button>
            <button title="Italic" type="button" onClick={() => insertText('_', '_')} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded italic text-zinc-300 font-serif">I</button>
@@ -1613,7 +1984,7 @@ function BioEditForm({ profile, data, setData }: any) {
            </label>
          </div>
       </div>
-      <textarea ref={textareaRef} rows={8} value={data.bio ?? ''} onChange={e => setData({...data, bio: e.target.value})} className="w-full bg-[#1e1e22] border border-zinc-800 rounded-md px-3 py-2 text-white resize-none font-mono text-sm leading-relaxed custom-scrollbar focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none" placeholder="Type *bold*, _italic_, or Spotify links here..." />
+      <textarea ref={textareaRef} rows={8} value={data.bio ?? ''} onChange={e => setData({...data, bio: e.target.value})} className="w-full bg-[#1e1e22] border border-zinc-800 rounded-md px-3 py-2 text-white resize-none font-mono text-sm leading-relaxed custom-scrollbar focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none" placeholder="Highlight some text above to apply customized style tags..." />
     </div>
   )
 }
