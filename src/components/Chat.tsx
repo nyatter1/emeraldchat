@@ -23,8 +23,7 @@ const MarkdownComponents = {
   a: ({ node, href, children, ...props }: any) => {
     if (href && SPOTIFY_URL_REGEX.test(href)) {
       return (
-        <div className="flex flex-col gap-1 w-full max-w-sm">
-          <a href={href} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline break-all">{children}</a>
+        <div className="flex flex-col gap-1 w-full max-w-sm mt-1">
           <SpotifyEmbed url={href} />
         </div>
       );
@@ -61,10 +60,22 @@ export function stringifyBio(data: BioData): string {
   return JSON.stringify(data);
 }
 
+const TEST_BOT: Profile = {
+  id: 'test-bot-0000-0000',
+  username: 'TestBot',
+  email: 'testbot@emerald.chat',
+  age: 9999,
+  gender: 'Robot',
+  bio: '{"text":"I keep the chat clean by wiping messages when they reach 500! *Beep boop*","mood":"Running routine maintenance 🧹"}',
+  avatar_url: 'https://api.dicebear.com/7.x/bottts/svg?seed=EmeraldBot&backgroundColor=10b981',
+  banner_url: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop',
+  updated_at: new Date().toISOString()
+};
+
 export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { currentUserProfile: Profile, onSignOut: () => void, onProfileUpdate: (p: Profile) => void }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [onlineUsers, setOnlineUsers] = useState<Profile[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<Profile[]>([TEST_BOT]);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -109,6 +120,9 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
          });
         }
       })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, (payload) => {
+         setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+      })
       .subscribe();
 
     // Setup Presence for online users
@@ -120,6 +134,11 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         const users = Object.values(newState).flat().map((p: any) => p.profile) as Profile[];
         // Filter unique by id just in case
         const uniqueUsers = Array.from(new Map(users.map(u => [u.id, u])).values());
+        
+        if (!uniqueUsers.find(u => u.id === TEST_BOT.id)) {
+          uniqueUsers.unshift(TEST_BOT);
+        }
+        
         setOnlineUsers(uniqueUsers);
       })
       .subscribe(async (status) => {
@@ -161,6 +180,15 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       console.error('Error sending message', error);
       // Rollback optimistic update on error by removing tempId
       setMessages(prev => prev.filter(m => m.id !== tempId));
+    } else {
+      // If we crossed a threshold and RPC exists, clear them
+      if (messages.length >= 500) {
+         try {
+           await supabase.rpc('clear_messages');
+         } catch (err) {
+           // User needs to execute the new sql to create the function
+         }
+      }
     }
   };
 
@@ -311,6 +339,11 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
   useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
+      if (profileId === TEST_BOT.id) {
+        setProfile(TEST_BOT);
+        setLoading(false);
+        return;
+      }
       const { data } = await supabase.from('profiles').select('*').eq('id', profileId).single();
       setProfile(data);
       setLoading(false);

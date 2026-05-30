@@ -61,6 +61,14 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
+-- TestBot RPC to clear old messages
+CREATE OR REPLACE FUNCTION public.clear_messages()
+RETURNS void AS $$
+BEGIN
+  DELETE FROM public.messages;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Setup Storage for avatars and banners
 INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true) ON CONFLICT DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('banners', 'banners', true) ON CONFLICT DO NOTHING;
