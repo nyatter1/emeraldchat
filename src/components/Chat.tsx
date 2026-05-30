@@ -384,6 +384,12 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           const isA_Bot = a.id === TEST_BOT.id;
           const isB_Bot = b.id === TEST_BOT.id;
 
+          const isA_Dev = rankA === 0;
+          const isB_Dev = rankB === 0;
+
+          if (isA_Dev && !isB_Dev) return -1;
+          if (isB_Dev && !isA_Dev) return 1;
+          
           if (isA_Bot && !isB_Bot) return -1;
           if (isB_Bot && !isA_Bot) return 1;
 
