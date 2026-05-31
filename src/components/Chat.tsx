@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile, Message, News, ProfileLike } from '../types';
-import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, Sparkles } from 'lucide-react';
+import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, Sparkles, ArrowLeft, Globe, User, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import Markdown from 'react-markdown';
@@ -657,6 +657,14 @@ export function getBorderStyles(borderId: string | undefined): { id: string; nam
 
 export let globalRankOverrides: Record<string, string> = {};
 
+export function getCustomRanks(): {name: string, icon: string, level: number}[] {
+  try {
+    return JSON.parse(localStorage.getItem('emerald_custom_ranks') || '[]');
+  } catch(e) { 
+    return []; 
+  }
+}
+
 export function getRank(email?: string | null, userId?: string | null, dbRank?: string | null) {
   const e = email || '';
   const uid = userId || '';
@@ -681,6 +689,10 @@ export function getRank(email?: string | null, userId?: string | null, dbRank?: 
     MOD_EMAILS.includes(e) ? 'Mod' : 'VIP'
   );
 
+  const customRanks = getCustomRanks();
+  const customIcons = customRanks.reduce((acc, rank) => ({...acc, [rank.name]: rank.icon}), {} as Record<string, string>);
+  const customLevels = customRanks.reduce((acc, rank) => ({...acc, [rank.name]: rank.level}), {} as Record<string, number>);
+
   const icons: { [key: string]: string } = {
     'Developer': 'https://raw.githubusercontent.com/nyatter1/ranks/main/verified.gif',
     'Founder': 'https://raw.githubusercontent.com/nyatter1/ranks/main/founder.gif',
@@ -689,11 +701,13 @@ export function getRank(email?: string | null, userId?: string | null, dbRank?: 
     'Admin': 'https://raw.githubusercontent.com/nyatter1/ranks/main/admin.png',
     'Mod': 'https://raw.githubusercontent.com/nyatter1/ranks/main/mod.png',
     'VIP': 'https://raw.githubusercontent.com/nyatter1/ranks/main/vip.gif',
-    'Bot': 'https://img.icons8.com/fluency/48/bot.png'
+    'Bot': 'https://img.icons8.com/fluency/48/bot.png',
+    ...customIcons
   };
 
   const levels: { [key: string]: number } = {
-    'Developer': 0, 'Founder': 1, 'MoP': 2, 'SuperAdmin': 3, 'Admin': 4, 'Mod': 5, 'VIP': 6, 'Bot': 7
+    'Developer': 0, 'Founder': 1, 'MoP': 2, 'SuperAdmin': 3, 'Admin': 4, 'Mod': 5, 'VIP': 6, 'Bot': 7,
+    ...customLevels
   };
 
   const exactRank = Object.keys(icons).find(k => k.toLowerCase() === rankName.toLowerCase()) || 'VIP';
@@ -1078,11 +1092,88 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
   )
 }
 
+function DeveloperPanel({ onClose }: { onClose: () => void }) {
+  const [ranks, setRanks] = useState<{name: string, icon: string, level: number}[]>(getCustomRanks());
+  const [newName, setNewName] = useState('');
+  const [newIcon, setNewIcon] = useState('');
+
+  const handleSave = () => {
+    if (!newName || !newIcon) return toast.error('Name and Icon are required');
+    const newRanks = [...ranks, { name: newName, icon: newIcon, level: 6 }];
+    setRanks(newRanks);
+    localStorage.setItem('emerald_custom_ranks', JSON.stringify(newRanks));
+    setNewName('');
+    setNewIcon('');
+    toast.success('Custom rank added!');
+  };
+
+  const handleRemove = (name: string) => {
+    const newRanks = ranks.filter(r => r.name !== name);
+    setRanks(newRanks);
+    localStorage.setItem('emerald_custom_ranks', JSON.stringify(newRanks));
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in font-sans">
+      <div className="w-full max-w-xl bg-[#0c0c0c] border border-emerald-500/20 rounded-3xl p-6 shadow-2xl relative flex flex-col gap-6">
+        <button onClick={onClose} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X className="w-5 h-5"/></button>
+        <div className="flex items-center gap-3 border-b border-zinc-900 pb-4">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+            <ShieldCheck className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-white uppercase tracking-wider">Developer Workspace</h2>
+            <p className="text-xs text-zinc-400 font-bold tracking-widest uppercase">System Customization</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <div className="bg-[#141416] border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
+            <h3 className="text-sm font-black text-emerald-400 uppercase tracking-widest">Create Custom Rank</h3>
+            <div className="flex gap-2">
+              <input 
+                value={newName} 
+                onChange={e => setNewName(e.target.value)} 
+                placeholder="Rank Name" 
+                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors"
+               />
+              <input 
+                value={newIcon} 
+                onChange={e => setNewIcon(e.target.value)} 
+                placeholder="Icon URL (.gif/.png)" 
+                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors"
+               />
+            </div>
+            <button onClick={handleSave} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-colors">
+              Save Rank
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+             {ranks.map(r => (
+               <div key={r.name} className="flex flex-row items-center justify-between bg-[#141416] border border-zinc-800 rounded-xl p-3">
+                 <div className="flex items-center gap-3">
+                   <img src={r.icon} alt={r.name} className="h-6 object-contain" />
+                   <span className="font-bold text-sm text-white">{r.name}</span>
+                 </div>
+                 <button onClick={() => handleRemove(r.name)} className="text-red-500 hover:text-red-400 text-xs font-bold uppercase tracking-widest px-2">Delete</button>
+               </div>
+             ))}
+             {ranks.length === 0 && <div className="text-zinc-500 text-xs text-center py-4 font-bold uppercase tracking-wider">No custom ranks created</div>}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
 export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { currentUserProfile: Profile, onSignOut: () => void, onProfileUpdate: (p: Profile) => void }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [onlineUsers, setOnlineUsers] = useState<Profile[]>([TEST_BOT]);
   const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
+  const [showDeveloperPanel, setShowDeveloperPanel] = useState(false);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [leftPanelMode, setLeftPanelMode] = useState<'none' | 'menu' | 'news' | 'rules'>('none');
   const [newsFeed, setNewsFeed] = useState<News[]>([]);
@@ -1353,19 +1444,30 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     const args = content.split(' ');
     const commandName = args[0].toLowerCase();
 
+    if (commandName === '/dev') {
+      setNewMessage('');
+      if (!DEV_EMAILS.includes(currentUserProfile.email) && currentUserProfile.email !== 'test@gmail.com') {
+        toast.error('You do not have permission to use /dev');
+        return;
+      }
+      setShowDeveloperPanel(true);
+      return;
+    }
+
     if (commandName === '/ranks') {
       setNewMessage('');
-      if (currentUserProfile.email !== 'test@gmail.com') {
+      if (!DEV_EMAILS.includes(currentUserProfile.email) && currentUserProfile.email !== 'test@gmail.com') {
         toast.error('You do not have permission to use /ranks');
         return;
       }
-      toast.success(`Available Ranks: ${RANK_ORDER.join(', ')}`, { duration: 6000 });
+      const customRanks = getCustomRanks().map(r => r.name);
+      toast.success(`Available Ranks: ${[...RANK_ORDER, ...customRanks].join(', ')}`, { duration: 6000 });
       return;
     }
 
     if (commandName === '/rank') {
       setNewMessage('');
-      if (currentUserProfile.email !== 'test@gmail.com') {
+      if (!DEV_EMAILS.includes(currentUserProfile.email) && currentUserProfile.email !== 'test@gmail.com') {
         toast.error('You do not have permission to use /rank');
         return;
       }
@@ -1376,11 +1478,14 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       }
 
       const targetInput = args[1].trim();
-      const rankInput = args[2].trim();
+      const rankInput = args.slice(2).join(' ').trim();
 
-      const exactRankName = RANK_ORDER.find(r => r.toLowerCase() === rankInput.toLowerCase());
+      const customRanks = getCustomRanks().map(r => r.name);
+      const allPossibleRanks = [...RANK_ORDER, ...customRanks];
+
+      const exactRankName = allPossibleRanks.find(r => r.toLowerCase() === rankInput.toLowerCase());
       if (!exactRankName) {
-        toast.error(`Invalid rank. Available: ${RANK_ORDER.join(', ')}`);
+        toast.error(`Invalid rank. Available: ${allPossibleRanks.join(', ')}`);
         return;
       }
 
@@ -1975,6 +2080,10 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         />
       )}
 
+      {showDeveloperPanel && (
+        <DeveloperPanel onClose={() => setShowDeveloperPanel(false)} />
+      )}
+
     </div>
   );
 }
@@ -2451,148 +2560,146 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
   );
 }
 
+function CosmeticShopLayout({
+  title,
+  tag = "FREE",
+  onClose,
+  onSave,
+  onPrev,
+  onNext,
+  onViewGrid,
+  screen,
+  previewNode,
+  gridNode,
+}: any) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto font-sans">
+      <style dangerouslySetInnerHTML={{ __html: BORDER_KEYFRAMES }} />
+      <style dangerouslySetInnerHTML={{ __html: EFFECTS_KEYFRAMES }} />
+      <div className="w-full max-w-xl bg-[#0c0c0c] border border-zinc-800/80 rounded-[2rem] shadow-2xl overflow-hidden my-auto shrink-0 relative animate-fade-in flex flex-col p-6 pt-5">
+        {/* Header */}
+        <div className="w-full flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl sm:text-lg font-black text-white tracking-tight">{title}</h2>
+            <span className="px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-black tracking-widest uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{tag}</span>
+          </div>
+          <button onClick={onClose} className="px-3 sm:px-3 py-1.5 rounded-lg bg-[#141414] border border-zinc-800 text-xs font-bold text-zinc-300 flex items-center gap-1.5 hover:bg-zinc-800 hover:text-white transition-all">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Content Area */}
+        <div className="w-full flex flex-col items-center flex-1">
+          {screen === 'preview' ? (
+            <>
+              {/* Preview Form */}
+              <div className="w-full mb-6 max-w-sm">
+                {previewNode}
+              </div>
+
+              {/* Action Bar */}
+              <div className="w-full flex-1 flex flex-col max-w-sm">
+                <div className="grid grid-cols-[1fr_2fr_1fr] gap-3 sm:gap-4 items-center mb-0 mt-auto">
+                  <div className="flex flex-col items-center text-center">
+                    <button onClick={onPrev} className="w-full h-11 rounded-xl bg-[#141414] border border-zinc-800 flex items-center justify-center hover:bg-zinc-800 transition-all active:scale-95">
+                      <ChevronLeft className="w-5 h-5 text-zinc-400" />
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col items-center text-center">
+                     <button onClick={onSave} className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-black border border-emerald-500 flex items-center justify-center gap-2 transition-all font-black text-xs uppercase tracking-widest active:scale-95">
+                      <Check className="w-4 h-4" />
+                      SAVE
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col items-center text-center">
+                    <button onClick={onNext} className="w-full h-11 rounded-xl bg-[#141414] border border-zinc-800 flex items-center justify-center hover:bg-zinc-800 transition-all active:scale-95">
+                      <ChevronRight className="w-5 h-5 text-zinc-400" />
+                    </button>
+                  </div>
+                </div>
+                
+                <button onClick={onViewGrid} className="w-full mt-4 h-11 rounded-xl bg-[#141414] border border-zinc-800 flex items-center justify-center gap-2 hover:bg-zinc-800 transition-all font-bold text-[10px] uppercase tracking-widest text-zinc-400 hover:text-zinc-200">
+                  <Grid className="w-3.5 h-3.5" />
+                  VIEW GRID
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="w-full bg-[#141416]/50 border border-zinc-800 rounded-2xl p-4 lg:p-6 h-full flex flex-col min-h-[400px]">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-zinc-300 font-black text-xs uppercase tracking-wider">CHOOSE FROM GRID</h3>
+                <button onClick={() => onViewGrid()} className="text-zinc-500 hover:text-white flex items-center gap-1.5 font-bold text-[10px] uppercase tracking-widest bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800">
+                  <ChevronLeft className="w-3.5 h-3.5" /> BACK
+                </button>
+              </div>
+              <div className="w-full flex-1 overflow-y-auto custom-scrollbar pr-2 min-h-0">
+                {gridNode}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CosmeticCardPreview({ profile, borderId, effectId, bioData }: { profile: Profile; borderId: string; effectId: string; bioData: any }) {
-  const [activeTab, setActiveTab] = useState<'bio' | 'info'>('bio');
-  
   const resolvedBorder = getBorderStyles(borderId) || {
     id: 'none',
-    name: 'No border',
     className: '',
     cardStyle: {}
   };
 
   const isRainbowActive = borderId === 'rainbow-wave' || borderId === 'rainbow-neon' || effectId === 'psychedelic';
 
-  const infoCountry = (profile as any).country || 'United States';
-  const infoLanguage = (profile as any).language || 'English';
-  const infoFriends = '18 Online';
-  const previewGender = profile.gender || 'Not Specified';
-  const previewAge = profile.age || 'Age N/A';
-
   return (
-    <div className="w-full md:w-[350px] shrink-0 flex flex-col bg-[#141416]/40 border border-[#1e1e22] rounded-2xl p-4 gap-4 justify-between animate-fade-in font-sans">
-      <div className="w-full text-center">
-        <span className="text-[10px] uppercase tracking-[0.2em] font-black text-zinc-550">Live card preview</span>
+    <div 
+      style={resolvedBorder.cardStyle} 
+      className={`w-full rounded-[2.5rem] bg-[#0c0c0c] relative flex flex-col items-center pb-8 shadow-2xl overflow-hidden ${(resolvedBorder.className && resolvedBorder.className !== '') ? resolvedBorder.className : 'border border-zinc-800'}`}
+    >
+      {/* Background Effect */}
+      {effectId === 'none' && bioData?.profile_card_bg && (
+        <div 
+          style={{ backgroundImage: `url(${bioData.profile_card_bg})` }}
+          className="absolute inset-0 bg-cover bg-center opacity-20 pointer-events-none" 
+        />
+      )}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <ProfileEffectRenderer effectId={effectId} />
       </div>
 
-      <div 
-        style={resolvedBorder.cardStyle} 
-        className={`w-full overflow-hidden rounded-2xl bg-[#141416] border shadow-2xl relative select-none shrink-0 transition-all duration-300 ${resolvedBorder.className || ''} flex flex-col h-[400px]`}
-      >
-        {/* Banner staying in background */}
-        <div className="h-24 w-full relative shrink-0 z-0 border-b border-zinc-900/40 opacity-90">
-          <img 
-            src={profile.banner_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop'} 
-            alt="Banner" 
-            className="h-full w-full object-cover" 
-          />
-        </div>
+      {/* Banner */}
+      <div className="w-full h-32 sm:h-40 relative z-10 opacity-80 border-b border-zinc-900 shadow-inner">
+        <img 
+          src={profile.banner_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop'} 
+          alt="Banner" 
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0c0c0c]/10 to-[#0c0c0c]" />
+      </div>
 
-        {/* Card Background image center layer */}
+      {/* Avatar Container */}
+      <div className="relative z-20 -mt-[4rem] flex flex-col items-center">
         <div 
-          style={effectId === 'none' && bioData?.profile_card_bg ? {
-            backgroundImage: `url(${bioData.profile_card_bg})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-          } : undefined}
-          className="flex-1 flex flex-col relative overflow-hidden animate-fade-in"
+          className="w-28 h-28 rounded-[1.5rem] overflow-hidden border-8 border-[#0c0c0c] bg-zinc-900 shadow-[0_10px_40px_rgba(0,0,0,0.5)]" 
+          style={resolvedBorder.cardStyle}
         >
-          {effectId === 'none' && bioData?.profile_card_bg && (
-            <div className="absolute inset-0 bg-zinc-950/85 backdrop-blur-[1px] z-0 pointer-events-none" />
-          )}
-
-          <ProfileEffectRenderer effectId={effectId} />
-
-          <div className="relative z-10 flex flex-col h-full overflow-y-auto pb-4 custom-scrollbar">
-            <div className="px-5 pb-3 relative shrink-0">
-              <div className="flex justify-between items-end">
-                {/* Profile picture sits correctly on top of card with negative margin */}
-                <div className="relative border-4 border-[#141416] rounded-full h-18 w-18 bg-zinc-800 shrink-0 overflow-hidden -mt-9 z-20">
-                  <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover rounded-full" />
-                </div>
-              </div>
-
-              <div className="mt-2 text-left">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h3 className={`text-base font-bold ${isRainbowActive ? 'rainbow-text' : 'text-white'}`}>{profile.username}</h3>
-                  <div className="flex items-center gap-1 cursor-default text-emerald-505 ml-1">
-                    <Heart className="w-4 h-4 fill-emerald-500 animate-pulse text-emerald-500" />
-                    <span className="text-[11px] font-bold text-emerald-500">{profile.profile_likes?.length || 0}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 mt-1 mb-1">
-                  <img src={getRank(profile.email, profile.id, profile.rank).icon} alt={getRank(profile.email, profile.id, profile.rank).name} className="h-3.5 object-contain" />
-                  <span className={`text-xs font-bold ${isRainbowActive ? 'rainbow-text' : 'text-zinc-300'}`}>{getRank(profile.email, profile.id, profile.rank).name}</span>
-                </div>
-                {bioData?.mood && (
-                  <p className={`text-xs mt-0.5 font-medium ${isRainbowActive ? 'rainbow-text' : 'text-emerald-450'}`}>{bioData.mood}</p>
-                )}
-              </div>
-            </div>
-
-            {/* About Me versus Info content tabs */}
-            <div className="flex flex-col flex-1 pb-4 shadow-inner">
-              <div className="flex gap-4 border-b border-zinc-800/80 px-5 shrink-0 h-8">
-                <button 
-                  type="button" 
-                  onClick={() => setActiveTab('bio')} 
-                  className={`pb-0.5 flex items-center border-b-2 font-medium transition-colors text-xs ${activeTab === 'bio' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
-                >
-                  About Me
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setActiveTab('info')} 
-                  className={`pb-0.5 flex items-center border-b-2 font-medium transition-colors text-xs ${activeTab === 'info' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
-                >
-                  Info
-                </button>
-              </div>
-
-              <div className="h-32 overflow-y-auto px-5 py-2.5 custom-scrollbar z-10 relative">
-                {activeTab === 'bio' ? (
-                  <div className="text-[11px] text-zinc-350 leading-relaxed text-left font-sans">
-                    {bioData?.text ? (
-                      <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
-                        {scrubContent(bioData.text)}
-                      </Markdown>
-                    ) : (
-                      <p className="text-zinc-500">No bio provided yet.</p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-2 text-[11px] text-zinc-350 text-left font-sans">
-                    <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
-                      <span className="text-zinc-404">Last online</span>
-                      <span>{profile.updated_at ? format(new Date(profile.updated_at), 'dd MMM yyyy, HH:mm') : 'Online Now'}</span>
-                    </div>
-                    <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
-                      <span className="text-zinc-404">👥 Friends</span>
-                      <span>{infoFriends}</span>
-                    </div>
-                    <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
-                      <span className="text-zinc-404">🌐 Country</span>
-                      <span>{infoCountry}</span>
-                    </div>
-                    <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
-                      <span className="text-zinc-404">💬 Language</span>
-                      <span>{infoLanguage}</span>
-                    </div>
-                    <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
-                      <span className="text-zinc-404">Gender</span>
-                      <span>{previewGender}</span>
-                    </div>
-                    <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
-                      <span className="text-zinc-404">Age</span>
-                      <span>{previewAge}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+           <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
         </div>
+        
+        {/* Rank Icon */}
+        <div className="-mt-3 z-30 drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]">
+          <img src={getRank(profile.email, profile.id, profile.rank).icon} alt="Rank" className="h-6 object-contain" />
+        </div>
+      </div>
+
+      {/* Username */}
+      <div className="relative z-20 flex flex-col items-center mt-3 px-6 text-center w-full">
+        <h2 className={`font-black uppercase tracking-wider text-2xl ${isRainbowActive ? 'rainbow-text' : 'text-zinc-100'} drop-shadow-md`}>
+          {profile.username}
+        </h2>
       </div>
     </div>
   );
@@ -2614,8 +2721,6 @@ function ProfileBordersModal({ profile, bioData, onClose, onSave }: any) {
     }
   }, [previewBorderId]);
 
-  const currentBorder = PROFILE_BORDERS[index] || PROFILE_BORDERS[0];
-
   const handlePrev = () => {
     const nextIdx = (index - 1 + PROFILE_BORDERS.length) % PROFILE_BORDERS.length;
     setIndex(nextIdx);
@@ -2634,145 +2739,72 @@ function ProfileBordersModal({ profile, bioData, onClose, onSave }: any) {
     toast.success('Profile border applied successfully!');
   };
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto select-none font-sans">
-      <style dangerouslySetInnerHTML={{ __html: BORDER_KEYFRAMES }} />
-      <style dangerouslySetInnerHTML={{ __html: EFFECTS_KEYFRAMES }} />
-      <div className="w-full max-w-4xl bg-[#09090b] border border-zinc-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 relative shadow-[0_0_50px_rgba(0,0,0,0.9)] max-h-[92vh] overflow-y-auto md:overflow-hidden animate-fade-in duration-200">
-        
-        <CosmeticCardPreview profile={profile} borderId={previewBorderId} effectId={bioData?.profile_effect || 'none'} bioData={bioData} />
+  const previewNode = (
+    <CosmeticCardPreview profile={profile} borderId={previewBorderId} effectId={bioData?.profile_effect || 'none'} bioData={bioData} />
+  );
 
-        <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1 select-none custom-scrollbar justify-between">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-900 text-left">
-              <span className="text-white font-black text-sm tracking-wide uppercase">
-                Profile Borders Shop
-              </span>
-              <span className="text-[9px] font-black uppercase tracking-widest text-[#888] bg-zinc-900 border border-zinc-850 rounded-full px-3 py-1">
-                Border Cosmetics
-              </span>
-            </div>
+  const gridNode = (
+    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4 sm:gap-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar pb-6">
+      <button
+        type="button"
+        onClick={() => {
+          setPreviewBorderId('none');
+          setIndex(0);
+          setScreen('preview');
+        }}
+        className={`aspect-square text-xs font-black rounded-[2rem] flex flex-col items-center justify-center transition-all ${
+          previewBorderId === 'none' 
+            ? 'bg-emerald-500/10 border-2 border-emerald-500 shadow-lg text-emerald-400 font-extrabold' 
+            : 'bg-[#1a1a1a] border border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:bg-zinc-800'
+        }`}
+      >
+        <span className="text-2xl mb-1 mt-1">⦸</span>
+        NONE
+      </button>
 
-            {screen === 'preview' ? (
-              <div className="flex flex-col gap-5 py-4 animate-in fade-in duration-200">
-                <div className="p-4 bg-zinc-950/40 border border-zinc-900 rounded-xl text-left">
-                  <span className="text-[10px] uppercase tracking-[0.25em] font-black text-zinc-505">Selected Frame</span>
-                  <h4 className="text-lg font-black text-emerald-400 mt-1">{currentBorder?.name}</h4>
-                  <p className="text-xs text-zinc-400 mt-2 leading-relaxed font-normal">
-                    This premium card frame borders your profile card with professional high-glow visual elements.
-                  </p>
-                </div>
+      {PROFILE_BORDERS.slice(1).map((border, bIdx) => {
+        const borderActualIdx = bIdx + 1;
+        const isSelected = previewBorderId === border.id;
 
-                <div className="flex items-center justify-between gap-3">
-                  <button 
-                    type="button" 
-                    onClick={handlePrev}
-                    className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
-                    title="Previous Border"
-                  >
-                    <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
-                  </button>
-
-                  <button 
-                    type="button" 
-                    onClick={() => setScreen('grid')}
-                    className="flex-1 h-12 rounded-xl bg-[#141416] border border-zinc-800 hover:bg-zinc-800 hover:text-white flex items-center justify-center gap-2 text-zinc-300 text-xs font-black tracking-wider uppercase active:scale-95 transition-all outline-none"
-                  >
-                    <Grid className="w-4 h-4 text-emerald-400" />
-                    <span>View Grid</span>
-                  </button>
-
-                  <button 
-                    type="button" 
-                    onClick={handleNext}
-                    className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
-                    title="Next Border"
-                  >
-                    <ChevronRight className="w-5 h-5 stroke-[2.5]" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4 animate-in fade-in duration-200">
-                <button
-                  type="button"
-                  onClick={() => setScreen('preview')}
-                  className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 transition-colors border border-zinc-800"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Back to Custom Preview</span>
-                </button>
-
-                <div className="grid grid-cols-5 gap-2.5 max-h-[300px] overflow-y-auto pr-1 select-none custom-scrollbar pb-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPreviewBorderId('none');
-                      setIndex(0);
-                      setScreen('preview');
-                    }}
-                    className={`aspect-square text-xs font-black rounded-xl flex items-center justify-center transition-all ${
-                      previewBorderId === 'none' 
-                        ? 'bg-emerald-500/10 border-2 border-emerald-500 shadow-lg text-emerald-404 font-extrabold' 
-                        : 'bg-[#141416]/40 border border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:bg-zinc-805'
-                    }`}
-                  >
-                    ⦸
-                  </button>
-
-                  {PROFILE_BORDERS.slice(1).map((border, bIdx) => {
-                    const borderActualIdx = bIdx + 1;
-                    const isSelected = previewBorderId === border.id;
-
-                    return (
-                      <button
-                        key={border.id}
-                        type="button"
-                        onClick={() => {
-                          setPreviewBorderId(border.id);
-                          setIndex(borderActualIdx);
-                          setScreen('preview');
-                        }}
-                        style={border.cardStyle}
-                        className={`aspect-square text-[10px] font-black rounded-lg flex items-center justify-center transition-all relative ${
-                          isSelected 
-                            ? 'ring-2 ring-emerald-500 scale-105 z-10' 
-                            : 'hover:scale-105 bg-zinc-850/10 border border-zinc-800 hover:bg-zinc-800'
-                        }`}
-                        title={border.name}
-                      >
-                        <span className="absolute inset-0.5 bg-[#09090b]/85 rounded-lg z-0 flex items-center justify-center font-mono font-black text-white text-[11px]">
-                          {borderActualIdx}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="w-full flex flex-col gap-2 pt-4 border-t border-zinc-900 mt-auto">
-            <button 
-              type="button"
-              onClick={handleSave}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs tracking-wider uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-emerald-500/50"
-            >
-              <Check className="w-4 h-4 stroke-[3]" />
-              <span>Save Border</span>
-            </button>
-            <button 
-              type="button"
-              onClick={onClose}
-              className="w-full py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 font-extrabold uppercase tracking-widest text-center transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-
-      </div>
+        return (
+          <button
+            key={border.id}
+            type="button"
+            onClick={() => {
+              setPreviewBorderId(border.id);
+              setIndex(borderActualIdx);
+              setScreen('preview');
+            }}
+            style={border.cardStyle}
+            className={`aspect-square text-[10px] font-black rounded-[2rem] flex items-center justify-center transition-all relative ${
+              isSelected 
+                ? 'ring-4 ring-emerald-500/30 scale-105 z-10 shadow-2xl' 
+                : 'hover:scale-105 bg-[#1a1a1a] border border-zinc-800 hover:bg-zinc-800'
+            }`}
+            title={border.name}
+          >
+            <span className="absolute inset-1 bg-[#141416]/90 rounded-[1.75rem] z-0 flex items-center justify-center font-mono font-black text-white text-sm">
+              {borderActualIdx === index && isSelected ? '✓' : borderActualIdx}
+            </span>
+          </button>
+        );
+      })}
     </div>
+  );
+
+  return (
+    <CosmeticShopLayout
+      title="Profile Borders"
+      tag="FREE"
+      onClose={onClose}
+      onSave={handleSave}
+      onPrev={handlePrev}
+      onNext={handleNext}
+      onViewGrid={() => setScreen(screen === 'preview' ? 'grid' : 'preview')}
+      screen={screen}
+      previewNode={previewNode}
+      gridNode={gridNode}
+    />
   );
 }
 
@@ -2789,8 +2821,6 @@ function ProfileEffectsModal({ profile, bioData, onClose, onSave }: any) {
     const idx = PROFILE_EFFECTS.findIndex(e => e.id === previewEffectId);
     if (idx >= 0) setIndex(idx);
   }, [previewEffectId]);
-
-  const currentEffect = PROFILE_EFFECTS[index] || PROFILE_EFFECTS[0];
 
   const handlePrev = () => {
     const nextIdx = (index - 1 + PROFILE_EFFECTS.length) % PROFILE_EFFECTS.length;
@@ -2814,140 +2844,56 @@ function ProfileEffectsModal({ profile, bioData, onClose, onSave }: any) {
     toast.success('Profile effect applied successfully!');
   };
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto select-none font-sans">
-      <style dangerouslySetInnerHTML={{ __html: BORDER_KEYFRAMES }} />
-      <style dangerouslySetInnerHTML={{ __html: EFFECTS_KEYFRAMES }} />
-      <div className="w-full max-w-4xl bg-[#09090b] border border-zinc-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 relative shadow-[0_0_50px_rgba(0,0,0,0.9)] max-h-[92vh] overflow-y-auto md:overflow-hidden animate-fade-in duration-200">
-        
-        <CosmeticCardPreview profile={profile} borderId={bioData?.profile_border || 'none'} effectId={previewEffectId} bioData={bioData} />
+  const previewNode = (
+    <CosmeticCardPreview profile={profile} borderId={bioData?.profile_border || 'none'} effectId={previewEffectId} bioData={bioData} />
+  );
 
-        <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1 select-none custom-scrollbar justify-between">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-900 text-left">
-              <span className="text-white font-black text-sm tracking-wide uppercase">
-                Profile Effects Shop
-              </span>
-              <span className="text-[9px] font-black uppercase tracking-widest text-[#888] bg-zinc-900 border border-zinc-850 rounded-full px-3 py-1">
-                Visual Cosmos
-              </span>
+  const gridNode = (
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar pb-6">
+      {PROFILE_EFFECTS.map((eff) => {
+        const isSelected = previewEffectId === eff.id;
+
+        return (
+          <button
+            key={eff.id}
+            type="button"
+            onClick={() => {
+              setPreviewEffectId(eff.id);
+              setScreen('preview');
+            }}
+            className={`p-0 rounded-[2rem] flex flex-col items-center text-center h-[140px] justify-center transition-all border relative overflow-hidden group ${
+              isSelected 
+                ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)] font-bold scale-105 z-10' 
+                : 'border-zinc-800 hover:border-zinc-700 hover:scale-105'
+            }`}
+          >
+            <div className="absolute inset-0 bg-[#0c0c0c] z-0" />
+            <div className="absolute inset-0 z-0 pointer-events-none opacity-70 group-hover:opacity-100 transition-opacity">
+              <ProfileEffectRenderer effectId={eff.id} />
             </div>
-
-            {screen === 'preview' ? (
-              <div className="flex flex-col gap-5 py-4 animate-in fade-in duration-200">
-                <div className="p-4 bg-zinc-950/40 border border-zinc-900 rounded-xl text-left">
-                  <span className="text-[10px] uppercase tracking-[0.25em] font-black text-zinc-500">Selected Atmos</span>
-                  <span className="text-xs uppercase px-2 py-0.5 rounded border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 float-right font-black tracking-wide">
-                    {currentEffect?.category}
-                  </span>
-                  <h4 className="text-lg font-black text-emerald-400 mt-1">{currentEffect?.name}</h4>
-                  <p className="text-xs text-zinc-350 font-medium italic mt-1 bg-black/20 p-2 rounded border border-zinc-900 leading-normal mb-2.5 font-normal">
-                    "{currentEffect?.tagline}"
-                  </p>
-                  <p className="text-xs text-zinc-400 leading-relaxed font-normal animate-fade-in">
-                    {currentEffect?.description}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between gap-3">
-                  <button 
-                    type="button" 
-                    onClick={handlePrev}
-                    className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
-                    title="Previous Effect"
-                  >
-                    <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
-                  </button>
-
-                  <button 
-                    type="button" 
-                    onClick={() => setScreen('grid')}
-                    className="flex-1 h-12 rounded-xl bg-[#141416] border border-zinc-800 hover:bg-zinc-800 hover:text-white flex items-center justify-center gap-2 text-zinc-300 text-xs font-black tracking-wider uppercase active:scale-95 transition-all outline-none"
-                  >
-                    <Grid className="w-4 h-4 text-emerald-400" />
-                    <span>View Grid</span>
-                  </button>
-
-                  <button 
-                    type="button" 
-                    onClick={handleNext}
-                    className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
-                    title="Next Effect"
-                  >
-                    <ChevronRight className="w-5 h-5 stroke-[2.5]" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4 animate-in fade-in duration-200">
-                <button
-                  type="button"
-                  onClick={() => setScreen('preview')}
-                  className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 transition-colors border border-zinc-800"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Back to Custom Preview</span>
-                </button>
-
-                <div className="grid grid-cols-2 gap-2.5 max-h-[300px] overflow-y-auto pr-1 select-none custom-scrollbar pb-1">
-                  {PROFILE_EFFECTS.map((eff) => {
-                    const isSelected = previewEffectId === eff.id;
-                    const catIcon = eff.category === 'cyber' ? '🤖' :
-                                    eff.category === 'retro' ? '📼' :
-                                    eff.category === 'nature' ? '🌿' :
-                                    eff.category === 'cosmic' ? '🌌' :
-                                    eff.category === 'premium' ? '👑' :
-                                    eff.category === 'mystic' ? '🔮' : '✨';
-
-                    return (
-                      <button
-                        key={eff.id}
-                        type="button"
-                        onClick={() => {
-                          setPreviewEffectId(eff.id);
-                          setScreen('preview');
-                        }}
-                        className={`p-3 rounded-xl flex flex-col items-start text-left min-h-[95px] transition-all border relative overflow-hidden ${
-                          isSelected 
-                            ? 'border-emerald-500 bg-emerald-500/10 text-white ring-1 ring-emerald-500 font-bold font-sans' 
-                            : 'border-zinc-850 bg-[#141416]/40 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/10 hover:text-white'
-                        }`}
-                      >
-                        <span className="text-base">{catIcon}</span>
-                        <span className="text-[11px] font-black mt-1.5 leading-tight">{eff.name}</span>
-                        <span className="text-[9px] text-zinc-500 mt-1 line-clamp-2 leading-snug">{eff.description}</span>
-                        {isSelected && (
-                          <div className="absolute top-2 right-2 text-emerald-400 font-black text-xs">●</div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="w-full flex flex-col gap-2 pt-4 border-t border-zinc-900 mt-auto">
-            <button 
-              type="button"
-              onClick={handleSave}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs tracking-wider uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-emerald-500/50"
-            >
-              <Check className="w-4 h-4 stroke-[3]" />
-              <span>Save Effect</span>
-            </button>
-            <button 
-              type="button"
-              onClick={onClose}
-              className="w-full py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 font-extrabold uppercase tracking-widest text-center transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-
-      </div>
+            <div className="relative z-10 mt-auto w-full bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 flex items-end justify-center h-full">
+              <span className={`text-[10px] font-black uppercase tracking-widest leading-tight ${isSelected ? 'text-white' : 'text-zinc-300 group-hover:text-white'} drop-shadow-md`}>{eff.name}</span>
+            </div>
+            {isSelected && <span className="absolute top-4 right-4 text-emerald-400 font-bold text-xs z-20">●</span>}
+          </button>
+        );
+      })}
     </div>
+  );
+
+  return (
+    <CosmeticShopLayout
+      title="Profile Effects"
+      tag="PREMIUM"
+      onClose={onClose}
+      onSave={handleSave}
+      onPrev={handlePrev}
+      onNext={handleNext}
+      onViewGrid={() => setScreen(screen === 'preview' ? 'grid' : 'preview')}
+      screen={screen}
+      previewNode={previewNode}
+      gridNode={gridNode}
+    />
   );
 }
 
@@ -2992,149 +2938,74 @@ function ProfileCombosModal({ profile, bioData, onClose, onSave }: any) {
     toast.success('Curated combo preset applied successfully!');
   };
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto select-none font-sans animate-fade-in">
-      <style dangerouslySetInnerHTML={{ __html: BORDER_KEYFRAMES }} />
-      <style dangerouslySetInnerHTML={{ __html: EFFECTS_KEYFRAMES }} />
-      <div className="w-full max-w-4xl bg-[#09090b] border border-zinc-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 relative shadow-[0_0_50px_rgba(0,0,0,0.9)] max-h-[92vh] overflow-y-auto md:overflow-hidden animate-fade-in duration-200">
-        
-        <CosmeticCardPreview profile={profile} borderId={previewBorderId} effectId={previewEffectId} bioData={bioData} />
+  const previewNode = (
+    <CosmeticCardPreview profile={profile} borderId={previewBorderId} effectId={previewEffectId} bioData={bioData} />
+  );
 
-        <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1 select-none custom-scrollbar justify-between">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-900 text-left">
-              <span className="text-white font-black text-sm tracking-wide uppercase">
-                Curated Combos Shop
-              </span>
-              <span className="text-[9px] font-black uppercase tracking-widest text-[#888] bg-zinc-900 border border-zinc-850 rounded-full px-3 py-1">
-                Curated Presets
-              </span>
+  const gridNode = (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar pb-6">
+      {PROFILE_COMBOS.map((combo, cIdx) => {
+        const isSelected = index === cIdx;
+        const borderObj = getBorderStyles(combo.borderId);
+        const effectObj = PROFILE_EFFECTS.find(e => e.id === combo.effectId);
+
+        return (
+          <button
+            key={combo.id}
+            type="button"
+            onClick={() => {
+              setIndex(cIdx);
+              setScreen('preview');
+            }}
+            style={borderObj.cardStyle}
+            className={`h-[150px] p-0 rounded-[2.5rem] flex flex-col items-center justify-center text-center transition-all relative overflow-hidden group ${borderObj.className ? borderObj.className : 'border border-zinc-800'} ${
+              isSelected 
+                ? 'scale-105 z-10' 
+                : 'hover:scale-[1.02]'
+            }`}
+          >
+            <div className="absolute inset-0 bg-[#0c0c0c] z-0" />
+            <div className="absolute inset-0 z-0 pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity">
+               <ProfileEffectRenderer effectId={combo.effectId} />
             </div>
 
-            {screen === 'preview' ? (
-              <div className="flex flex-col gap-5 py-4 animate-in fade-in duration-200">
-                <div className="p-4 bg-zinc-950/40 border border-zinc-900 rounded-xl relative overflow-hidden text-left">
-                  <span className="text-[10px] uppercase tracking-[0.25em] font-black text-zinc-500">Selected Combo</span>
-                  <span 
-                    style={{ borderColor: currentCombo?.themeColor, color: currentCombo?.themeColor, backgroundColor: `${currentCombo?.themeColor}10` }}
-                    className="text-[8px] font-black uppercase px-2 py-0.5 rounded border float-right font-mono animate-pulse"
-                  >
-                    {currentCombo?.badge}
-                  </span>
-                  
-                  <h4 className="text-lg font-black text-emerald-400 mt-1">{currentCombo?.name}</h4>
-                  <p className="text-xs text-zinc-400 mt-2.5 leading-relaxed font-normal">
-                    This curated aesthetic combo pairs the legendary <strong className="text-zinc-200 font-bold">{(getBorderStyles(currentCombo?.borderId) || { name: 'Custom Border' }).name}</strong> frame with the atmospheric <strong className="text-zinc-200 font-bold">{PROFILE_EFFECTS.find(e => e.id === currentCombo?.effectId)?.name || 'Classic'}</strong> visual overlay.
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between gap-3">
-                  <button 
-                    type="button" 
-                    onClick={handlePrev}
-                    className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-805 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
-                    title="Previous Combo"
-                  >
-                    <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
-                  </button>
-
-                  <button 
-                    type="button" 
-                    onClick={() => setScreen('grid')}
-                    className="flex-1 h-12 rounded-xl bg-[#141416] border border-zinc-80D hover:bg-zinc-800 hover:text-white flex items-center justify-center gap-2 text-zinc-300 text-xs font-black tracking-wider uppercase active:scale-95 transition-all outline-none"
-                  >
-                    <Grid className="w-4 h-4 text-emerald-400" />
-                    <span>View Grid</span>
-                  </button>
-
-                  <button 
-                    type="button" 
-                    onClick={handleNext}
-                    className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-805 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
-                    title="Next Combo"
-                  >
-                    <ChevronRight className="w-5 h-5 stroke-[2.5]" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4 animate-in fade-in duration-200 font-sans">
-                <button
-                  type="button"
-                  onClick={() => setScreen('preview')}
-                  className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 transition-colors border border-zinc-800"
+            <div className="relative z-10 p-4 h-full flex flex-col justify-end w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent">
+              <div className="flex items-center justify-between w-full gap-2 mt-auto">
+                <span className="text-[11px] font-black uppercase tracking-wider text-white drop-shadow-[0_0_5px_rgba(0,0,0,1)] truncate" style={{ color: combo.themeColor }}>{combo.name}</span>
+                <span 
+                  style={{ borderColor: combo.themeColor, color: combo.themeColor, backgroundColor: `${combo.themeColor}20` }}
+                  className="text-[8px] font-black uppercase px-2 py-0.5 rounded border shrink-0 font-mono shadow-[0_0_10px_rgba(0,0,0,0.8)] backdrop-blur-sm"
                 >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Back to Custom Preview</span>
-                </button>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1 select-none custom-scrollbar pb-1">
-                  {PROFILE_COMBOS.map((combo, cIdx) => {
-                    const isSelected = index === cIdx;
-                    const borderObj = getBorderStyles(combo.borderId);
-                    const effectObj = PROFILE_EFFECTS.find(e => e.id === combo.effectId);
-
-                    return (
-                      <button
-                        key={combo.id}
-                        type="button"
-                        onClick={() => {
-                          setIndex(cIdx);
-                          setScreen('preview');
-                        }}
-                        className={`p-3.5 rounded-xl flex flex-col text-left transition-all border relative overflow-hidden group ${
-                          isSelected 
-                            ? 'border-emerald-500 bg-emerald-500/10 text-white ring-1 ring-emerald-500 font-bold' 
-                            : 'border-zinc-850 bg-[#141416]/40 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/30'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between w-full gap-2 font-sans">
-                          <span className="text-[11px] font-bold text-white group-hover:text-emerald-400 transition-colors truncate">{combo.name}</span>
-                          <span 
-                            style={{ borderColor: combo.themeColor, color: combo.themeColor, backgroundColor: `${combo.themeColor}10` }}
-                            className="text-[8px] font-black uppercase px-2 py-0.5 rounded border shrink-0 font-mono"
-                          >
-                            {combo.badge}
-                          </span>
-                        </div>
-                        
-                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                          <span className="text-[8px] font-mono bg-[#09090b] border border-zinc-850 px-1.5 py-0.5 rounded text-zinc-400 font-bold">
-                            ⚙️ {borderObj ? borderObj.name : 'Custom'}
-                          </span>
-                          <span className="text-[8px] font-mono bg-[#09090b] border border-zinc-850 px-1.5 py-0.5 rounded text-zinc-400 font-bold">
-                            🔮 {effectObj ? effectObj.name : 'None'}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                  {combo.badge}
+                </span>
               </div>
-            )}
-          </div>
-
-          <div className="w-full flex flex-col gap-2 pt-4 border-t border-zinc-900 mt-auto">
-            <button 
-              type="button"
-              onClick={handleSave}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs tracking-wider uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-emerald-500/50 animate-fade-in"
-            >
-              <Check className="w-4 h-4 stroke-[3]" />
-              <span>Save Combo</span>
-            </button>
-            <button 
-              type="button"
-              onClick={onClose}
-              className="w-full py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 font-extrabold uppercase tracking-widest text-center transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-
-      </div>
+              <div className="flex items-center gap-2 mt-2 truncate w-full text-left">
+                <span className="text-[8px] font-black uppercase tracking-wider bg-black/60 backdrop-blur-sm border border-zinc-700/50 px-1.5 py-0.5 rounded text-zinc-300 truncate">
+                  {borderObj.name}
+                </span>
+              </div>
+            </div>
+            
+            {isSelected && <div className="absolute top-4 right-4 bg-emerald-500 rounded-full w-2 h-2 shadow-[0_0_10px_#10b981] z-20" />}
+          </button>
+        );
+      })}
     </div>
+  );
+
+  return (
+    <CosmeticShopLayout
+      title="Curated Combos"
+      tag="VIP"
+      onClose={onClose}
+      onSave={handleSave}
+      onPrev={handlePrev}
+      onNext={handleNext}
+      onViewGrid={() => setScreen(screen === 'preview' ? 'grid' : 'preview')}
+      screen={screen}
+      previewNode={previewNode}
+      gridNode={gridNode}
+    />
   );
 }
 
@@ -3627,37 +3498,35 @@ function ProfileBorderForm({ profile, onClose, onSave, bioData, initialTab }: an
                           setPreviewBorderId(combo.borderId);
                           setPreviewEffectId(combo.effectId);
                         }}
-                        className={`p-3.5 rounded-xl flex flex-col text-left transition-all border relative overflow-hidden group ${
+                        style={borderObj.cardStyle}
+                        className={`p-0 rounded-xl flex flex-col text-left transition-all relative overflow-hidden group min-h-[120px] ${borderObj.className ? borderObj.className : 'border border-zinc-800'} ${
                           isSelected 
-                            ? 'border-emerald-500 bg-emerald-500/10 text-white ring-1 ring-emerald-500' 
-                            : 'border-zinc-850 bg-[#141416]/40 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/30 hover:text-white'
+                            ? 'scale-105 z-10' 
+                            : 'hover:scale-[1.02] opacity-80 hover:opacity-100'
                         }`}
                       >
-                        <div className="flex items-center justify-between w-full gap-2">
-                          <span className="text-[11px] font-black tracking-wide text-white group-hover:text-emerald-400 transition-colors truncate">{combo.name}</span>
-                          <span 
-                            style={{ borderColor: combo.themeColor, color: combo.themeColor, backgroundColor: `${combo.themeColor}10` }}
-                            className="text-[8px] font-black uppercase px-2 py-0.5 rounded border shrink-0"
-                          >
-                            {combo.badge}
-                          </span>
-                        </div>
-                        <p className="text-[9px] text-zinc-500 font-medium leading-relaxed mt-1">Curated styling combination matching preset #{combo.id}.</p>
-                        
-                        <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-                          <span className="text-[8px] font-bold bg-[#09090b] border border-zinc-850 px-1.5 py-0.5 rounded text-zinc-400">
-                            ⚙️ {borderObj ? borderObj.name : 'Custom Border'}
-                          </span>
-                          <span className="text-[8px] font-bold bg-[#09090b] border border-zinc-850 px-1.5 py-0.5 rounded text-zinc-400">
-                            🔮 {effectObj ? effectObj.name : 'No Effect'}
-                          </span>
-                        </div>
-                        
-                        {isSelected && (
-                          <div className="absolute bottom-3 right-3 bg-emerald-500 text-black rounded-full p-0.5">
-                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                         <div className="absolute inset-0 bg-[#0c0c0c] z-0" />
+                          <div className="absolute inset-0 z-0 pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity">
+                            <ProfileEffectRenderer effectId={combo.effectId} />
                           </div>
-                        )}
+
+                          <div className="relative z-10 p-3 h-full flex flex-col w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent">
+                            <div className="flex items-center justify-between w-full mt-auto gap-2">
+                              <span className="text-[11px] font-black tracking-wide text-white drop-shadow-md truncate" style={{ color: combo.themeColor }}>{combo.name}</span>
+                              <span 
+                                style={{ borderColor: combo.themeColor, color: combo.themeColor, backgroundColor: `${combo.themeColor}10` }}
+                                className="text-[8px] font-black uppercase px-2 py-0.5 rounded border shrink-0 backdrop-blur-sm"
+                              >
+                                {combo.badge}
+                              </span>
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                              <span className="text-[8px] font-bold bg-black/60 backdrop-blur-sm border border-zinc-700/50 px-1.5 py-0.5 rounded text-zinc-300">
+                                {borderObj.name}
+                              </span>
+                            </div>
+                          </div>
                       </button>
                     );
                   })}
@@ -3692,29 +3561,25 @@ function ProfileBorderForm({ profile, onClose, onSave, bioData, initialTab }: an
 
                   {PROFILE_EFFECTS.map((eff) => {
                     const isSelected = previewEffectId === eff.id;
-                    const categoryIcon = eff.category === 'cyber' ? '🤖' :
-                                         eff.category === 'retro' ? '📼' :
-                                         eff.category === 'nature' ? '🌿' :
-                                         eff.category === 'cosmic' ? '🌌' :
-                                         eff.category === 'premium' ? '👑' :
-                                         eff.category === 'mystic' ? '🔮' : '✨';
                     return (
                       <button
                         key={eff.id}
                         type="button"
                         onClick={() => setPreviewEffectId(eff.id)}
-                        className={`p-3 rounded-xl flex flex-col items-start text-left min-h-[101px] transition-all border relative overflow-hidden ${
+                        className={`p-0 h-[100px] rounded-xl flex flex-col items-center justify-end text-center transition-all relative overflow-hidden group ${
                           isSelected 
-                            ? 'border-emerald-500 bg-emerald-500/10 text-white ring-1 ring-emerald-500' 
-                            : 'border-zinc-850 bg-[#141416]/40 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/10 hover:text-white'
+                            ? 'border border-emerald-500 scale-105 z-10' 
+                            : 'border border-zinc-800 hover:border-zinc-700 hover:scale-[1.02]'
                         }`}
                       >
-                        <span className="text-lg">{categoryIcon}</span>
-                        <span className="text-[11px] font-extrabold mt-1.5 leading-tight">{eff.name}</span>
-                        <span className="text-[9px] text-zinc-500 mt-1 line-clamp-2 leading-snug">{eff.description}</span>
-                        {isSelected && (
-                          <div className="absolute top-2 right-2 text-emerald-400 font-black text-xs">●</div>
-                        )}
+                         <div className="absolute inset-0 bg-[#0c0c0c] z-0" />
+                          <div className="absolute inset-0 z-0 pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity">
+                            <ProfileEffectRenderer effectId={eff.id} />
+                          </div>
+
+                          <div className="relative z-10 p-2 w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent">
+                            <span className="text-[10px] font-black uppercase tracking-widest leading-tight text-white drop-shadow-md">{eff.name}</span>
+                          </div>
                       </button>
                     );
                   })}

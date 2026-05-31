@@ -49,6 +49,14 @@ export const PROFILE_EFFECTS: ProfileEffect[] = [
   { id: 'pixel_dungeon', name: 'Pixel Quest', description: 'Stone bricks and floating gold diamond tokens', tagline: 'Your quest begins now.', category: 'retro' },
   { id: 'cyberpunk', name: 'Node Network', description: 'Cyber circuit boards with moving packets', tagline: 'Data is the new currency.', category: 'cyber' },
   { id: 'binary', name: 'Binary Code', description: 'Rain lines of computer zero and one code digits', tagline: 'Reading the raw core files.', category: 'cyber' },
+  { id: 'glitch', name: 'RGB Glitch', description: 'Distorted rgb color separations', tagline: 'System error detected.', category: 'cyber' },
+  { id: 'blood_moon', name: 'Blood Moon', description: 'Crimson horror drips and haze', tagline: 'The harvest begins tonight.', category: 'mystic' },
+  { id: 'butterflies', name: 'Monarch Butterflies', description: 'Floating elegant violet butterflies', tagline: 'Gentle wings in the breeze.', category: 'nature' },
+  { id: 'hologram', name: 'Holographic Scan', description: 'Sci-fi horizontal tracking scanner', tagline: 'Scanning biometrics.', category: 'cyber' },
+  { id: 'enchanted_fireflies', name: 'Enchanted Fireflies', description: 'Glowing yellow light orbs hovering in the night', tagline: 'A calm summer night.', category: 'mystic' },
+  { id: 'rain', name: 'Midnight Rain', description: 'Fast diagonal rain drops against dark glass', tagline: 'Stormy weather.', category: 'nature' },
+  { id: 'party_confetti', name: 'Party Confetti', description: 'Colorful popping shapes floating down', tagline: 'Celebration time.', category: 'premium' },
+  { id: 'aurora', name: 'Aurora Borealis', description: 'Shifting northern lights green and purple', tagline: 'Magnetic atmosphere.', category: 'cosmic' },
 ];
 
 // Curated Matching Combos presets
@@ -133,10 +141,97 @@ export const PROFILE_COMBOS: ProfileCombo[] = [
     badge: 'SWEETNESS',
     themeColor: '#f472b6'
   },
+  {
+    id: 'glitch_entity',
+    name: 'System Error 404',
+    borderId: 'hologram',
+    effectId: 'glitch',
+    badge: 'CORRUPTED',
+    themeColor: '#ef4444'
+  },
+  {
+    id: 'vampire_lord',
+    name: 'Crimson Vampire',
+    borderId: 'overlord',
+    effectId: 'blood_moon',
+    badge: 'IMMORTAL',
+    themeColor: '#991b1b'
+  },
+  {
+    id: 'cyber_hacker',
+    name: 'Cybernetic Hacker',
+    borderId: 'neon-emerald',
+    effectId: 'cyberpunk',
+    badge: 'SYSTEM',
+    themeColor: '#10b981'
+  },
+  {
+    id: 'midnight_storm',
+    name: 'Midnight Storm',
+    borderId: 'rainbow-wave',
+    effectId: 'rain',
+    badge: 'STORM',
+    themeColor: '#3b82f6'
+  },
+  {
+    id: 'party_legend',
+    name: 'Legendary Party',
+    borderId: 'royal-gold',
+    effectId: 'party_confetti',
+    badge: 'FESTIVE',
+    themeColor: '#fbbf24'
+  },
+  {
+    id: 'cosmic_aurora',
+    name: 'Northern Aura',
+    borderId: 'cosmic-purple',
+    effectId: 'aurora',
+    badge: 'CELESTIAL',
+    themeColor: '#a855f7'
+  },
 ];
 
 // CSS Keyframes representing rich and reliable CSS-based animations
 export const EFFECTS_KEYFRAMES = `
+@keyframes scanHolo {
+  0%, 100% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 0.8; }
+  50% { transform: translateY(300px); opacity: 0.8; }
+  60% { opacity: 0; }
+}
+@keyframes butterflyFly {
+  0% { transform: translate(0, 300px) rotate(-15deg) scale(0.6); opacity: 0; }
+  20% { opacity: 0.9; }
+  80% { opacity: 0.9; }
+  100% { transform: translate(60px, -50px) rotate(15deg) scale(1.1); opacity: 0; }
+}
+@keyframes rgbGlitchAnim {
+  0%, 100% { transform: translate(0); text-shadow: -2px 0 red, 2px 0 cyan; }
+  20% { transform: translate(-2px, 1px); text-shadow: 2px 0 red, -2px 0 cyan; }
+  40% { transform: translate(2px, -1px); text-shadow: -2px 0 red, 2px 0 cyan; }
+  60% { transform: translate(1px, 2px); text-shadow: 2px 0 red, -2px 0 cyan; opacity: 0.9; }
+  80% { transform: translate(-1px, -2px); text-shadow: -2px 0 red, 2px 0 cyan; opacity: 1; }
+}
+@keyframes rainDrop {
+  0% { transform: translate(0, -50px) rotate(15deg); opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.6; }
+  100% { transform: translate(-30px, 400px) rotate(15deg); opacity: 0; }
+}
+@keyframes fireflyFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+  25% { transform: translate(15px, -15px) scale(1.3); opacity: 0.9; box-shadow: 0 0 15px #fef08a; }
+  50% { transform: translate(0, -30px) scale(1); opacity: 0.6; }
+  75% { transform: translate(-15px, -15px) scale(1.2); opacity: 0.9; box-shadow: 0 0 15px #fef08a; }
+}
+@keyframes confettiFall {
+  0% { transform: translateY(-50px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(400px) rotate(720deg); opacity: 0; }
+}
+@keyframes auroraShift {
+  0%, 100% { background-position: 0% 50%; opacity: 0.3; }
+  50% { background-position: 100% 50%; opacity: 0.6; transform: scale(1.1) rotate(5deg); }
+}
 @keyframes scrollBgY {
   0% { background-position: 0 0; }
   100% { background-position: 0 400px; }
@@ -937,6 +1032,189 @@ export const ProfileEffectRenderer = ({ effectId }: { effectId: string }) => {
               </div>
             );
           })}
+        </div>
+      );
+    }
+
+    case 'blood_moon': {
+      return (
+        <div className="absolute inset-0 bg-gradient-to-b from-red-950/80 to-zinc-950 pointer-events-none overflow-hidden select-none z-0 rounded-2xl">
+          <div className="absolute top-0 inset-x-0 h-16 bg-red-800/20 blur-xl" />
+          {Array.from({ length: 8 }).map((_, i) => {
+            const size = 3 + (i % 2) * 5;
+            const left = (i * 12.5) % 95;
+            const delay = i * 1.2;
+            const duration = 4 + (i % 3) * 2;
+            return (
+              <div
+                key={i}
+                className="absolute bg-red-600/80 rounded-full"
+                style={{
+                  width: `${size}px`,
+                  height: `${size * 3}px`,
+                  left: `${left}%`,
+                  top: '-20px',
+                  boxShadow: '0 0 8px rgba(220,38,38,0.7)',
+                  animation: `fallCrumb ${duration}s infinite linear`,
+                  animationDelay: `${delay}s`,
+                }}
+              />
+            );
+          })}
+        </div>
+      );
+    }
+    
+    case 'glitch': {
+      return (
+        <div className="absolute inset-0 bg-zinc-950 pointer-events-none overflow-hidden select-none z-0 rounded-2xl flex items-center justify-center">
+          <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px]" />
+          <div className="text-4xl font-black text-transparent opacity-10" style={{ animation: 'rgbGlitchAnim 0.3s infinite steps(2)' }}>
+            ERROR
+          </div>
+        </div>
+      );
+    }
+
+    case 'butterflies': {
+      return (
+        <div className="absolute inset-0 bg-gradient-to-t from-indigo-950/40 to-zinc-950 pointer-events-none overflow-hidden select-none z-0 rounded-2xl">
+          {Array.from({ length: 6 }).map((_, i) => {
+            const size = 16 + (i % 3) * 4;
+            const left = 10 + (i * 16) % 80;
+            const delay = i * 0.9;
+            const duration = 5 + (i % 2) * 3;
+            return (
+              <div
+                key={i}
+                className="absolute text-purple-400 opacity-80 mix-blend-screen"
+                style={{
+                  fontSize: `${size}px`,
+                  left: `${left}%`,
+                  bottom: '-30px',
+                  filter: 'drop-shadow(0 0 5px rgba(168,85,247,0.6))',
+                  animation: `butterflyFly ${duration}s infinite ease-in-out`,
+                  animationDelay: `${delay}s`,
+                }}
+              >
+                🦋
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    case 'hologram': {
+      return (
+        <div className="absolute inset-0 bg-[#020617] pointer-events-none overflow-hidden select-none z-0 rounded-2xl">
+          <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(6,182,212,0.05)_50%)] bg-[length:100%_4px]" />
+          <div 
+            className="absolute inset-x-0 h-16 bg-gradient-to-b from-cyan-500/0 via-cyan-400/20 to-cyan-500/0 blur-[2px]"
+            style={{ animation: 'scanHolo 4s infinite ease-in-out' }}
+          />
+          <div 
+            className="absolute inset-x-0 h-[2px] bg-cyan-300 shadow-[0_0_10px_#22d3ee]"
+            style={{ animation: 'scanHolo 4s infinite ease-in-out' }}
+          />
+        </div>
+      );
+    }
+
+    case 'enchanted_fireflies': {
+      return (
+        <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/30 to-black pointer-events-none overflow-hidden select-none z-0 rounded-2xl">
+          {Array.from({ length: 15 }).map((_, i) => {
+            const size = 3 + (i % 3) * 2;
+            const left = 5 + (i * 17) % 90;
+            const top = 10 + (i * 23) % 80;
+            const delay = i * 0.4;
+            const duration = 4 + (i % 3) * 2.5;
+            return (
+              <div
+                key={i}
+                className="absolute bg-yellow-200 rounded-full"
+                style={{
+                  width: `${size}px`,
+                  height: `${size}px`,
+                  left: `${left}%`,
+                  top: `${top}%`,
+                  animation: `fireflyFloat ${duration}s infinite ease-in-out`,
+                  animationDelay: `${delay}s`,
+                }}
+              />
+            );
+          })}
+        </div>
+      );
+    }
+    
+    case 'rain': {
+      return (
+        <div className="absolute inset-0 bg-gradient-to-b from-blue-950/40 to-zinc-950 pointer-events-none overflow-hidden select-none z-0 rounded-2xl">
+          <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.1)_50%)] bg-[length:100%_4px]" />
+          {Array.from({ length: 40 }).map((_, i) => {
+            const h = 15 + (i % 3) * 10;
+            const left = (i * 7.5) % 110;
+            const delay = (i * 0.1) % 1.5;
+            const duration = 0.6 + (i % 3) * 0.4;
+            return (
+              <div
+                key={i}
+                className="absolute w-[1px] bg-cyan-200/40 shadow-[0_0_5px_rgba(34,211,238,0.5)]"
+                style={{
+                  height: `${h}px`,
+                  left: `${left}%`,
+                  animation: `rainDrop ${duration}s infinite linear`,
+                  animationDelay: `${delay}s`,
+                }}
+              />
+            );
+          })}
+        </div>
+      );
+    }
+    
+    case 'party_confetti': {
+      const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+      return (
+        <div className="absolute inset-0 bg-transparent pointer-events-none overflow-hidden select-none z-0 rounded-2xl">
+          {Array.from({ length: 40 }).map((_, i) => {
+            const w = 6 + (i % 3) * 4;
+            const h = 8 + (i % 2) * 4;
+            const left = (i * 9) % 100;
+            const delay = i * 0.2;
+            const duration = 3 + (i % 3) * 1.5;
+            const bg = colors[i % colors.length];
+            const isCircle = i % 4 === 0;
+            return (
+              <div
+                key={i}
+                className="absolute"
+                style={{
+                  width: `${w}px`,
+                  height: `${h}px`,
+                  left: `${left}%`,
+                  backgroundColor: bg,
+                  borderRadius: isCircle ? '50%' : '1px',
+                  animation: `confettiFall ${duration}s infinite linear`,
+                  animationDelay: `${delay}s`,
+                }}
+              />
+            );
+          })}
+        </div>
+      );
+    }
+
+    case 'aurora': {
+      return (
+        <div className="absolute inset-0 bg-black pointer-events-none overflow-hidden select-none z-0 rounded-2xl flex items-center justify-center">
+          <div 
+            className="absolute inset-[-50%] bg-[radial-gradient(ellipse_at_center,theme(colors.green.500/20),transparent_50%),radial-gradient(ellipse_at_bottom_left,theme(colors.purple.600/30),transparent_50%),radial-gradient(ellipse_at_top_right,theme(colors.cyan.400/20),transparent_50%)] bg-[length:200%_200%]"
+            style={{ animation: 'auroraShift 15s infinite ease-in-out' }}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.5)_50%)] bg-[length:100%_4px]" />
         </div>
       );
     }
