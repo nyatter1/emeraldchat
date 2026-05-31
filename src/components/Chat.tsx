@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile, Message, News, ProfileLike } from '../types';
-import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, Sparkles, ArrowLeft, Globe, User, MessageSquare } from 'lucide-react';
+import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, CheckCircle, Sparkles, ArrowLeft, Globe, User, MessageSquare, Layers, Wallet } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import Markdown from 'react-markdown';
@@ -706,6 +706,7 @@ export function getRank(email?: string | null, userId?: string | null, dbRank?: 
     'Admin': 'https://raw.githubusercontent.com/nyatter1/ranks/main/admin.png',
     'Mod': 'https://raw.githubusercontent.com/nyatter1/ranks/main/mod.png',
     'VIP': 'https://raw.githubusercontent.com/nyatter1/ranks/main/vip.gif',
+    'Owner': 'https://raw.githubusercontent.com/nyatter1/ranks/main/founder.gif',
     'Bot': 'https://img.icons8.com/fluency/48/bot.png',
     ...customIcons
   };
@@ -714,7 +715,7 @@ export function getRank(email?: string | null, userId?: string | null, dbRank?: 
   
   const customLevels = customRanks.reduce((acc, rank) => ({...acc, [rank.name]: rank.level}), {} as Record<string, number>);
   const defaultLevels: { [key: string]: number } = {
-    'Developer': 0, 'Founder': 1, 'MoP': 2, 'SuperAdmin': 3, 'Admin': 4, 'Mod': 5, 'VIP': 6, 'Bot': 999,
+    'Developer': 0, 'Founder': 1, 'Owner': 1, 'MoP': 2, 'SuperAdmin': 3, 'Admin': 4, 'Mod': 5, 'VIP': 6, 'Bot': 999,
     ...customLevels
   };
 
@@ -959,10 +960,14 @@ export interface BioData {
   custom_rank_order?: string[];
   default_rank?: string;
   custom_ranks?: {name: string, icon: string, level: number}[];
+  gems?: number;
+  coins?: number;
+  last_daily_claim?: string;
+  invisible?: boolean;
 }
 
 export function parseBio(bioStr: string | null | undefined): BioData {
-  if (!bioStr) return { text: '', mood: '', profile_effect: 'none' };
+  if (!bioStr) return { text: '', mood: '', profile_effect: 'none', gems: 5, coins: 1000, invisible: false };
   try {
     const data = JSON.parse(bioStr);
     return {
@@ -978,11 +983,15 @@ export function parseBio(bioStr: string | null | undefined): BioData {
       banned_users: data.banned_users || [],
       muted_users: data.muted_users || [],
       custom_rank_order: data.custom_rank_order || RANK_ORDER,
-      default_rank: data.default_rank || 'VIP',
+      default_rank: data.default_rank || 'Member',
       custom_ranks: data.custom_ranks || [],
+      gems: typeof data.gems === 'number' ? data.gems : 5,
+      coins: typeof data.coins === 'number' ? data.coins : 1000,
+      last_daily_claim: data.last_daily_claim,
+      invisible: !!data.invisible,
     };
   } catch (e) {}
-  return { text: bioStr, mood: '', profile_effect: 'none' };
+  return { text: bioStr, mood: '', profile_effect: 'none', gems: 5, coins: 1000, invisible: false };
 }
 
 export function stringifyBio(data: BioData): string {
@@ -1409,11 +1418,14 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [showDeveloperPanel, setShowDeveloperPanel] = useState(false);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [leftPanelMode, setLeftPanelMode] = useState<'none' | 'menu' | 'news' | 'rules'>('none');
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [profileMenuState, setProfileMenuState] = useState<'closed' | 'main' | 'wallet'>('closed');
   const [newsFeed, setNewsFeed] = useState<News[]>([]);
   const [newNewsContent, setNewNewsContent] = useState('');
   const [hasNewNews, setHasNewNews] = useState(false);
   const [rankOverrides, setRankOverrides] = useState<Record<string, string>>({});
   
+  const menuRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioNewMsg = useRef<HTMLAudioElement | null>(null);
   const audioQuote = useRef<HTMLAudioElement | null>(null);
@@ -1438,6 +1450,16 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileMenuState !== 'closed' && menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setProfileMenuState('closed');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [profileMenuState]);
 
   useEffect(() => {
     scrollToBottom();
@@ -1821,8 +1843,222 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       return;
     }
 
+    const commandList = ['/clear', '/dev', '/ranks', '/rank', '/daily', '/bank', '/allin', '/dice', '/cmds', '/invis', '/coinflip', '/give'];
+    if (content.startsWith('/') && !commandList.includes(commandName)) {
+      setNewMessage('');
+      toast.error('Invalid command');
+      return;
+    }
+
+    if (commandName === '/cmds') {
+      setNewMessage('');
+      const commandsMessage: Message = {
+        id: crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+        content: `__SYSTEM__:**Available Commands:**\n\`/daily\` - Claim your daily reward\n\`/bank\` - View your balance\n\`/allin <g/r>\` - Bet everything\n\`/dice <number> <g/r>\` - Roll dice for a chance to win\n\`/coinflip <amount> <g/r>\` - 50/50 chance\n\`/give <username> <amount> <g/r>\` - Send money\n\`/cmds\` - View this list`,
+        user_id: currentUserProfile.id,
+        profiles: currentUserProfile
+      };
+      setMessages(prev => [...prev, commandsMessage]);
+      return;
+    }
+
+    if (commandName === '/invis') {
+      setNewMessage('');
+      if (!['Developer', 'Founder', 'Owner'].includes(currentUserProfile.rank || '')) {
+        toast.error('You do not have permission to use /invis');
+        return;
+      }
+      const bioData = parseBio(currentUserProfile.bio);
+      bioData.invisible = !bioData.invisible;
+      await supabase.from('profiles').update({ bio: stringifyBio(bioData) }).eq('id', currentUserProfile.id);
+      toast.success(bioData.invisible ? 'You are now INVISIBLE on the online list' : 'You are now VISIBLE on the online list');
+      return;
+    }
+
+    const bioData = parseBio(currentUserProfile.bio);
+    let finalContent = content;
+    let rankLvl = getRank(currentUserProfile.email, currentUserProfile.id, currentUserProfile.rank).level;
+    const isOwner = rankLvl <= 1; // Founder/Developer/Owner usually lowest level
+
+    if (commandName === '/daily') {
+      setNewMessage('');
+      const now = new Date();
+      const lastClaim = bioData.last_daily_claim ? new Date(bioData.last_daily_claim) : new Date(0);
+      const isNextDay = now.getDate() !== lastClaim.getDate() || now.getMonth() !== lastClaim.getMonth() || now.getFullYear() !== lastClaim.getFullYear();
+      
+      if (!isNextDay) {
+        toast.error('You already claimed your daily reward today!');
+        return;
+      }
+      
+      bioData.coins += 500;
+      bioData.gems += 2;
+      bioData.last_daily_claim = now.toISOString();
+      await supabase.from('profiles').update({ bio: stringifyBio(bioData) }).eq('id', currentUserProfile.id);
+      
+      finalContent = `__CMD_UI__:bank:{"title": "Daily Claimed!", "coins": ${bioData.coins}, "gems": ${bioData.gems}, "msg": "Received +500 Gold, +2 Rubies"}`;
+    }
+    
+    else if (commandName === '/bank') {
+      setNewMessage('');
+      finalContent = `__CMD_UI__:bank:{"title": "Bank Account", "coins": ${bioData.coins}, "gems": ${bioData.gems}, "msg": ""}`;
+    }
+    
+    else if (commandName === '/allin') {
+      setNewMessage('');
+      const currencyStr = (args[1] || '').toLowerCase();
+      const isGold = currencyStr === 'gold' || currencyStr === 'g';
+      const isGems = currencyStr === 'rubies' || currencyStr === 'ruby' || currencyStr === 'r';
+      
+      if (!isGold && !isGems) {
+         toast.error('Usage: /allin [gold/g or rubies/r]');
+         return;
+      }
+      
+      const val = isGold ? bioData.coins : bioData.gems;
+      if (val <= 0) {
+         toast.error(`You have no ${isGold ? 'Gold' : 'Rubies'} to bet!`);
+         return;
+      }
+      
+      const winChance = isOwner ? 1.0 : 0.4;
+      const won = Math.random() < winChance;
+      let multiplier = 1;
+      
+      if (won) {
+         // Random multiplier between 1 and 1000, heavily weighted towards low numbers
+         const roll = Math.random();
+         if (roll > 0.99) multiplier = Math.floor(Math.random() * 500) + 500;
+         else if (roll > 0.95) multiplier = Math.floor(Math.random() * 50) + 10;
+         else if (roll > 0.8) multiplier = Math.floor(Math.random() * 5) + 2;
+         else multiplier = 1.5;
+         
+         const profit = Math.floor(val * multiplier);
+         if (isGold) bioData.coins += profit; else bioData.gems += profit;
+         
+         finalContent = `__CMD_UI__:bet:{"action": "ALL IN", "type": "${isGold ? 'Gold' : 'Rubies'}", "bet": ${val}, "won": true, "amount": ${profit}, "multiplier": "${multiplier.toFixed(1)}x"}`;
+      } else {
+         if (isGold) bioData.coins = 0; else bioData.gems = 0;
+         finalContent = `__CMD_UI__:bet:{"action": "ALL IN", "type": "${isGold ? 'Gold' : 'Rubies'}", "bet": ${val}, "won": false, "amount": ${val}, "multiplier": "0x"}`;
+      }
+      await supabase.from('profiles').update({ bio: stringifyBio(bioData) }).eq('id', currentUserProfile.id);
+    }
+    
+    else if (commandName === '/dice') {
+      setNewMessage('');
+      const amountStr = args[1];
+      const currencyStr = (args[2] || '').toLowerCase();
+      const amount = parseInt(amountStr);
+      
+      const isGold = currencyStr === 'gold' || currencyStr === 'g';
+      const isGems = currencyStr === 'rubies' || currencyStr === 'ruby' || currencyStr === 'r';
+      
+      if (isNaN(amount) || amount <= 0 || (!isGold && !isGems)) {
+         toast.error('Usage: /dice [amount] [gold/g or rubies/r]');
+         return;
+      }
+      
+      const val = isGold ? bioData.coins : bioData.gems;
+      if (val < amount) {
+         toast.error(`You do not have enough ${isGold ? 'Gold' : 'Rubies'}.`);
+         return;
+      }
+      
+      const winChance = isOwner ? 1.0 : 0.45;
+      const won = Math.random() < winChance;
+      
+      if (won) {
+         if (isGold) bioData.coins += amount; else bioData.gems += amount;
+         finalContent = `__CMD_UI__:bet:{"action": "DICE ROLL", "type": "${isGold ? 'Gold' : 'Rubies'}", "bet": ${amount}, "won": true, "amount": ${amount}, "multiplier": "1x"}`;
+      } else {
+         if (isGold) bioData.coins -= amount; else bioData.gems -= amount;
+         finalContent = `__CMD_UI__:bet:{"action": "DICE ROLL", "type": "${isGold ? 'Gold' : 'Rubies'}", "bet": ${amount}, "won": false, "amount": ${amount}, "multiplier": "0x"}`;
+      }
+      await supabase.from('profiles').update({ bio: stringifyBio(bioData) }).eq('id', currentUserProfile.id);
+    }
+    
+    else if (commandName === '/coinflip') {
+      setNewMessage('');
+      const amountStr = args[1];
+      const currencyStr = (args[2] || '').toLowerCase();
+      const amount = parseInt(amountStr);
+      
+      const isGold = currencyStr === 'gold' || currencyStr === 'g';
+      const isGems = currencyStr === 'rubies' || currencyStr === 'ruby' || currencyStr === 'r';
+      
+      if (isNaN(amount) || amount <= 0 || (!isGold && !isGems)) {
+         toast.error('Usage: /coinflip [amount] [gold/g or rubies/r]');
+         return;
+      }
+      
+      const val = isGold ? bioData.coins : bioData.gems;
+      if (val < amount) {
+         toast.error(`You do not have enough ${isGold ? 'Gold' : 'Rubies'}.`);
+         return;
+      }
+      
+      const winChance = isOwner ? 1.0 : 0.5;
+      const won = Math.random() < winChance;
+      
+      if (won) {
+         if (isGold) bioData.coins += amount; else bioData.gems += amount;
+         finalContent = `__CMD_UI__:bet:{"action": "COIN FLIP", "type": "${isGold ? 'Gold' : 'Rubies'}", "bet": ${amount}, "won": true, "amount": ${amount}, "multiplier": "1x"}`;
+      } else {
+         if (isGold) bioData.coins -= amount; else bioData.gems -= amount;
+         finalContent = `__CMD_UI__:bet:{"action": "COIN FLIP", "type": "${isGold ? 'Gold' : 'Rubies'}", "bet": ${amount}, "won": false, "amount": ${amount}, "multiplier": "0x"}`;
+      }
+      await supabase.from('profiles').update({ bio: stringifyBio(bioData) }).eq('id', currentUserProfile.id);
+    }
+
+    else if (commandName === '/give') {
+      setNewMessage('');
+      const targetUsername = args[1];
+      const amountStr = args[2];
+      const currencyStr = (args[3] || '').toLowerCase();
+      const amount = parseInt(amountStr);
+      
+      const isGold = currencyStr === 'gold' || currencyStr === 'g';
+      const isGems = currencyStr === 'rubies' || currencyStr === 'ruby' || currencyStr === 'r';
+      
+      if (!targetUsername || isNaN(amount) || amount <= 0 || (!isGold && !isGems)) {
+         toast.error('Usage: /give [username] [amount] [gold/g or rubies/r]');
+         return;
+      }
+      
+      const val = isGold ? bioData.coins : bioData.gems;
+      if (val < amount && !isOwner) {
+         toast.error(`You do not have enough ${isGold ? 'Gold' : 'Rubies'}.`);
+         return;
+      }
+
+      // Fetch target user 
+      const { data: targetProfile, error: targetError } = await supabase.from('profiles').select('*').ilike('username', targetUsername).single();
+      if (targetError || !targetProfile) {
+         toast.error(`User ${targetUsername} not found.`);
+         return;
+      }
+
+      if (targetProfile.id === currentUserProfile.id) {
+         toast.error(`You can't give to yourself!`);
+         return;
+      }
+      
+      if (!isOwner) {
+         if (isGold) bioData.coins -= amount; else bioData.gems -= amount;
+         await supabase.from('profiles').update({ bio: stringifyBio(bioData) }).eq('id', currentUserProfile.id);
+      }
+
+      const targetBio = parseBio(targetProfile.bio);
+      if (isGold) targetBio.coins += amount; else targetBio.gems += amount;
+      await supabase.from('profiles').update({ bio: stringifyBio(targetBio) }).eq('id', targetProfile.id);
+
+      finalContent = `__CMD_UI__:gift:{"to": "${targetProfile.username}", "type": "${isGold ? 'Gold' : 'Rubies'}", "amount": ${amount}}`;
+    }
+
     // Hard block for forbidden links
-    if (FORBIDDEN_TLDS.test(content.toLowerCase())) {
+    if (finalContent.toLowerCase().match(FORBIDDEN_TLDS)) {
+
       setNewMessage('');
       toast('You can\'t type this in chat! Its advertising', {
         icon: '🚫',
@@ -1837,7 +2073,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     const tempId = crypto.randomUUID();
     const tempMessage: Message = {
       id: tempId,
-      content,
+      content: finalContent,
       created_at: new Date().toISOString(),
       user_id: currentUserProfile.id,
       profiles: currentUserProfile
@@ -1847,7 +2083,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
     const { error } = await supabase
       .from('messages')
-      .insert({ id: tempId, content, user_id: currentUserProfile.id });
+      .insert({ id: tempId, content: finalContent, user_id: currentUserProfile.id });
 
     if (error) {
       console.error('Error sending message', error);
@@ -1997,12 +2233,17 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     return msg;
   };
 
-  const displayOnlineUsers = onlineUsers;
+  const displayOnlineUsers = onlineUsers.filter(u => {
+    // If it's the current user, show them to themselves? The prompt says "wont show u on the players online list", maybe even to them?
+    // The prompt just says "makes u go offline but wont show u on the players online list (only for Founder and Developer)".
+    if (u.id === currentUserProfile.id) return !parseBio(u.bio).invisible;
+    return !parseBio(u.bio).invisible;
+  });
 
   const isDev = ['test@gmail.com', 'dev@gmail.com'].includes(currentUserProfile.email || '');
 
   return (
-    <div className="flex h-screen bg-zinc-950 text-zinc-100 font-sans overflow-hidden">
+    <div className="flex h-[100dvh] bg-zinc-950 text-zinc-100 font-sans overflow-hidden w-full">
       
         {/* Left Drawer Menu */}
         {leftPanelMode !== 'none' && (
@@ -2129,6 +2370,11 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           </>
         )}
 
+      {/* Right panel backdrop */}
+      {rightPanelOpen && (
+        <div className="lg:hidden fixed inset-0 bg-black/60 z-30 backdrop-blur-sm" onClick={() => setRightPanelOpen(false)} />
+      )}
+
       {/* Main Chat Area */}
       <div className="flex flex-1 flex-col relative">
         {/* Header */}
@@ -2146,12 +2392,18 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                  <div className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-600 rounded-full border border-zinc-950" />
                )}
              </button>
-             <h1 className="text-lg font-bold tracking-tight text-emerald-500">Emerald Chat</h1>
+             <img src="/logo.png" alt="Logo" className="h-[22px] object-contain ml-2" />
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 relative" ref={menuRef}>
+            <button
+              onClick={() => setRightPanelOpen(!rightPanelOpen)}
+              className="lg:hidden p-2 text-zinc-400 hover:text-emerald-500 hover:bg-zinc-800 rounded-lg transition-colors focus:outline-none"
+            >
+              <User className="h-5 w-5" />
+            </button>
             <button 
-              onClick={() => setSelectedProfileId(currentUserProfile.id)}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity focus:outline-none"
+              onClick={() => setProfileMenuState(prev => prev === 'closed' ? 'main' : 'closed')}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity focus:outline-none ml-1 sm:ml-0"
             >
               <span className="text-sm font-bold text-zinc-200 hidden sm:block">{currentUserProfile.username}</span>
               <img 
@@ -2160,13 +2412,100 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                 className="h-8 w-8 rounded-full border border-zinc-700 object-cover"
               />
             </button>
-            <button
-              onClick={onSignOut}
-              className="p-2 text-zinc-500 hover:text-emerald-500 hover:bg-zinc-800 rounded-lg transition-colors focus:outline-none"
-              title="Sign Out"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+
+            {profileMenuState !== 'closed' && (
+              <div className="absolute top-12 right-0 w-64 bg-[#111111] border border-[#222222] rounded-xl shadow-2xl z-50 overflow-hidden font-sans">
+                {profileMenuState === 'main' ? (
+                  <>
+                    <div className="p-4 border-b border-[#222222] flex items-center gap-3">
+                      <img src={currentUserProfile.avatar_url} alt="Avatar" className="h-10 w-10 border border-[#333333] rounded-lg object-cover" />
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <img src={getRank(currentUserProfile.email, currentUserProfile.id, currentUserProfile.rank).icon} alt="Rank" className="h-4 object-contain" />
+                          <span className="text-[11px] font-bold text-zinc-200 uppercase tracking-wider">{getRank(currentUserProfile.email, currentUserProfile.id, currentUserProfile.rank).name}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[17px] font-extrabold text-white tracking-wide">{currentUserProfile.username}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col py-2">
+                      <button className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-zinc-300 hover:bg-[#222222] transition-colors" title="Coming soon">
+                        <Layers className="w-5 h-5 text-zinc-500" />
+                        Level info
+                      </button>
+                      <button 
+                        onClick={() => setProfileMenuState('wallet')}
+                        className="flex items-center justify-between px-4 py-2.5 text-sm font-bold text-zinc-300 hover:bg-[#222222] transition-colors group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Wallet className="w-5 h-5 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+                          Wallet
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-zinc-300" />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setSelectedProfileId(currentUserProfile.id);
+                          setProfileMenuState('closed');
+                        }}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-zinc-300 hover:bg-[#222222] transition-colors"
+                      >
+                        <User className="w-5 h-5 text-zinc-500" />
+                        Edit profile
+                      </button>
+                    </div>
+                    <div className="border-t border-[#222222] py-2">
+                      <button 
+                        onClick={onSignOut}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-bold text-zinc-300 hover:bg-[#222222] transition-colors"
+                      >
+                        <LogOut className="w-5 h-5 text-zinc-500" />
+                        Logout
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-3 border-b border-[#222222] flex items-center gap-2">
+                      <button 
+                        onClick={() => setProfileMenuState('main')}
+                        className="p-1 hover:bg-[#222222] rounded-md transition-colors"
+                      >
+                        <ChevronLeft className="w-5 h-5 text-white" />
+                      </button>
+                      <span className="font-extrabold text-white text-[15px]">Wallet</span>
+                    </div>
+                    <div className="p-5 space-y-5 bg-[#0a0a0a]">
+                      <div>
+                        <div className="text-[13px] font-extrabold text-white mb-1.5 font-sans">Ruby</div>
+                        <div className="flex items-center gap-2">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L2 9L12 22L22 9L12 2Z" fill="#ff007f" />
+                            <path d="M12 2L2 9L12 12V2Z" fill="#ff4da6" />
+                            <path d="M22 9L12 2V12L22 9Z" fill="#cc0066" />
+                            <path d="M2 9L12 22V12L2 9Z" fill="#e60073" />
+                            <path d="M22 9L12 22V12L22 9Z" fill="#99004d" />
+                          </svg>
+                          <span className="text-xl font-extrabold text-white">{parseBio(currentUserProfile.bio).gems}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[13px] font-extrabold text-white mb-1.5 font-sans">Gold</div>
+                        <div className="flex items-center gap-2">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="10" fill="#FFB800" />
+                            <circle cx="12" cy="12" r="8" fill="#FFC700" />
+                            <path d="M12 6L13.8 9.6L17.5 10L14.7 12.6L15.5 16.5L12 14.5L8.5 16.5L9.3 12.6L6.5 10L10.2 9.6L12 6Z" fill="#FFD600" />
+                          </svg>
+                          <span className="text-xl font-extrabold text-white">{parseBio(currentUserProfile.bio).coins}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </header>
 
@@ -2212,9 +2551,108 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                         </div>
                       </div>
                       <div className="text-zinc-200 text-[15px] leading-relaxed break-words relative pr-12">
-                        <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
-                          {scrubContent(renderMsg.content)}
-                        </Markdown>
+                        {renderMsg.content?.startsWith('__SYSTEM__:') ? (
+                          <div className="bg-[#111] border border-zinc-800 rounded-md p-3 my-2 text-sm text-zinc-300">
+                             <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+                               {renderMsg.content.slice(11)}
+                             </Markdown>
+                          </div>
+                        ) : renderMsg.content?.startsWith('__CMD_UI__:') ? (
+                          (() => {
+                            try {
+                               const rest = renderMsg.content.slice(11);
+                               const firstColon = rest.indexOf(':');
+                               const cmdType = rest.slice(0, firstColon);
+                               const data = JSON.parse(rest.slice(firstColon + 1));
+                               
+                               if (cmdType === 'bank') {
+                                 return (
+                                   <div className="mt-2 bg-[#0a0a0a] border border-[#222] rounded-xl p-4 w-fit min-w-[250px] shadow-lg">
+                                      <div className="flex items-center gap-2 mb-3">
+                                        <Wallet className="w-5 h-5 text-emerald-500" />
+                                        <span className="font-bold text-white uppercase tracking-wider text-sm">{data.title}</span>
+                                      </div>
+                                      {data.msg && <div className="text-xs text-zinc-400 mb-3">{data.msg}</div>}
+                                      <div className="flex gap-6">
+                                        <div className="flex items-center gap-2">
+                                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 9L12 22L22 9L12 2Z" fill="#ff007f" /><path d="M12 2L2 9L12 12V2Z" fill="#ff4da6" /><path d="M22 9L12 2V12L22 9Z" fill="#cc0066" /><path d="M2 9L12 22V12L2 9Z" fill="#e60073" /><path d="M22 9L12 22V12L22 9Z" fill="#99004d" /></svg>
+                                          <span className="font-extrabold text-lg text-white">{data.gems ?? 0}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#FFB800" /><circle cx="12" cy="12" r="8" fill="#FFC700" /><path d="M12 6L13.8 9.6L17.5 10L14.7 12.6L15.5 16.5L12 14.5L8.5 16.5L9.3 12.6L6.5 10L10.2 9.6L12 6Z" fill="#FFD600" /></svg>
+                                          <span className="font-extrabold text-lg text-white">{data.coins ?? 0}</span>
+                                        </div>
+                                      </div>
+                                   </div>
+                                 );
+                               } else if (cmdType === 'bet') {
+                                 const isWin = data.won;
+                                 return (
+                                   <div className={`mt-2 bg-[#0a0a0a] border ${isWin ? 'border-emerald-500/30' : 'border-red-500/30'} rounded-xl p-4 w-fit min-w-[280px] shadow-lg relative overflow-hidden`}>
+                                      {isWin && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500" />}
+                                      {!isWin && <div className="absolute top-0 left-0 w-full h-1 bg-red-500" />}
+                                      
+                                      <div className="flex items-center justify-between mb-3">
+                                        <span className="font-bold text-white uppercase tracking-wider text-[11px] bg-zinc-800 px-2 py-1 rounded">
+                                          {data.action}
+                                        </span>
+                                        <span className={`font-black text-sm ${isWin ? 'text-emerald-400' : 'text-red-400'}`}>
+                                          {isWin ? 'WON' : 'LOST'}
+                                        </span>
+                                      </div>
+                                      
+                                      <div className="flex items-center justify-between mt-2">
+                                        <div className="flex flex-col">
+                                          <span className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Bet Amount</span>
+                                          <div className="flex items-center gap-1.5">
+                                            {data.type === 'Rubies' ? (
+                                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 9L12 22L22 9L12 2Z" fill="#ff007f" /><path d="M12 2L2 9L12 12V2Z" fill="#ff4da6" /><path d="M22 9L12 2V12L22 9Z" fill="#cc0066" /><path d="M2 9L12 22V12L2 9Z" fill="#e60073" /><path d="M22 9L12 22V12L22 9Z" fill="#99004d" /></svg>
+                                            ) : (
+                                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#FFB800" /><circle cx="12" cy="12" r="8" fill="#FFC700" /><path d="M12 6L13.8 9.6L17.5 10L14.7 12.6L15.5 16.5L12 14.5L8.5 16.5L9.3 12.6L6.5 10L10.2 9.6L12 6Z" fill="#FFD600" /></svg>
+                                            )}
+                                            <span className="font-bold text-zinc-300">{data.bet}</span>
+                                          </div>
+                                        </div>
+
+                                        {isWin && (
+                                          <div className="flex flex-col items-end">
+                                            <span className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Profit ({data.multiplier})</span>
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="font-extrabold text-emerald-400">+{data.amount}</span>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                   </div>
+                                 );
+                               } else if (cmdType === 'gift') {
+                                 return (
+                                   <div className="mt-2 bg-[#0a0a0a] border border-blue-500/30 rounded-xl p-4 w-fit min-w-[250px] shadow-lg relative overflow-hidden">
+                                      <div className="absolute top-0 left-0 w-full h-1 bg-blue-500" />
+                                      <div className="flex items-center gap-2 mb-3">
+                                        <Sparkles className="w-5 h-5 text-blue-400" />
+                                        <span className="font-bold text-white uppercase tracking-wider text-[11px]">User Gift</span>
+                                      </div>
+                                      <span className="text-zinc-300 text-sm">Given to <strong className="text-blue-400">{data.to}</strong></span>
+                                      <div className="flex items-center mt-3 gap-2">
+                                          {data.type === 'Rubies' ? (
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 9L12 22L22 9L12 2Z" fill="#ff007f" /><path d="M12 2L2 9L12 12V2Z" fill="#ff4da6" /><path d="M22 9L12 2V12L22 9Z" fill="#cc0066" /><path d="M2 9L12 22V12L2 9Z" fill="#e60073" /><path d="M22 9L12 22V12L22 9Z" fill="#99004d" /></svg>
+                                          ) : (
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#FFB800" /><circle cx="12" cy="12" r="8" fill="#FFC700" /><path d="M12 6L13.8 9.6L17.5 10L14.7 12.6L15.5 16.5L12 14.5L8.5 16.5L9.3 12.6L6.5 10L10.2 9.6L12 6Z" fill="#FFD600" /></svg>
+                                          )}
+                                          <span className="font-extrabold text-lg text-white">{data.amount}</span>
+                                      </div>
+                                   </div>
+                                 );
+                               }
+                            } catch (err) {}
+                            return <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>{scrubContent(renderMsg.content)}</Markdown>;
+                          })()
+                        ) : (
+                          <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+                            {scrubContent(renderMsg.content)}
+                          </Markdown>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2226,7 +2664,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         </div>
 
         {/* Input Area */}
-        <div className="border-t border-zinc-800 bg-zinc-950 p-4">
+        <div className="border-t border-zinc-800 bg-zinc-950 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
           <form onSubmit={handleSendMessage} className="relative mx-auto max-w-4xl flex items-end gap-2 bg-[#1e1e22] border border-zinc-800 rounded-[8px] p-1.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all">
             <textarea
               value={newMessage}
@@ -2248,11 +2686,14 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       </div>
 
       {/* Right Sidebar */}
-      <div className="hidden w-[280px] flex-col border-l border-zinc-800 bg-[#141416] lg:flex shrink-0">
-        <div className="px-4 py-4 border-b border-zinc-800/40">
+      <div className={`${rightPanelOpen ? 'flex absolute right-0 z-40 h-full' : 'hidden'} w-[280px] flex-col border-l border-zinc-800 bg-[#141416] lg:relative lg:flex shrink-0 transition-transform`}>
+        <div className="px-4 py-4 border-b border-zinc-800/40 flex justify-between items-center">
           <div className="flex items-center gap-2 px-1">
             <span className="text-xs font-bold tracking-wider text-zinc-400 uppercase">Online — {displayOnlineUsers.length}</span>
           </div>
+          <button onClick={() => setRightPanelOpen(false)} className="lg:hidden text-zinc-400 hover:text-white">
+            <X className="w-5 h-5"/>
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 pb-4 pt-2 custom-scrollbar">
