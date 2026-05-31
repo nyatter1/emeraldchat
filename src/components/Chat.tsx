@@ -661,15 +661,12 @@ export let globalAdminState = {
   banned_users: [] as string[],
   muted_users: [] as string[],
   custom_rank_order: [] as string[],
-  default_rank: 'VIP'
+  default_rank: 'VIP',
+  custom_ranks: [] as {name: string, icon: string, level: number}[]
 };
 
 export function getCustomRanks(): {name: string, icon: string, level: number}[] {
-  try {
-    return JSON.parse(localStorage.getItem('emerald_custom_ranks') || '[]');
-  } catch(e) { 
-    return []; 
-  }
+  return globalAdminState.custom_ranks || [];
 }
 
 export function getRank(email?: string | null, userId?: string | null, dbRank?: string | null) {
@@ -724,12 +721,12 @@ export function getRank(email?: string | null, userId?: string | null, dbRank?: 
   let assignedLvl = defaultLevels[rankName] ?? 999;
   
   // if rank is in currentOrder, use its index as the level
-  const orderIdx = currentOrder.findIndex(r => r.toLowerCase() === rankName.toLowerCase());
+  const orderIdx = currentOrder.findIndex(r => r && typeof r === 'string' && r.toLowerCase() === rankName.toLowerCase());
   if (orderIdx !== -1) {
     assignedLvl = orderIdx;
   }
 
-  const exactRank = Object.keys(icons).find(k => k.toLowerCase() === rankName.toLowerCase()) || defRank;
+  const exactRank = Object.keys(icons).find(k => k && typeof k === 'string' && k.toLowerCase() === rankName.toLowerCase()) || defRank;
 
   return { name: exactRank, icon: icons[exactRank] || icons['VIP'], level: assignedLvl };
 }
@@ -957,6 +954,7 @@ export interface BioData {
   muted_users?: string[];
   custom_rank_order?: string[];
   default_rank?: string;
+  custom_ranks?: {name: string, icon: string, level: number}[];
 }
 
 export function parseBio(bioStr: string | null | undefined): BioData {
@@ -977,6 +975,7 @@ export function parseBio(bioStr: string | null | undefined): BioData {
       muted_users: data.muted_users || [],
       custom_rank_order: data.custom_rank_order || RANK_ORDER,
       default_rank: data.default_rank || 'VIP',
+      custom_ranks: data.custom_ranks || [],
     };
   } catch (e) {}
   return { text: bioStr, mood: '', profile_effect: 'none' };
@@ -1156,20 +1155,22 @@ function DeveloperPanel({ onClose, allProfiles }: { onClose: () => void, allProf
     }
   };
 
-  const handleSaveRank = () => {
+  const handleSaveRank = async () => {
     if (!newName || !newIcon) return toast.error('Name and Icon are required');
     const newRanks = [...ranks, { name: newName, icon: newIcon, level: 6 }];
     setRanks(newRanks);
-    localStorage.setItem('emerald_custom_ranks', JSON.stringify(newRanks));
+    globalAdminState.custom_ranks = newRanks;
+    await pushGlobalState({ custom_ranks: newRanks });
     setNewName('');
     setNewIcon('');
     toast.success('Custom rank added!');
   };
 
-  const handleRemoveRank = (name: string) => {
+  const handleRemoveRank = async (name: string) => {
     const newRanks = ranks.filter(r => r.name !== name);
     setRanks(newRanks);
-    localStorage.setItem('emerald_custom_ranks', JSON.stringify(newRanks));
+    globalAdminState.custom_ranks = newRanks;
+    await pushGlobalState({ custom_ranks: newRanks });
   }
 
   // Modi actions
@@ -1491,6 +1492,9 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           if (bio.default_rank) {
             globalAdminState.default_rank = bio.default_rank;
           }
+          if (bio.custom_ranks) {
+            globalAdminState.custom_ranks = bio.custom_ranks;
+          }
           if (globalAdminState.banned_users.includes(currentUserProfile.id)) {
             onSignOut();
           }
@@ -1589,6 +1593,9 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
            }
            if (bio.default_rank) {
              globalAdminState.default_rank = bio.default_rank;
+           }
+           if (bio.custom_ranks) {
+             globalAdminState.custom_ranks = bio.custom_ranks;
            }
            if (globalAdminState.banned_users.includes(currentUserProfile.id)) {
              onSignOut();
@@ -1744,7 +1751,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       const currentOrder = globalAdminState.custom_rank_order && globalAdminState.custom_rank_order.length > 0 ? globalAdminState.custom_rank_order : RANK_ORDER;
       const allPossibleRanks = [...currentOrder, ...customRanks];
 
-      const exactRankName = allPossibleRanks.find(r => r.toLowerCase() === rankInput.toLowerCase());
+      const exactRankName = allPossibleRanks.find(r => r && typeof r === 'string' && r.toLowerCase() === rankInput.toLowerCase());
       if (!exactRankName) {
         toast.error(`Invalid rank. Available: ${allPossibleRanks.join(', ')}`);
         return;
