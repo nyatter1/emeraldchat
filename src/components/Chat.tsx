@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile, Message, News, ProfileLike } from '../types';
-import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, Home, Film, Tv, Youtube, ListVideo } from 'lucide-react';
+import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import Markdown from 'react-markdown';
@@ -20,6 +20,175 @@ export const ADMIN_EMAILS: string[] = [];
 export const MOD_EMAILS: string[] = [];
 
 export const RANK_ORDER = ['Developer', 'Founder', 'MoP', 'SuperAdmin', 'Admin', 'Mod', 'VIP'];
+
+export const PROFILE_BORDERS = [
+  {
+    id: 'none',
+    name: 'No border (Classic)',
+    className: 'border-zinc-800',
+    cardStyle: {},
+    avatarStyle: {}
+  },
+  {
+    id: 'neon-emerald',
+    name: 'Neon Emerald Glow',
+    className: 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)]',
+    cardStyle: {
+      border: '3px solid #10b981',
+      boxShadow: '0 0 25px rgba(16, 185, 129, 0.65), inset 0 0 10px rgba(16, 185, 129, 0.3)',
+      animation: 'borderPulseEmerald 2.5s infinite ease-in-out'
+    },
+    avatarStyle: {
+      border: '2.5px solid #10b981',
+      boxShadow: '0 0 8px #10b981'
+    }
+  },
+  {
+    id: 'crimson-flare',
+    name: 'Crimson Flare Pulse',
+    className: 'border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.55)]',
+    cardStyle: {
+      border: '3px solid #ef4444',
+      boxShadow: '0 0 30px rgba(239, 68, 68, 0.75), inset 0 0 12px rgba(239, 68, 68, 0.4)',
+      animation: 'borderPulseCrimson 2s infinite ease-in-out'
+    },
+    avatarStyle: {
+      border: '2.5px solid #ef4444',
+      boxShadow: '0 0 8px #ef4444'
+    }
+  },
+  {
+    id: 'cosmic-purple',
+    name: 'Cosmic Purple Laser',
+    className: 'border-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.55)]',
+    cardStyle: {
+      border: '3px solid #a855f7',
+      boxShadow: '0 0 25px rgba(168, 85, 247, 0.7), inset 0 0 12px rgba(168, 85, 247, 0.35)',
+      animation: 'borderPulseCosmic 2.5s infinite ease-in-out'
+    },
+    avatarStyle: {
+      border: '2.5px solid #a855f7',
+      boxShadow: '0 0 8px #a855f7'
+    }
+  },
+  {
+    id: 'royal-gold',
+    name: 'Sovereign Royal Gold',
+    className: 'border-amber-400 shadow-[0_0_22px_rgba(251,191,36,0.6)]',
+    cardStyle: {
+      border: '3px solid #fbbf24',
+      boxShadow: '0 0 30px rgba(251, 191, 36, 0.8), inset 0 0 15px rgba(251, 191, 36, 0.4)',
+      animation: 'borderRotateGold 4s linear infinite'
+    },
+    avatarStyle: {
+      border: '2.5px solid #fbbf24',
+      boxShadow: '0 0 8px #fbbf24'
+    }
+  },
+  {
+    id: 'rainbow-wave',
+    name: 'RGB Chroma Wave',
+    className: 'border-transparent',
+    cardStyle: {
+      border: '3px solid transparent',
+      backgroundImage: 'linear-gradient(#141416, #141416), linear-gradient(to right, #ff0055, #00ff55, #0055ff, #ff0055)',
+      backgroundOrigin: 'border-box',
+      backgroundClip: 'padding-box, border-box',
+      boxShadow: '0 0 30px rgba(255, 0, 100, 0.5)',
+      animation: 'borderChromaWave 3s linear infinite'
+    },
+    avatarStyle: {
+      border: '2px solid transparent',
+      backgroundImage: 'linear-gradient(#141416, #141416), linear-gradient(to right, #ff0055, #00ff55, #0055ff, #ff0055)',
+      backgroundOrigin: 'border-box',
+      backgroundClip: 'padding-box, border-box',
+      boxShadow: '0 0 8px rgba(255, 0, 100, 0.5)'
+    }
+  },
+  {
+    id: 'frozen-glacier',
+    name: 'Chilling Glacier Frost',
+    className: 'border-cyan-300 shadow-[0_0_20px_rgba(103,232,249,0.5)]',
+    cardStyle: {
+      border: '3px solid #67e8f9',
+      boxShadow: '0 0 25px rgba(103, 232, 249, 0.75), inset 0 0 14px rgba(103, 232, 249, 0.3)',
+      animation: 'borderPulseCyan 2.8s infinite ease-in-out'
+    },
+    avatarStyle: {
+      border: '2.5px solid #67e8f9',
+      boxShadow: '0 0 8px #67e8f9'
+    }
+  },
+  {
+    id: 'cyber-matrix',
+    name: 'Cyber Matrix Hex',
+    className: 'border-emerald-600 shadow-[0_0_18px_rgba(52,211,153,0.4)]',
+    cardStyle: {
+      border: '3px double #34d399',
+      boxShadow: '0 0 20px rgba(52, 211, 153, 0.6), inset 0 0 10px rgba(52, 211, 153, 0.25)',
+      animation: 'matrixFlicker 1.5s infinite steps(2)'
+    },
+    avatarStyle: {
+      border: '2.5px double #34d399',
+      boxShadow: '0 0 8px #34d399'
+    }
+  },
+  {
+    id: 'bubblegum-pink',
+    name: 'Sweet Bubblegum Dream',
+    className: 'border-pink-400 shadow-[0_0_20px_rgba(244,114,182,0.5)]',
+    cardStyle: {
+      border: '3px solid #f472b6',
+      boxShadow: '0 0 25px rgba(244, 114, 182, 0.7), inset 0 0 12px rgba(244, 114, 182, 0.3)',
+      animation: 'borderPulseBubblegum 2s infinite ease-in-out'
+    },
+    avatarStyle: {
+      border: '2.5px solid #f472b6',
+      boxShadow: '0 0 8px #f472b6'
+    }
+  }
+];
+
+export const BORDER_KEYFRAMES = `
+@keyframes borderPulseEmerald {
+  0% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.35), inset 0 0 8px rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.7); }
+  50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.8), inset 0 0 15px rgba(16, 185, 129, 0.45); border-color: rgba(16, 185, 129, 1); }
+  100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.35), inset 0 0 8px rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.7); }
+}
+@keyframes borderPulseCrimson {
+  0% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.4), inset 0 0 8px rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.7); }
+  50% { box-shadow: 0 0 35px rgba(239, 68, 68, 0.9), inset 0 0 15px rgba(239, 68, 68, 0.5); border-color: rgba(239, 68, 68, 1); }
+  100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.4), inset 0 0 8px rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.7); }
+}
+@keyframes borderPulseCosmic {
+  0% { box-shadow: 0 0 15px rgba(168, 85, 247, 0.45), inset 0 0 8px rgba(168, 85, 247, 0.2); border-color: rgba(168, 85, 247, 0.75); }
+  50% { box-shadow: 0 0 30px rgba(168, 85, 247, 0.85), inset 0 0 15px rgba(168, 85, 247, 0.5); border-color: rgba(168, 85, 247, 1); }
+  100% { box-shadow: 0 0 15px rgba(168, 85, 247, 0.45), inset 0 0 8px rgba(168, 85, 247, 0.2); border-color: rgba(168, 85, 247, 0.75); }
+}
+@keyframes borderPulseCyan {
+  0% { box-shadow: 0 0 15px rgba(6, 182, 212, 0.4), inset 0 0 8px rgba(6, 182, 212, 0.2); border-color: rgba(6, 182, 212, 0.7); }
+  50% { box-shadow: 0 0 32px rgba(6, 182, 212, 0.85), inset 0 0 15px rgba(6, 182, 212, 0.5); border-color: rgba(6, 182, 212, 1); }
+  100% { box-shadow: 0 0 15px rgba(6, 182, 212, 0.4), inset 0 0 8px rgba(6, 182, 212, 0.2); border-color: rgba(6, 182, 212, 0.7); }
+}
+@keyframes borderPulseBubblegum {
+  0% { box-shadow: 0 0 15px rgba(244, 114, 182, 0.45), inset 0 0 8px rgba(244, 114, 182, 0.2); border-color: rgba(244, 114, 182, 0.7); }
+  50% { box-shadow: 0 0 30px rgba(244, 114, 182, 0.85), inset 0 0 15px rgba(244, 114, 182, 0.5); border-color: rgba(244, 114, 182, 1); }
+  100% { box-shadow: 0 0 15px rgba(244, 114, 182, 0.45), inset 0 0 8px rgba(244, 114, 182, 0.2); border-color: rgba(244, 114, 182, 0.7); }
+}
+@keyframes borderRotateGold {
+  0% { border-color: #fbbf24; box-shadow: 0 0 15px rgba(251, 191, 36, 0.5); }
+  50% { border-color: #f59e0b; box-shadow: 0 0 32px rgba(251, 191, 36, 0.9); }
+  100% { border-color: #fbbf24; box-shadow: 0 0 15px rgba(251, 191, 36, 0.5); }
+}
+@keyframes borderChromaWave {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+@keyframes matrixFlicker {
+  0%, 100% { opacity: 0.95; box-shadow: 0 0 15px rgba(52, 211, 153, 0.5); }
+  50% { opacity: 1; box-shadow: 0 0 25px rgba(52, 211, 153, 0.8); }
+}
+`;
 
 export let globalRankOverrides: Record<string, string> = {};
 
@@ -282,6 +451,7 @@ export interface BioData {
   profile_music_type?: 'mp3' | 'youtube' | '';
   profile_music_source?: string;
   profile_card_bg?: string;
+  profile_border?: string;
   assigned_ranks?: Record<string, string>;
   custom_fonts?: Record<string, string>;
 }
@@ -296,6 +466,7 @@ export function parseBio(bioStr: string | null | undefined): BioData {
       profile_music_type: data.profile_music_type || '',
       profile_music_source: data.profile_music_source || '',
       profile_card_bg: data.profile_card_bg || '',
+      profile_border: data.profile_border || 'none',
       assigned_ranks: data.assigned_ranks || {},
       custom_fonts: data.custom_fonts || {}
     };
@@ -319,90 +490,6 @@ const TEST_BOT: Profile = {
   updated_at: new Date().toISOString()
 };
 
-const VIDEO_BOT: Profile = {
-  id: 'video-bot-0000-0000',
-  username: 'Video Bot',
-  email: 'videobot@emerald.chat',
-  age: 9999,
-  gender: 'Cinema Host',
-  bio: '{"text":"I play and manage YouTube videos in the Cinema Room! Enter or paste your YouTube links below...","mood":"Popping cinema popcorn 🍿"}',
-  avatar_url: 'https://api.dicebear.com/7.x/bottts/svg?seed=VideoBot&backgroundColor=10b981',
-  banner_url: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=2070&auto=format&fit=crop',
-  updated_at: new Date().toISOString()
-};
-
-function getYouTubeId(url: string): string | null {
-  if (!url) return null;
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/;
-  const match = url.match(regExp);
-  return (match && match[2].length === 11) ? match[2] : null;
-}
-
-function CinemaPlayer({ videoId, onEnded }: { videoId: string; onEnded: () => void }) {
-  const playerRef = useRef<any>(null);
-
-  useEffect(() => {
-    // Load YouTube API if not already present
-    if (!(window as any).YT) {
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-    }
-
-    const checkAndInit = () => {
-      if ((window as any).YT && (window as any).YT.Player) {
-        if (playerRef.current) {
-          try {
-            playerRef.current.destroy();
-          } catch (e) {}
-        }
-        playerRef.current = new (window as any).YT.Player('cinema-iframe', {
-          videoId,
-          playerVars: {
-            autoplay: 1,
-            controls: 1,
-            rel: 0,
-            showinfo: 0,
-            mute: 0,
-            enablejsapi: 1
-          },
-          events: {
-            onStateChange: (event: any) => {
-              // 0 means ended
-              if (event.data === 0) {
-                onEnded();
-              }
-            },
-            onError: () => {
-              // Skip broken videos
-              onEnded();
-            }
-          }
-        });
-      } else {
-        setTimeout(checkAndInit, 150);
-      }
-    };
-
-    checkAndInit();
-
-    return () => {
-      if (playerRef.current) {
-        try {
-          playerRef.current.destroy();
-        } catch (e) {}
-        playerRef.current = null;
-      }
-    };
-  }, [videoId, onEnded]);
-
-  return (
-    <div className="w-full aspect-video bg-black rounded-xl overflow-hidden border border-zinc-800 shadow-2xl relative">
-      <div id="cinema-iframe" className="w-full h-full" />
-    </div>
-  );
-}
 
 function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, handleDeleteNews, handleCommentNews, isDev }: any) {
   const [commentText, setCommentText] = useState('');
@@ -420,7 +507,18 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
          </button>
        )}
        <div className="flex items-center gap-3 pr-8">
-         <img src={news.profiles?.avatar_url} className="w-10 h-10 rounded-full object-cover border border-zinc-700" alt="" />
+         {(() => {
+           const uBorderConfig = parseBio(news.profiles?.bio);
+           const uBorder = PROFILE_BORDERS.find(b => b.id === uBorderConfig.profile_border) || PROFILE_BORDERS[0];
+           return (
+             <img 
+               src={news.profiles?.avatar_url} 
+               style={uBorder.avatarStyle}
+               className={`w-10 h-10 rounded-full object-cover border shrink-0 ${uBorderConfig.profile_border && uBorderConfig.profile_border !== 'none' ? 'border-transparent' : 'border-zinc-700'}`} 
+               alt="" 
+             />
+           );
+         })()}
          <div className="flex flex-col">
            <div className="flex items-center gap-1.5">
              <img src={getRank(news.profiles?.email, news.profiles?.id, news.profiles?.rank).icon} alt={getRank(news.profiles?.email, news.profiles?.id, news.profiles?.rank).name} className="h-4 object-contain" />
@@ -462,7 +560,18 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
              <div className="space-y-3 max-h-[250px] overflow-y-auto custom-scrollbar pr-1">
                {news.news_comments?.map((comment: any) => (
                  <div key={comment.id} className="flex gap-2.5"><UserProfileFontsLoader bio={comment.profiles?.bio} />
-                   <img src={comment.profiles?.avatar_url} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" alt="" />
+                   {(() => {
+                     const cBorderConfig = parseBio(comment.profiles?.bio);
+                     const cBorder = PROFILE_BORDERS.find(b => b.id === cBorderConfig.profile_border) || PROFILE_BORDERS[0];
+                     return (
+                       <img 
+                         src={comment.profiles?.avatar_url} 
+                         style={cBorder.avatarStyle}
+                         className={`w-7 h-7 rounded-full object-cover border shrink-0 ${cBorderConfig.profile_border && cBorderConfig.profile_border !== 'none' ? 'border-transparent' : 'border-zinc-700'}`} 
+                         alt="" 
+                       />
+                     );
+                   })()}
                    <div className="flex flex-col bg-[#1e1e22] rounded-2xl px-3 py-2 w-fit max-w-[90%]">
                      <span className="flex items-center gap-1.5 text-[13px] font-bold text-zinc-200 leading-tight mb-0.5">
                        <img src={getRank(comment.profiles?.email, comment.profiles?.id, comment.profiles?.rank).icon} alt={getRank(comment.profiles?.email, comment.profiles?.id, comment.profiles?.rank).name} className="h-3.5 object-contain" />
@@ -508,10 +617,6 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [onlineUsers, setOnlineUsers] = useState<Profile[]>([TEST_BOT]);
-  const [currentRoom, setCurrentRoom] = useState<'main' | 'cinema'>('main');
-  const [showRooms, setShowRooms] = useState(true);
-  const [localPlayedVideoIds, setLocalPlayedVideoIds] = useState<Set<string>>(new Set());
-  const [cinemaVideoInput, setCinemaVideoInput] = useState('');
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [leftPanelMode, setLeftPanelMode] = useState<'none' | 'menu' | 'news' | 'rules'>('none');
   const [newsFeed, setNewsFeed] = useState<News[]>([]);
@@ -909,56 +1014,6 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     }
   };
 
-  const handleSendCinemaVideo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!cinemaVideoInput.trim()) return;
-
-    let input = cinemaVideoInput.trim();
-    let url = input;
-    if (input.toLowerCase().startsWith('/video ')) {
-      url = input.substring('/video '.length).trim();
-    }
-
-    setCinemaVideoInput('');
-
-    // Insert user command message
-    const cmdId = crypto.randomUUID();
-    const cmdMsgText = `[cinema]/video ${url}`;
-    
-    // Add optimistically so it feels instant
-    const tempCmdMsg: Message = {
-      id: cmdId,
-      content: cmdMsgText,
-      created_at: new Date().toISOString(),
-      user_id: currentUserProfile.id,
-      profiles: currentUserProfile
-    };
-    setMessages(prev => [...prev, tempCmdMsg]);
-
-    const { error: cmdError } = await supabase.from('messages').insert({
-      id: cmdId,
-      content: cmdMsgText,
-      user_id: currentUserProfile.id
-    });
-
-    if (cmdError) {
-      console.error("Failed to queue video message:", cmdError);
-      setMessages(prev => prev.filter(m => m.id !== cmdId));
-      toast.error("Failed to queue video. Please try again.");
-      return;
-    }
-
-    // Insert Video Bot announcement [cinema-bot] so all clients render it in chat logs
-    const botId = crypto.randomUUID();
-    const botMsgText = `[cinema-bot]🎬 Video Bot: Registered a new movie in the queue requested by **${currentUserProfile.username}**! Grab your 🍿 popcorn!`;
-    
-    await supabase.from('messages').insert({
-      id: botId,
-      content: botMsgText,
-      user_id: currentUserProfile.id
-    });
-  };
-
   const handleLikeNews = async (newsId: string, hasLiked: boolean) => {
     setNewsFeed(prev => prev.map(news => {
       if (news.id !== newsId) return news;
@@ -1075,83 +1130,15 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     }
   };
 
-  const isCinemaMessage = (content: string) => {
-    return content.startsWith('[cinema]') || content.startsWith('[cinema-bot]');
-  };
-
   const visibleMessages = messages.filter(msg => {
-    const isCinema = isCinemaMessage(msg.content);
-    return currentRoom === 'cinema' ? isCinema : !isCinema;
+    return !msg.content.startsWith('[cinema]');
   });
 
   const transformMessage = (msg: Message) => {
-    let displayContent = msg.content;
-    let displayProfile = msg.profiles;
-
-    if (msg.content.startsWith('[cinema-bot]')) {
-      displayContent = msg.content.substring('[cinema-bot]'.length);
-      displayProfile = {
-        ...VIDEO_BOT,
-        email: msg.profiles?.email || VIDEO_BOT.email,
-        id: VIDEO_BOT.id
-      };
-    } else if (msg.content.startsWith('[cinema]/video ')) {
-      const rawUrl = msg.content.substring('[cinema]/video '.length).trim();
-      displayContent = `🎬 **Queued YouTube Video:** ${rawUrl}`;
-    } else if (msg.content.startsWith('[cinema]')) {
-      displayContent = msg.content.substring('[cinema]'.length);
-    }
-
-    return {
-      ...msg,
-      profiles: displayProfile,
-      content: displayContent
-    };
+    return msg;
   };
 
-  const cinemaQueue = messages
-    .filter(m => m.content.startsWith('[cinema]/video '))
-    .map(m => {
-      const url = m.content.substring('[cinema]/video '.length).trim();
-      const videoId = getYouTubeId(url) || url;
-      return {
-        messageId: m.id,
-        videoId,
-        originalUrl: url,
-        username: m.profiles?.username || 'User',
-        userId: m.user_id,
-        createdAt: m.created_at
-      };
-    })
-    .filter(v => !localPlayedVideoIds.has(v.messageId));
-
-  const activeVideo = cinemaQueue[0];
-
-  const handleVideoEnded = async () => {
-    if (!activeVideo) return;
-    const finishedId = activeVideo.messageId;
-
-    // Advance locally first to guarantee a smooth transition
-    setLocalPlayedVideoIds(prev => {
-      const updated = new Set(prev);
-      updated.add(finishedId);
-      return updated;
-    });
-
-    // Clean up from database
-    try {
-      await supabase.from('messages').delete().eq('id', finishedId);
-    } catch (e) {
-      console.warn("Database deletion skipped or failed:", e);
-    }
-  };
-
-  const displayOnlineUsers = onlineUsers.map(user => {
-    if (currentRoom === 'cinema' && user.id === TEST_BOT.id) {
-      return VIDEO_BOT;
-    }
-    return user;
-  });
+  const displayOnlineUsers = onlineUsers;
 
   const isDev = ['test@gmail.com', 'dev@gmail.com'].includes(currentUserProfile.email || '');
 
@@ -1177,47 +1164,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                        <ShieldCheck className="w-5 h-5 text-emerald-500" />
                      </button>
 
-                     {/* Room Switcher for Mobile/General */}
-                     <div className="mt-4 border-t border-zinc-800/60 pt-4">
-                       <span className="text-[10px] font-bold tracking-wider text-zinc-500 uppercase px-1.5 block mb-2">Switch Rooms</span>
-                       <div className="space-y-2">
-                         <button
-                           onClick={() => {
-                             setCurrentRoom('main');
-                             setLeftPanelMode('none');
-                           }}
-                           className={`w-full flex items-center justify-between p-3.5 rounded-xl text-sm font-semibold transition-all ${
-                             currentRoom === 'main'
-                               ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
-                               : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                           }`}
-                         >
-                           <div className="flex items-center gap-2.5">
-                             <Menu className="w-4 h-4" />
-                             <span>🌐 Main Chat</span>
-                           </div>
-                           {currentRoom === 'main' && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-                         </button>
 
-                         <button
-                           onClick={() => {
-                             setCurrentRoom('cinema');
-                             setLeftPanelMode('none');
-                           }}
-                           className={`w-full flex items-center justify-between p-3.5 rounded-xl text-sm font-semibold transition-all ${
-                             currentRoom === 'cinema'
-                               ? 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-400'
-                               : 'bg-zinc-900 border border-zinc-805 text-zinc-400 hover:text-zinc-200'
-                           }`}
-                         >
-                           <div className="flex items-center gap-2.5">
-                             <Film className="w-4 h-4 text-cyan-500" />
-                             <span>🎬 Cinema Room</span>
-                           </div>
-                           {currentRoom === 'cinema' && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />}
-                         </button>
-                       </div>
-                     </div>
                   </div>
                 </>
               )}
@@ -1364,65 +1311,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           </div>
         </header>
 
-        {/* Cinema Stage */}
-        {currentRoom === 'cinema' && (
-          <div className="bg-[#111113] border-b border-zinc-800 p-4 shrink-0 flex flex-col gap-4 max-w-4xl mx-auto w-full">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-xs font-mono tracking-wider font-bold text-zinc-300 uppercase">EMERALD CINEMA — CURRENT PLAYING</span>
-              </div>
-              <span className="text-xs font-mono text-zinc-500 tracking-wider">
-                {cinemaQueue.length} video{cinemaQueue.length !== 1 ? 's' : ''} in playlist queue
-              </span>
-            </div>
 
-            {activeVideo ? (
-              <div className="space-y-3">
-                <CinemaPlayer videoId={activeVideo.videoId} onEnded={handleVideoEnded} />
-                <div className="flex items-center justify-between bg-zinc-900/50 p-2.5 rounded-lg border border-zinc-800/80">
-                  <div className="flex items-center gap-2.5 overflow-hidden">
-                    <Youtube className="w-5 h-5 text-red-500 shrink-0" />
-                    <div className="text-xs truncate">
-                      <span className="font-bold text-zinc-300">Playing: </span>
-                      <span className="text-zinc-400 select-all">{activeVideo.originalUrl}</span>
-                    </div>
-                  </div>
-                  <div className="text-[10px] text-zinc-500 font-mono shrink-0">
-                    Requested by <span className="text-emerald-400 font-bold">{activeVideo.username}</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="w-full aspect-video bg-[#0d0d0f] rounded-xl border border-zinc-850 shadow-2xl flex flex-col items-center justify-center p-6 relative overflow-hidden group">
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-0" />
-                <Film className="w-12 h-12 text-zinc-750 mb-3 animate-pulse relative z-10" />
-                <h3 className="text-zinc-300 font-bold text-sm relative z-10">The Cinema Screen is Dark</h3>
-                <p className="text-zinc-500 text-xs text-center max-w-sm mt-1 relative z-10">
-                  Enter a YouTube link in the input bar at the bottom to start queuing movies!
-                </p>
-              </div>
-            )}
-
-            {/* Up next drawer */}
-            {cinemaQueue.length > 1 && (
-              <div className="border border-zinc-800/40 bg-zinc-900/10 p-2.5 rounded-lg">
-                <div className="flex items-center gap-2 text-xs text-zinc-400 mb-2 font-semibold">
-                  <ListVideo className="w-4 h-4 text-emerald-500" />
-                  <span>Up Next ({cinemaQueue.length - 1}):</span>
-                </div>
-                <div className="max-h-24 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
-                  {cinemaQueue.slice(1).map((v, i) => (
-                    <div key={v.messageId} className="flex justify-between text-[11px] bg-zinc-900/60 p-1.5 rounded border border-zinc-800/50 text-zinc-400 gap-4">
-                      <span className="truncate max-w-[200px] sm:max-w-md">{v.originalUrl}</span>
-                      <span className="shrink-0 text-zinc-500 italic">Queued by {v.username}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Message List */}
         <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
@@ -1440,12 +1329,20 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                 >
                   <UserProfileFontsLoader bio={renderMsg.profiles?.bio} />
                   <div className="flex items-start gap-3">
-                    <img 
-                      src={renderMsg.profiles?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=default'} 
-                      alt="Avatar" 
-                      className="h-[42px] w-[42px] rounded-md object-cover shrink-0 mt-0.5 border border-zinc-800 cursor-pointer"
-                      onClick={() => setSelectedProfileId(renderMsg.user_id)}
-                    />
+                    {(() => {
+                      const msgBio = parseBio(renderMsg.profiles?.bio);
+                      const msgBorderId = msgBio.profile_border || 'none';
+                      const msgBorder = PROFILE_BORDERS.find(b => b.id === msgBorderId) || PROFILE_BORDERS[0];
+                      return (
+                        <img 
+                          src={renderMsg.profiles?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=default'} 
+                          alt="Avatar" 
+                          style={msgBorder.avatarStyle}
+                          className={`h-[42px] w-[42px] rounded-md object-cover shrink-0 mt-0.5 cursor-pointer border ${msgBorderId === 'none' ? 'border-zinc-800' : 'border-transparent'}`}
+                          onClick={() => setSelectedProfileId(renderMsg.user_id)}
+                        />
+                      );
+                    })()}
                     <div className="flex flex-col w-full">
                       <div className="flex items-baseline justify-between mb-0.5">
                         <div className="flex items-center gap-2 leading-none">
@@ -1472,100 +1369,33 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
         {/* Input Area */}
         <div className="border-t border-zinc-800 bg-zinc-950 p-4">
-          {currentRoom === 'cinema' ? (
-            <form onSubmit={handleSendCinemaVideo} className="relative mx-auto max-w-4xl flex items-center gap-2 bg-[#141416] border border-zinc-800 rounded-[8px] p-2 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all">
-              <div className="pl-3 text-red-500 shrink-0">
-                <Youtube className="w-5 h-5 animate-pulse" />
-              </div>
-              <input
-                type="text"
-                value={cinemaVideoInput}
-                onChange={(e) => setCinemaVideoInput(e.target.value)}
-                placeholder="Enter YouTube link or type /video <link> here... "
-                className="w-full bg-transparent px-3 py-2 text-[14px] text-zinc-100 placeholder-zinc-500 focus:outline-none"
-              />
-              <button
-                type="submit"
-                disabled={!cinemaVideoInput.trim()}
-                className="flex px-4 py-2 text-xs font-bold shrink-0 items-center justify-center rounded-md bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:bg-zinc-800 disabled:text-zinc-600 gap-1.5"
-              >
-                <span>Queue Video</span>
-                <Send className="h-3 w-3" />
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleSendMessage} className="relative mx-auto max-w-4xl flex items-end gap-2 bg-[#1e1e22] border border-zinc-800 rounded-[8px] p-1.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all">
-              <textarea
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={handleKeyPress}
-                placeholder="Message Emerald Chat..."
-                className="max-h-[50vh] min-h-[40px] w-full resize-none bg-transparent px-3 py-2 text-[15px] text-zinc-100 placeholder-zinc-500 focus:outline-none custom-scrollbar"
-                rows={1}
-              />
-              <button
-                type="submit"
-                disabled={!newMessage.trim()}
-                className="mb-0.5 mr-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-white transition-colors hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600"
-              >
-                <Send className="h-[18px] w-[18px] ml-0.5" />
-              </button>
-            </form>
-          )}
+          <form onSubmit={handleSendMessage} className="relative mx-auto max-w-4xl flex items-end gap-2 bg-[#1e1e22] border border-zinc-800 rounded-[8px] p-1.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all">
+            <textarea
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Message Emerald Chat..."
+              className="max-h-[50vh] min-h-[40px] w-full resize-none bg-transparent px-3 py-2 text-[15px] text-zinc-100 placeholder-zinc-500 focus:outline-none custom-scrollbar"
+              rows={1}
+            />
+            <button
+              type="submit"
+              disabled={!newMessage.trim()}
+              className="mb-0.5 mr-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-white transition-colors hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600"
+            >
+              <Send className="h-[18px] w-[18px] ml-0.5" />
+            </button>
+          </form>
         </div>
       </div>
 
       {/* Right Sidebar */}
       <div className="hidden w-[280px] flex-col border-l border-zinc-800 bg-[#141416] lg:flex shrink-0">
-        <div className="px-4 py-4 border-b border-zinc-800/40 flex items-center justify-between">
+        <div className="px-4 py-4 border-b border-zinc-800/40">
           <div className="flex items-center gap-2 px-1">
             <span className="text-xs font-bold tracking-wider text-zinc-400 uppercase">Online — {displayOnlineUsers.length}</span>
           </div>
-          <button
-            onClick={() => setShowRooms(!showRooms)}
-            className={`p-1 text-zinc-400 hover:text-emerald-400 transition-colors rounded ${showRooms ? 'text-emerald-400 font-bold bg-[#1e1e22]' : ''}`}
-            title="Toggle Rooms List"
-          >
-            <Home className="w-4 h-4" />
-          </button>
         </div>
-
-        {showRooms && (
-          <div className="px-3 py-3 border-b border-zinc-800/40">
-            <span className="text-[10px] font-bold tracking-wider text-zinc-500 uppercase px-1.5 block mb-1.5">Chat Rooms</span>
-            <div className="space-y-1">
-              <button
-                onClick={() => setCurrentRoom('main')}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                  currentRoom === 'main'
-                    ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
-                    : 'bg-zinc-900/30 border border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Menu className="w-3.5 h-3.5" />
-                  <span>🌐 Main Chat</span>
-                </div>
-                {currentRoom === 'main' && <div className="w-1 h-1 rounded-full bg-emerald-400" />}
-              </button>
-
-              <button
-                onClick={() => setCurrentRoom('cinema')}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                  currentRoom === 'cinema'
-                    ? 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-400'
-                    : 'bg-zinc-900/30 border border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Film className="w-3.5 h-3.5 text-cyan-500" />
-                  <span>🎬 Cinema Room</span>
-                </div>
-                {currentRoom === 'cinema' && <div className="w-1 h-1 rounded-full bg-cyan-400 animate-pulse" />}
-              </button>
-            </div>
-          </div>
-        )}
 
         <div className="flex-1 overflow-y-auto px-3 pb-4 pt-2 custom-scrollbar">
           <div className="space-y-1">
@@ -1576,7 +1406,19 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                 className="flex w-full items-center gap-3 rounded-lg bg-[#1e1e22] px-3 py-2.5 transition-colors hover:bg-[#252529] focus:outline-none mb-1.5 border border-zinc-800/50"
               >
                 <div className="relative shrink-0">
-                  <img src={user.avatar_url} alt="Avatar" className="h-[34px] w-[34px] rounded-full object-cover" />
+                  {(() => {
+                    const onlineBio = parseBio(user.bio);
+                    const onlineBorderId = onlineBio.profile_border || 'none';
+                    const onlineBorder = PROFILE_BORDERS.find(b => b.id === onlineBorderId) || PROFILE_BORDERS[0];
+                    return (
+                      <img 
+                        src={user.avatar_url} 
+                        alt="Avatar" 
+                        style={onlineBorder.avatarStyle}
+                        className={`h-[34px] w-[34px] rounded-full object-cover border ${onlineBorderId === 'none' ? 'border-transparent' : 'border-transparent'}`} 
+                      />
+                    );
+                  })()}
                   <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#1e1e22] bg-emerald-500"></div>
                 </div>
                 <div className="flex flex-col items-start overflow-hidden w-full">
@@ -1613,7 +1455,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
-  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | null>(null);
+  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | 'border' | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'bio'>('bio');
   const [isPlaying, setIsPlaying] = useState(false);
   
@@ -1626,11 +1468,6 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
       setLoading(true);
       if (profileId === TEST_BOT.id) {
         setProfile(TEST_BOT);
-        setLoading(false);
-        return;
-      }
-      if (profileId === VIDEO_BOT.id) {
-        setProfile(VIDEO_BOT);
         setLoading(false);
         return;
       }
@@ -1770,10 +1607,17 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
 
   if (!profile && !loading) return null;
 
+  const viewerBorderId = bioData.profile_border || 'none';
+  const viewerBorder = PROFILE_BORDERS.find(b => b.id === viewerBorderId) || PROFILE_BORDERS[0];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+      <style dangerouslySetInnerHTML={{ __html: BORDER_KEYFRAMES }} />
       <UserProfileFontsLoader bio={profile?.bio} />
-      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-[#141416] border border-zinc-800 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+      <div 
+        style={viewerBorder.cardStyle}
+        className={`w-full max-w-md overflow-hidden rounded-2xl bg-[#141416] border shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 ${viewerBorder.className || ''}`}
+      >
         
         <button onClick={onClose} className="absolute right-3 top-3 z-10 p-1.5 bg-black/40 text-white rounded-full hover:bg-black/60 transition-colors">
           <X className="h-5 w-5" />
@@ -1809,7 +1653,10 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
               <div className="relative z-10 flex flex-col h-full overflow-y-auto pb-4 custom-scrollbar">
                 <div className="px-6 pb-4 relative shrink-0">
                   <div className="flex justify-between items-end">
-                    <div className="relative group mt-4 mb-4 border-4 border-[#141416] rounded-full h-24 w-24 bg-zinc-800">
+                    <div 
+                      style={viewerBorder.avatarStyle}
+                      className={`relative group mt-4 mb-4 border-4 rounded-full h-24 w-24 bg-zinc-800 shrink-0 ${viewerBorderId === 'none' ? 'border-[#141416]' : 'border-transparent'}`}
+                    >
                        <img src={profile!.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
                        {editMode && (
                         <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity rounded-full">
@@ -1833,7 +1680,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-xl font-bold text-white">{profile!.username}</h3>
-                      {!isSelf && profile!.id !== TEST_BOT.id && profile!.id !== VIDEO_BOT.id && (
+                      {!isSelf && profile!.id !== TEST_BOT.id && (
                         <button onClick={handleLikeProfile} className="flex items-center gap-1.5 focus:outline-none transition-transform hover:scale-110 active:scale-95 group" title="Like Profile">
                           <Heart className={`w-5 h-5 transition-colors ${profile.profile_likes?.some((l: any) => l.user_id === currentUserId) ? 'fill-emerald-500 text-emerald-500' : 'text-zinc-500 group-hover:text-emerald-400'}`} />
                           <span className="text-sm font-bold text-zinc-400">{profile.profile_likes?.length || 0}</span>
@@ -1946,6 +1793,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                       <button onClick={() => setActiveEditModal('username')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Username</button>
                       <button onClick={() => setActiveEditModal('music')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Music className="w-4 h-4 text-emerald-500" /> Edit Profile Music</button>
                       <button onClick={() => setActiveEditModal('card_bg')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><ImageIcon className="w-4 h-4 text-emerald-500" /> Edit Profile Card Background</button>
+                      <button onClick={() => setActiveEditModal('border')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><ShieldCheck className="w-4 h-4 text-emerald-500" /> Edit Profile Border</button>
                     </div>
                   </div>
                 )}
@@ -2008,6 +1856,218 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
           {(props) => <CardBgEditForm profile={profile!} {...props} />}
         </EditModal>
       )}
+      {activeEditModal === 'border' && (
+        <ProfileBorderForm 
+          profile={profile!} 
+          bioData={bioData} 
+          onClose={() => setActiveEditModal(null)} 
+          onSave={(val: any) => {
+            const newBio = stringifyBio({ 
+              ...bioData, 
+              profile_border: val.profile_border
+            });
+            updateProfileData({ bio: newBio });
+          }} 
+        />
+      )}
+    </div>
+  );
+}
+
+function ProfileBorderForm({ profile, onClose, onSave, bioData }: any) {
+  const [index, setIndex] = useState(() => {
+    const currentId = bioData.profile_border || 'none';
+    const foundIdx = PROFILE_BORDERS.findIndex(b => b.id === currentId);
+    return foundIdx >= 0 ? foundIdx : 0;
+  });
+  const [showGrid, setShowGrid] = useState(false);
+
+  const currentBorder = PROFILE_BORDERS[index];
+
+  const handlePrev = () => {
+    setIndex(prev => (prev - 1 + PROFILE_BORDERS.length) % PROFILE_BORDERS.length);
+  };
+
+  const handleNext = () => {
+    setIndex(prev => (prev + 1) % PROFILE_BORDERS.length);
+  };
+
+  const handleSave = () => {
+    onSave({ profile_border: currentBorder.id });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto select-none">
+      <div className="w-full max-w-sm rounded-2xl bg-[#09090b] border border-zinc-800 p-6 flex flex-col gap-6 relative shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+        
+        {/* Header bar aligned with mockup */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-white font-extrabold text-sm tracking-widest uppercase flex items-center gap-1.5">
+              🎨 Profile Borders
+            </span>
+          </div>
+          <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-full px-2.5 py-0.5 text-xs font-bold text-amber-400">
+            <span>🪙</span>
+            <span>1000</span>
+          </div>
+        </div>
+
+        {/* Style selection indicator */}
+        <div className="text-center">
+          <span className="text-[10px] uppercase tracking-[0.25em] font-black text-zinc-500">STYLE {index + 1} OF {PROFILE_BORDERS.length}</span>
+          <h4 className="text-sm font-bold text-emerald-400 mt-1">{currentBorder.name}</h4>
+        </div>
+
+        {/* Live Preview card exact mockup structure and wrapped in activeBorder styling! */}
+        <div className="flex justify-center w-full">
+          <div 
+            style={currentBorder.cardStyle} 
+            className={`w-full max-w-[270px] overflow-hidden rounded-2xl bg-[#141416] border shadow-2xl relative select-none shrink-0 transition-all duration-300 ${currentBorder.className || ''}`}
+          >
+            {/* Banner banner_url */}
+            <div className="h-16 w-full relative shrink-0">
+              <img src={profile.banner_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop'} alt="Banner" className="h-full w-full object-cover opacity-80" />
+            </div>
+
+            {/* Content card_bg container */}
+            <div 
+              style={bioData.profile_card_bg ? {
+                backgroundImage: `url(${bioData.profile_card_bg})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+              } : undefined}
+              className="px-3 pb-3 pt-1 relative"
+            >
+              {bioData.profile_card_bg && (
+                <div className="absolute inset-0 bg-zinc-950/85 backdrop-blur-[1px] z-0" />
+              )}
+
+              <div className="relative z-10 flex flex-col items-center">
+                {/* Avatar with offset */}
+                <div 
+                  style={currentBorder.avatarStyle}
+                  className={`mt-[-28px] border-4 rounded-full h-14 w-14 bg-zinc-800 relative z-20 shrink-0 overflow-hidden ${currentBorder.id === 'none' ? 'border-[#141416]' : 'border-transparent'}`}
+                >
+                  <img src={profile.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
+                </div>
+
+                {/* Nickname and verified badges */}
+                <div className="text-center mt-1.5 w-full">
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">💎 VIP</span>
+                  </div>
+                  <h3 className="text-sm font-extrabold text-white leading-tight mt-1">{profile.username}</h3>
+                  <span className="text-[8px] font-bold text-red-500 tracking-widest uppercase block mt-0.5 animate-pulse">Preview Mode</span>
+                </div>
+
+                {/* Simulated content info tab exact match to image mockup */}
+                <div className="w-full bg-zinc-950/50 border border-zinc-900 rounded-lg p-2 mt-2.5 flex flex-col gap-1 text-[9px]">
+                  <div className="flex justify-between items-center text-zinc-500 border-b border-zinc-900/60 pb-1">
+                    <span>🌐 Country</span>
+                    <span className="text-zinc-300 font-bold">United States</span>
+                  </div>
+                  <div className="flex justify-between items-center text-zinc-500 border-b border-zinc-900/60 pb-1">
+                    <span>🧬 Gender</span>
+                    <span className="text-zinc-300 font-bold">{profile.gender || 'Not Specified'}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-zinc-500 pb-0.5">
+                    <span>🎂 Language</span>
+                    <span className="text-zinc-300 font-bold">English</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* View Grid Overlay Drawer if open */}
+        {showGrid && (
+          <div className="absolute inset-x-0 bottom-0 bg-[#09090b] border-t border-zinc-800 rounded-t-2xl p-4 z-40 max-h-[80%] overflow-y-auto custom-scrollbar animate-in slide-in-from-bottom duration-200">
+            <div className="flex items-center justify-between mb-3.5 pb-2 border-b border-zinc-800/80">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-zinc-400">Available Borders Grid</span>
+              <button onClick={() => setShowGrid(false)} className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider hover:text-emerald-300">Done</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {PROFILE_BORDERS.map((border, bIdx) => (
+                <button
+                  key={border.id}
+                  onClick={() => {
+                    setIndex(bIdx);
+                    setShowGrid(false);
+                  }}
+                  className={`p-2.5 rounded-xl border text-left flex flex-col gap-0.5 transition-all ${
+                    index === bIdx 
+                      ? 'bg-emerald-500/10 border-emerald-500 text-white' 
+                      : 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                  }`}
+                >
+                  <span className="text-[11px] font-bold truncate">{border.name}</span>
+                  <span className="text-[9px] text-zinc-500 font-mono">Free</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Navigation row mimicking exact layout of image */}
+        <div className="flex items-center justify-between gap-3 shrink-0">
+          <button 
+            type="button" 
+            onClick={handlePrev}
+            className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800/80 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <button 
+            type="button" 
+            onClick={() => setShowGrid(true)}
+            className="flex-1 h-10 rounded-xl bg-[#141416] border border-zinc-800 hover:bg-zinc-800 hover:text-white flex items-center justify-center gap-1.5 text-zinc-400 text-[10px] font-bold tracking-wider uppercase active:scale-95 transition-all outline-none"
+          >
+            <Grid className="w-3.5 h-3.5 text-emerald-400" />
+            <span>View Grid</span>
+          </button>
+
+          <button 
+            type="button" 
+            onClick={handleNext}
+            className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800/80 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Action button row matching 'Next Style ➔' and '✓ Save' of image! */}
+        <div className="flex items-center gap-2.5 shrink-0 border-t border-zinc-900 pt-3.5">
+          <button 
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2 text-[10px] font-bold text-zinc-400 hover:text-white text-center tracking-wide uppercase transition-colors"
+          >
+            Cancel
+          </button>
+          
+          <button 
+            type="button"
+            onClick={handleNext}
+            className="flex-1 py-2 rounded-full bg-zinc-900/60 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 font-bold text-[10px] tracking-wider uppercase transition-all flex items-center justify-center gap-1 active:scale-95"
+          >
+            <span>Next Style</span>
+            <ArrowRight className="w-3 h-3" />
+          </button>
+
+          <button 
+            type="button"
+            onClick={handleSave}
+            className="flex-1 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] tracking-wider uppercase shadow-lg shadow-emerald-900/20 hover:shadow-emerald-950/30 active:scale-95 transition-all flex items-center justify-center gap-1 border border-emerald-500"
+          >
+            <Check className="w-3 h-3" />
+            <span>Save</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
