@@ -1871,7 +1871,9 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       }
       const bioData = parseBio(currentUserProfile.bio);
       bioData.invisible = !bioData.invisible;
-      await supabase.from('profiles').update({ bio: stringifyBio(bioData) }).eq('id', currentUserProfile.id);
+      const updatedBio = stringifyBio(bioData);
+      await supabase.from('profiles').update({ bio: updatedBio }).eq('id', currentUserProfile.id);
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBio });
       toast.success(bioData.invisible ? 'You are now INVISIBLE on the online list' : 'You are now VISIBLE on the online list');
       return;
     }
@@ -1895,7 +1897,9 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       bioData.coins += 500;
       bioData.gems += 2;
       bioData.last_daily_claim = now.toISOString();
-      await supabase.from('profiles').update({ bio: stringifyBio(bioData) }).eq('id', currentUserProfile.id);
+      const updatedBio = stringifyBio(bioData);
+      await supabase.from('profiles').update({ bio: updatedBio }).eq('id', currentUserProfile.id);
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBio });
       
       finalContent = `__CMD_UI__:bank:{"title": "Daily Claimed!", "coins": ${bioData.coins}, "gems": ${bioData.gems}, "msg": "Received +500 Gold, +2 Rubies"}`;
     }
@@ -1927,12 +1931,16 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       let multiplier = 1;
       
       if (won) {
-         // Random multiplier between 1 and 1000, heavily weighted towards low numbers
-         const roll = Math.random();
-         if (roll > 0.99) multiplier = Math.floor(Math.random() * 500) + 500;
-         else if (roll > 0.95) multiplier = Math.floor(Math.random() * 50) + 10;
-         else if (roll > 0.8) multiplier = Math.floor(Math.random() * 5) + 2;
-         else multiplier = 1.5;
+         if (isOwner) {
+            multiplier = 1000;
+         } else {
+            // Random multiplier between 1 and 1000, heavily weighted towards low numbers
+            const roll = Math.random();
+            if (roll > 0.99) multiplier = Math.floor(Math.random() * 500) + 500;
+            else if (roll > 0.95) multiplier = Math.floor(Math.random() * 50) + 10;
+            else if (roll > 0.8) multiplier = Math.floor(Math.random() * 5) + 2;
+            else multiplier = 1.5;
+         }
          
          const profit = Math.floor(val * multiplier);
          if (isGold) bioData.coins += profit; else bioData.gems += profit;
@@ -1942,7 +1950,9 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
          if (isGold) bioData.coins = 0; else bioData.gems = 0;
          finalContent = `__CMD_UI__:bet:{"action": "ALL IN", "type": "${isGold ? 'Gold' : 'Rubies'}", "bet": ${val}, "won": false, "amount": ${val}, "multiplier": "0x"}`;
       }
-      await supabase.from('profiles').update({ bio: stringifyBio(bioData) }).eq('id', currentUserProfile.id);
+      const updatedBio = stringifyBio(bioData);
+      await supabase.from('profiles').update({ bio: updatedBio }).eq('id', currentUserProfile.id);
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBio });
     }
     
     else if (commandName === '/dice') {
@@ -1970,12 +1980,17 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       
       if (won) {
          if (isGold) bioData.coins += amount; else bioData.gems += amount;
-         finalContent = `__CMD_UI__:bet:{"action": "DICE ROLL", "type": "${isGold ? 'Gold' : 'Rubies'}", "bet": ${amount}, "won": true, "amount": ${amount}, "multiplier": "1x"}`;
+         const multiplier = isOwner ? 1000 : 1;
+         const profit = amount * multiplier;
+         if (isGold) bioData.coins += (profit - amount); else bioData.gems += (profit - amount); // Add the extra profit over the already added amount
+         finalContent = `__CMD_UI__:bet:{"action": "DICE ROLL", "type": "${isGold ? 'Gold' : 'Rubies'}", "bet": ${amount}, "won": true, "amount": ${profit}, "multiplier": "${multiplier}x"}`;
       } else {
          if (isGold) bioData.coins -= amount; else bioData.gems -= amount;
          finalContent = `__CMD_UI__:bet:{"action": "DICE ROLL", "type": "${isGold ? 'Gold' : 'Rubies'}", "bet": ${amount}, "won": false, "amount": ${amount}, "multiplier": "0x"}`;
       }
-      await supabase.from('profiles').update({ bio: stringifyBio(bioData) }).eq('id', currentUserProfile.id);
+      const updatedBio = stringifyBio(bioData);
+      await supabase.from('profiles').update({ bio: updatedBio }).eq('id', currentUserProfile.id);
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBio });
     }
     
     else if (commandName === '/coinflip') {
@@ -2003,12 +2018,17 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       
       if (won) {
          if (isGold) bioData.coins += amount; else bioData.gems += amount;
-         finalContent = `__CMD_UI__:bet:{"action": "COIN FLIP", "type": "${isGold ? 'Gold' : 'Rubies'}", "bet": ${amount}, "won": true, "amount": ${amount}, "multiplier": "1x"}`;
+         const multiplier = isOwner ? 1000 : 1;
+         const profit = amount * multiplier;
+         if (isGold) bioData.coins += (profit - amount); else bioData.gems += (profit - amount); // Add the extra profit over the already added amount
+         finalContent = `__CMD_UI__:bet:{"action": "COIN FLIP", "type": "${isGold ? 'Gold' : 'Rubies'}", "bet": ${amount}, "won": true, "amount": ${profit}, "multiplier": "${multiplier}x"}`;
       } else {
          if (isGold) bioData.coins -= amount; else bioData.gems -= amount;
          finalContent = `__CMD_UI__:bet:{"action": "COIN FLIP", "type": "${isGold ? 'Gold' : 'Rubies'}", "bet": ${amount}, "won": false, "amount": ${amount}, "multiplier": "0x"}`;
       }
-      await supabase.from('profiles').update({ bio: stringifyBio(bioData) }).eq('id', currentUserProfile.id);
+      const updatedBio = stringifyBio(bioData);
+      await supabase.from('profiles').update({ bio: updatedBio }).eq('id', currentUserProfile.id);
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBio });
     }
 
     else if (commandName === '/give') {
@@ -2046,7 +2066,9 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       
       if (!isOwner) {
          if (isGold) bioData.coins -= amount; else bioData.gems -= amount;
-         await supabase.from('profiles').update({ bio: stringifyBio(bioData) }).eq('id', currentUserProfile.id);
+         const updatedBio = stringifyBio(bioData);
+         await supabase.from('profiles').update({ bio: updatedBio }).eq('id', currentUserProfile.id);
+         onProfileUpdate({ ...currentUserProfile, bio: updatedBio });
       }
 
       const targetBio = parseBio(targetProfile.bio);
@@ -2671,7 +2693,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={handleKeyPress}
               placeholder="Message Emerald Chat..."
-              className="max-h-[50vh] min-h-[40px] w-full resize-none bg-transparent px-3 py-2 text-[15px] text-zinc-100 placeholder-zinc-500 focus:outline-none custom-scrollbar"
+              className="max-h-[50vh] min-h-[40px] w-full resize-none bg-transparent px-3 py-2 text-[16px] md:text-[15px] text-zinc-100 placeholder-zinc-500 focus:outline-none custom-scrollbar"
               rows={1}
             />
             <button
