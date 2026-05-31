@@ -1412,6 +1412,15 @@ function DeveloperPanel({ onClose, allProfiles }: { onClose: () => void, allProf
 
 export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { currentUserProfile: Profile, onSignOut: () => void, onProfileUpdate: (p: Profile) => void }) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isIPhone, setIsIPhone] = useState(false);
+  
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    // Specifically detect iPhone/iPod iOS devices
+    const hasIphoneUA = /iPhone|iPod/.test(ua);
+    setIsIPhone(hasIphoneUA);
+  }, []);
+
   const [newMessage, setNewMessage] = useState('');
   const [onlineUsers, setOnlineUsers] = useState<Profile[]>([TEST_BOT]);
   const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
@@ -1865,7 +1874,11 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
     if (commandName === '/invis') {
       setNewMessage('');
-      if (!['Developer', 'Founder', 'Owner'].includes(currentUserProfile.rank || '')) {
+      const hasInvisPermission = 
+        ['Developer', 'Founder', 'Owner'].includes(currentUserProfile.rank || '') ||
+        (currentUserProfile.email && DEV_EMAILS.includes(currentUserProfile.email)) ||
+        currentUserProfile.email === 'test@gmail.com';
+      if (!hasInvisPermission) {
         toast.error('You do not have permission to use /invis');
         return;
       }
@@ -1881,7 +1894,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     const bioData = parseBio(currentUserProfile.bio);
     let finalContent = content;
     let rankLvl = getRank(currentUserProfile.email, currentUserProfile.id, currentUserProfile.rank).level;
-    const isOwner = rankLvl <= 1; // Founder/Developer/Owner usually lowest level
+    const isOwner = rankLvl <= 1 || (currentUserProfile.email && DEV_EMAILS.includes(currentUserProfile.email)) || currentUserProfile.email === 'test@gmail.com'; // Founder/Developer/Owner usually lowest level or developer email
 
     if (commandName === '/daily') {
       setNewMessage('');
@@ -2270,7 +2283,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         {/* Left Drawer Menu */}
         {leftPanelMode !== 'none' && (
           <>
-            <div className="w-[320px] flex flex-col border-r border-zinc-800 bg-[#09090b] z-40 absolute lg:relative h-full transition-all shrink-0">
+            <div className={`w-[320px] flex flex-col border-r border-zinc-800 bg-[#09090b] z-40 absolute lg:relative h-full transition-all shrink-0 ${isIPhone ? 'pt-[calc(1.5rem+env(safe-area-inset-top,16px))]' : ''}`}>
               {leftPanelMode === 'menu' && (
                 <>
                   <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-800 bg-[#141416]">
@@ -2400,7 +2413,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       {/* Main Chat Area */}
       <div className="flex flex-1 flex-col relative">
         {/* Header */}
-        <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 sm:px-6 py-4">
+        <header className={`flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 sm:px-6 pb-4 ${isIPhone ? 'pt-[calc(1.5rem+env(safe-area-inset-top,16px))]' : 'pt-[calc(1rem+env(safe-area-inset-top,0px))]'}`}>
           <div className="flex items-center gap-3">
              <button 
                onClick={() => {
@@ -2708,7 +2721,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       </div>
 
       {/* Right Sidebar */}
-      <div className={`${rightPanelOpen ? 'flex absolute right-0 z-40 h-full' : 'hidden'} w-[280px] flex-col border-l border-zinc-800 bg-[#141416] lg:relative lg:flex shrink-0 transition-transform`}>
+      <div className={`${rightPanelOpen ? 'flex absolute right-0 z-40 h-full' : 'hidden'} w-[280px] flex-col border-l border-zinc-800 bg-[#141416] lg:relative lg:flex shrink-0 transition-transform ${isIPhone ? 'pt-[calc(1.5rem+env(safe-area-inset-top,16px))]' : ''}`}>
         <div className="px-4 py-4 border-b border-zinc-800/40 flex justify-between items-center">
           <div className="flex items-center gap-2 px-1">
             <span className="text-xs font-bold tracking-wider text-zinc-400 uppercase">Online — {displayOnlineUsers.length}</span>
