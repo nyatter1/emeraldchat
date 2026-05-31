@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile, Message, News, ProfileLike } from '../types';
-import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, CheckCircle, Sparkles, ArrowLeft, Globe, User, MessageSquare, Layers, Wallet, Settings } from 'lucide-react';
+import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, CheckCircle, Sparkles, ArrowLeft, Globe, User, MessageSquare, Layers, Wallet, Settings, Plus, Coins, Paintbrush } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import Markdown from 'react-markdown';
@@ -12,6 +13,7 @@ import { USERCARD_STYLES } from '../usercardStyles';
 
 const SPOTIFY_URL_REGEX = /https:\/\/open\.spotify\.com\/(track|album|playlist|episode)\/([a-zA-Z0-9]+)(\?.*)?/;
 const IMAGE_EXT_REGEX = /\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i;
+const VIDEO_EXT_REGEX = /\.(mp4|webm|ogg|mov)(\?.*)?$/i;
 const FORBIDDEN_TLDS = /\.(online|site|indevs\.in)(\/.*)?$/i;
 
 export const DEV_EMAILS = ['test@gmail.com', 'dev@gmail.com', 'haydensixseven@gmail.com'];
@@ -744,8 +746,8 @@ function isSafeUrl(url: string | undefined): boolean {
   // Explicitly check forbidden TLDs first
   if (FORBIDDEN_TLDS.test(lowerUrl)) return false;
   
-  // Whitelist: Spotify or direct image links
-  return SPOTIFY_URL_REGEX.test(url) || IMAGE_EXT_REGEX.test(url);
+  // Whitelist: Spotify, direct image, or video links
+  return SPOTIFY_URL_REGEX.test(url) || IMAGE_EXT_REGEX.test(url) || VIDEO_EXT_REGEX.test(url);
 }
 
 function scrubContent(text: string): string {
@@ -781,6 +783,16 @@ const MarkdownComponents = {
     if (isSafeUrl(href)) {
       if (IMAGE_EXT_REGEX.test(lowerHref)) {
         return <img src={href} alt={children?.toString() || 'Image'} className="max-w-full rounded-lg my-2 border border-zinc-800" loading="lazy" />;
+      }
+      if (VIDEO_EXT_REGEX.test(lowerHref)) {
+        return (
+          <video 
+            src={href} 
+            controls 
+            className="max-w-full rounded-lg my-2 border border-zinc-800 max-h-[360px] bg-black" 
+            playsInline 
+          />
+        );
       }
       return <a href={href} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline break-all" {...props}>{processChildrenWithStyles(children)}</a>;
     }
@@ -1431,6 +1443,11 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   }, []);
 
   const [newMessage, setNewMessage] = useState('');
+  const [showAddons, setShowAddons] = useState(false);
+  const [showConvertCoinsModal, setShowConvertCoinsModal] = useState(false);
+  const [showPaintCanvasModal, setShowPaintCanvasModal] = useState(false);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  
   const [onlineUsers, setOnlineUsers] = useState<Profile[]>([TEST_BOT]);
   const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
   const [showDeveloperPanel, setShowDeveloperPanel] = useState(false);
@@ -2157,6 +2174,61 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     }
   };
 
+  const sendDirectMessage = async (contentStr: string) => {
+    if (globalAdminState.muted_users.includes(currentUserProfile.id)) {
+      toast.error("You are currently muted.");
+      return;
+    }
+    const tempId = crypto.randomUUID();
+    const tempMessage: Message = {
+      id: tempId,
+      content: contentStr,
+      created_at: new Date().toISOString(),
+      user_id: currentUserProfile.id,
+      profiles: currentUserProfile
+    };
+    setMessages(prev => [...prev, tempMessage]);
+    
+    const { error } = await supabase
+      .from('messages')
+      .insert({ id: tempId, content: contentStr, user_id: currentUserProfile.id });
+      
+    if (error) {
+       console.error("sendDirectMessage error:", error);
+       setMessages(prev => prev.filter(m => m.id !== tempId));
+       toast.error("Failed to send content.");
+    }
+  };
+
+  const handleDirectFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingFile(true);
+    const fileExt = file.name.split('.').pop();
+    const randomId = crypto.randomUUID();
+    const filePath = `attachments/${currentUserProfile.id}/${randomId}.${fileExt}`;
+
+    const uploadToast = toast.loading(`Uploading ${file.name}...`);
+
+    try {
+      const { error: uploadError } = await supabase.storage.from('banners').upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('banners').getPublicUrl(filePath);
+      if (!data?.publicUrl) throw new Error("Could not construct public URL");
+
+      await sendDirectMessage(data.publicUrl);
+      toast.success("File uploaded and sent!", { id: uploadToast });
+    } catch (error: any) {
+      console.error("Error uploading file:", error);
+      toast.error(`Upload failed: ${error.message || 'Unknown error'}`, { id: uploadToast });
+    } finally {
+      setIsUploadingFile(false);
+      e.target.value = '';
+    }
+  };
+
   const handleLikeNews = async (newsId: string, hasLiked: boolean) => {
     setNewsFeed(prev => prev.map(news => {
       if (news.id !== newsId) return news;
@@ -2714,6 +2786,71 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         {/* Input Area */}
         <div className="border-t border-zinc-800 bg-zinc-950 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
           <form onSubmit={handleSendMessage} className="relative mx-auto max-w-4xl flex items-end gap-2 bg-[#1e1e22] border border-zinc-800 rounded-[8px] p-1.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all">
+            <div className="flex items-center gap-1.5 pl-1 mb-1 self-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowAddons(!showAddons)}
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-200 focus:outline-none ${
+                  showAddons ? 'bg-zinc-700 text-zinc-100 rotate-45' : 'bg-[#29292e] text-zinc-400 hover:text-emerald-400 hover:bg-[#34343a]'
+                }`}
+                title="Add integrations"
+              >
+                <Plus className="h-5 w-5" />
+              </button>
+              <AnimatePresence>
+                {showAddons && (
+                  <motion.div
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 'auto' }}
+                    exit={{ opacity: 0, width: 0 }}
+                    className="flex items-center gap-1.5 overflow-hidden pr-1"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowConvertCoinsModal(true);
+                        setShowAddons(false);
+                      }}
+                      title="Gold & Ruby Treasury"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-zinc-400 hover:text-amber-400 hover:bg-[#34343a] transition-colors"
+                    >
+                      <Coins className="h-[18px] w-[18px]" />
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPaintCanvasModal(true);
+                        setShowAddons(false);
+                      }}
+                      title="Paint & Color Canvas"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-zinc-400 hover:text-indigo-400 hover:bg-[#34343a] transition-colors"
+                    >
+                      <Paintbrush className="h-[18px] w-[18px]" />
+                    </button>
+
+                    <label
+                      title="Send Image/GIF/Video (MP4)"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-zinc-400 hover:text-emerald-400 hover:bg-[#34343a] transition-colors cursor-pointer"
+                    >
+                      {isUploadingFile ? (
+                        <Loader2 className="h-[18px] w-[18px] animate-spin text-emerald-400" />
+                      ) : (
+                        <Upload className="h-[18px] w-[18px]" />
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*,video/mp4,video/webm,image/gif"
+                        className="hidden"
+                        onChange={handleDirectFileUpload}
+                        disabled={isUploadingFile}
+                      />
+                    </label>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
@@ -2874,6 +3011,22 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
       {showDeveloperPanel && (
         <DeveloperPanel onClose={() => setShowDeveloperPanel(false)} allProfiles={allProfiles} />
+      )}
+
+      {showConvertCoinsModal && (
+        <ConvertCoinsGemsModal 
+          currentUserProfile={currentUserProfile}
+          onProfileUpdate={onProfileUpdate}
+          onClose={() => setShowConvertCoinsModal(false)}
+        />
+      )}
+
+      {showPaintCanvasModal && (
+        <PaintCanvasModal 
+          onSendDrawing={sendDirectMessage}
+          currentUserProfile={currentUserProfile}
+          onClose={() => setShowPaintCanvasModal(false)}
+        />
       )}
 
     </div>
@@ -5942,6 +6095,643 @@ function CardBgEditForm({ profile, data, setData }: any) {
             </button>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ConvertCoinsGemsModal({ 
+  currentUserProfile, 
+  onProfileUpdate, 
+  onClose 
+}: { 
+  currentUserProfile: Profile; 
+  onProfileUpdate: (p: Profile) => void; 
+  onClose: () => void; 
+}) {
+  const bioData = parseBio(currentUserProfile.bio);
+  const currentGold = bioData.coins ?? 1000;
+  const currentRubies = bioData.gems ?? 5;
+
+  const [mode, setMode] = useState<'goldToRubies' | 'rubiesToGold'>('goldToRubies');
+  const [amountStr, setAmountStr] = useState<string>('');
+  const [converting, setConverting] = useState(false);
+
+  // Computed results
+  const amount = parseInt(amountStr, 10) || 0;
+  const expectedResult = mode === 'goldToRubies' 
+    ? Math.floor(amount / 1000) 
+    : amount * 1000;
+
+  const handleConvert = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (amount <= 0) {
+      toast.error("Please enter a valid amount greater than 0.");
+      return;
+    }
+
+    if (mode === 'goldToRubies') {
+      if (currentGold < amount) {
+        toast.error("You do not have enough Gold!");
+        return;
+      }
+      if (amount < 1000) {
+        toast.error("Minimum gold conversion is 1000 Gold.");
+        return;
+      }
+      const rubiesToGet = Math.floor(amount / 1000);
+      if (rubiesToGet <= 0) {
+        toast.error("You need at least 1000 Gold to get 1 Ruby.");
+        return;
+      }
+
+      setConverting(true);
+      const updatedBio = {
+        ...bioData,
+        coins: currentGold - amount,
+        gems: currentRubies + rubiesToGet
+      };
+      
+      const updatedBioStr = stringifyBio(updatedBio);
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ bio: updatedBioStr })
+          .eq('id', currentUserProfile.id);
+
+        if (error) throw error;
+        
+        onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+        toast.success(`Exchanged ${amount} Gold for ${rubiesToGet} Ruby!`);
+        setAmountStr('');
+      } catch (err: any) {
+        console.error(err);
+        toast.error(`Exchange failed: ${err.message || 'Unknown error'}`);
+      } finally {
+        setConverting(false);
+      }
+    } else {
+      if (currentRubies < amount) {
+        toast.error("You do not have enough Rubies!");
+        return;
+      }
+
+      setConverting(true);
+      const goldToGet = amount * 1000;
+      const updatedBio = {
+        ...bioData,
+        gems: currentRubies - amount,
+        coins: currentGold + goldToGet
+      };
+      
+      const updatedBioStr = stringifyBio(updatedBio);
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ bio: updatedBioStr })
+          .eq('id', currentUserProfile.id);
+
+        if (error) throw error;
+        
+        onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+        toast.success(`Exchanged ${amount} Ruby for ${goldToGet} Gold!`);
+        setAmountStr('');
+      } catch (err: any) {
+        console.error(err);
+        toast.error(`Exchange failed: ${err.message || 'Unknown error'}`);
+      } finally {
+        setConverting(false);
+      }
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-[#141416] p-6 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
+          <div className="flex items-center gap-2">
+            <Coins className="h-5 w-5 text-amber-500 animate-pulse" />
+            <span className="text-lg font-bold text-white tracking-wide">Treasury Exchange</span>
+          </div>
+          <button 
+            onClick={onClose}
+            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Balance Status Card */}
+        <div className="bg-zinc-950/50 border border-zinc-800/40 rounded-xl p-4 my-4 flex justify-around text-center">
+          <div>
+            <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Your Gold</div>
+            <div className="flex items-center justify-center gap-1.5 text-lg font-extrabold text-amber-400">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#FFB800" /><circle cx="12" cy="12" r="8" fill="#FFC700" /><path d="M12 6L13.8 9.6L17.5 10L14.7 12.6L15.5 16.5L12 14.5L8.5 16.5L9.3 12.6L6.5 10L10.2 9.6L12 6Z" fill="#FFD600" /></svg>
+              <span>{currentGold}</span>
+            </div>
+          </div>
+          <div className="h-10 w-px bg-zinc-800 self-center"></div>
+          <div>
+            <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Your Rubies</div>
+            <div className="flex items-center justify-center gap-1.5 text-lg font-extrabold text-pink-500">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 9L12 22L22 9L12 2Z" fill="#ff007f" /><path d="M12 2L2 9L12 12V2Z" fill="#ff4da6" /><path d="M22 9L12 2V12L22 9Z" fill="#cc0066" /><path d="M2 9L12 22V12L2 9Z" fill="#e60073" /><path d="M22 9L12 22V12L22 9Z" fill="#99004d" /></svg>
+              <span>{currentRubies}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Selector */}
+        <div className="flex bg-[#252529]/60 border border-zinc-800 p-1 rounded-lg gap-1.5 mb-4 border-zinc-800/80">
+          <button
+            type="button"
+            onClick={() => { setMode('goldToRubies'); setAmountStr(''); }}
+            className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${
+              mode === 'goldToRubies' 
+                ? 'bg-amber-500 text-black shadow-md' 
+                : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            Gold → Rubies
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('rubiesToGold'); setAmountStr(''); }}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
+              mode === 'rubiesToGold' 
+                ? 'bg-pink-600 text-white shadow-md' 
+                : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            Rubies → Gold
+          </button>
+        </div>
+
+        <form onSubmit={handleConvert} className="space-y-4">
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">
+              Amount to Exchange ({mode === 'goldToRubies' ? 'Gold' : 'Rubies'})
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                min="1"
+                placeholder={mode === 'goldToRubies' ? "Min. 1000 Gold" : "Number of Rubies"}
+                value={amountStr}
+                onChange={(e) => setAmountStr(e.target.value)}
+                className="w-full bg-zinc-950/80 border border-zinc-800 rounded-lg py-2.5 pl-3 pr-16 text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-sm font-medium"
+                required
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-500">
+                {mode === 'goldToRubies' ? 'GOLD' : 'RUBY'}
+              </span>
+            </div>
+          </div>
+
+          {/* Rate & Live Result */}
+          <div className="bg-zinc-950/30 border border-zinc-800/30 rounded-lg p-3 text-xs space-y-1.5">
+            <div className="flex justify-between">
+              <span className="text-zinc-500">Conversion Rate:</span>
+              <span className="font-semibold text-zinc-300">1000 Gold = 1 Ruby</span>
+            </div>
+            <div className="flex justify-between border-t border-zinc-800/40 pt-1.5 mt-1.5 text-sm">
+              <span className="text-zinc-400 font-medium">You will receive:</span>
+              <span className={`font-extrabold ${mode === 'goldToRubies' ? 'text-pink-400' : 'text-amber-400'}`}>
+                {mode === 'goldToRubies' 
+                  ? `${expectedResult} Ruby` 
+                  : `${expectedResult} Gold`}
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={converting || amount <= 0 || (mode === 'goldToRubies' && currentGold < amount) || (mode === 'rubiesToGold' && currentRubies < amount)}
+            className={`w-full py-2.5 rounded-lg text-sm font-bold shadow-lg transition-all duration-150 ${
+              converting
+                ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                : mode === 'goldToRubies'
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-black hover:brightness-110 active:scale-[0.98] disabled:bg-zinc-800/50 disabled:text-zinc-650 disabled:pointer-events-none'
+                  : 'bg-gradient-to-r from-pink-500 to-pink-600 text-white hover:brightness-110 active:scale-[0.98] disabled:bg-zinc-800/50 disabled:text-zinc-650 disabled:pointer-events-none'
+            }`}
+          >
+            {converting ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" /> Exchanging...
+              </span>
+            ) : (
+              `Exchange to ${mode === 'goldToRubies' ? 'Rubies' : 'Gold'}`
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function PaintCanvasModal({ 
+  onSendDrawing, 
+  currentUserProfile, 
+  onClose 
+}: { 
+  onSendDrawing: (contentStr: string) => Promise<void>; 
+  currentUserProfile: Profile; 
+  onClose: () => void; 
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [tool, setTool] = useState<'brush' | 'bucket' | 'eraser'>('brush');
+  const [color, setColor] = useState('#ffffff');
+  const [brushSize, setBrushSize] = useState(6);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Initialize canvas dark backdrop
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#1e1e22';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+  }, []);
+
+  const getCoordinates = (e: any) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    
+    if (e.touches && e.touches[0]) {
+      return {
+        x: Math.round(((e.touches[0].clientX - rect.left) / rect.width) * canvas.width),
+        y: Math.round(((e.touches[0].clientY - rect.top) / rect.height) * canvas.height),
+      };
+    }
+    
+    return {
+      x: Math.round(((e.clientX - rect.left) / rect.width) * canvas.width),
+      y: Math.round(((e.clientY - rect.top) / rect.height) * canvas.height),
+    };
+  };
+
+  const startDrawing = (e: any) => {
+    e.preventDefault();
+    const { x, y } = getCoordinates(e);
+    
+    if (tool === 'bucket') {
+      handleFloodFill(x, y, color);
+      return;
+    }
+
+    setIsDrawing(true);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineWidth = brushSize;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = tool === 'eraser' ? '#1e1e22' : color;
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      }
+    }
+  };
+
+  const draw = (e: any) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const { x, y } = getCoordinates(e);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.lineTo(x, y);
+        ctx.lineWidth = brushSize;
+        ctx.strokeStyle = tool === 'eraser' ? '#1e1e22' : color;
+        ctx.stroke();
+      }
+    }
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#1e1e22';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+  };
+
+  const handleFloodFill = (startX: number, startY: number, fillColor: string) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const data = imgData.data;
+
+    const hexToRgb = (hex: string) => {
+      let c = hex.replace('#', '');
+      if (c.length === 3) {
+        c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+      }
+      const r = parseInt(c.substring(0, 2), 16);
+      const g = parseInt(c.substring(2, 4), 16);
+      const b = parseInt(c.substring(4, 6), 16);
+      return { r, g, b };
+    };
+
+    const targetColor = hexToRgb(fillColor);
+    const targetIdx = (startY * width + startX) * 4;
+    const startR = data[targetIdx];
+    const startG = data[targetIdx + 1];
+    const startB = data[targetIdx + 2];
+    const startA = data[targetIdx + 3];
+
+    if (startR === targetColor.r && startG === targetColor.g && startB === targetColor.b && startA === 255) {
+      return;
+    }
+
+    const matchColor = (idx: number) => {
+      return (
+        Math.abs(data[idx] - startR) < 30 &&
+        Math.abs(data[idx + 1] - startG) < 30 &&
+        Math.abs(data[idx + 2] - startB) < 30 &&
+        Math.abs(data[idx + 3] - startA) < 30
+      );
+    };
+
+    const queue: [number, number][] = [[startX, startY]];
+    while (queue.length > 0) {
+      const [cx, cy] = queue.shift()!;
+      
+      const idx = (cy * width + cx) * 4;
+      if (!matchColor(idx)) continue;
+
+      data[idx] = targetColor.r;
+      data[idx + 1] = targetColor.g;
+      data[idx + 2] = targetColor.b;
+      data[idx + 3] = 255;
+
+      if (cx > 0) {
+        const leftIdx = (cy * width + (cx - 1)) * 4;
+        if (matchColor(leftIdx) && data[leftIdx] !== targetColor.r) {
+          queue.push([cx - 1, cy]);
+        }
+      }
+      if (cx < width - 1) {
+        const rightIdx = (cy * width + (cx + 1)) * 4;
+        if (matchColor(rightIdx) && data[rightIdx] !== targetColor.r) {
+          queue.push([cx + 1, cy]);
+        }
+      }
+      if (cy > 0) {
+        const topIdx = ((cy - 1) * width + cx) * 4;
+        if (matchColor(topIdx) && data[topIdx] !== targetColor.r) {
+          queue.push([cx, cy - 1]);
+        }
+      }
+      if (cy < height - 1) {
+        const botIdx = ((cy + 1) * width + cx) * 4;
+        if (matchColor(botIdx) && data[botIdx] !== targetColor.r) {
+          queue.push([cx, cy + 1]);
+        }
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+  };
+
+  const handleSave = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    setSaving(true);
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        toast.error("Failed to capture painting.");
+        setSaving(false);
+        return;
+      }
+
+      const file = new File([blob], `painting_${Date.now()}.png`, { type: 'image/png' });
+      const filePath = `paintings/${currentUserProfile.id}/${file.name}`;
+      
+      const paintToast = toast.loading("Saving and sending drawing...");
+      try {
+        const { error: uploadError } = await supabase.storage.from('banners').upload(filePath, file);
+        if (uploadError) throw uploadError;
+
+        const { data } = supabase.storage.from('banners').getPublicUrl(filePath);
+        if (!data?.publicUrl) throw new Error("Could not acquire public URL");
+
+        await onSendDrawing(data.publicUrl);
+        toast.success("Drawing shared successfully!", { id: paintToast });
+        onClose();
+      } catch (err: any) {
+        console.error(err);
+        toast.error(`Failed to post drawing: ${err.message || 'Unknown error'}`, { id: paintToast });
+      } finally {
+        setSaving(false);
+      }
+    }, 'image/png');
+  };
+
+  const colors = [
+    '#ffffff', '#ef4444', '#f97316', '#f59e0b', '#22c55e', 
+    '#10b981', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#000000', '#6b7280'
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-2xl rounded-xl border border-zinc-800 bg-[#141416] p-5 shadow-2xl flex flex-col gap-4">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
+          <div className="flex items-center gap-2">
+            <Paintbrush className="h-5 w-5 text-indigo-400" />
+            <span className="text-lg font-bold text-white tracking-wide">Emerald Paintpad</span>
+          </div>
+          <button 
+            onClick={onClose}
+            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Content body split into Canvas and Controls */}
+        <div className="flex flex-col md:flex-row gap-4">
+          
+          {/* Left: Interactive drawing state */}
+          <div className="flex-1 overflow-hidden rounded-lg border border-zinc-800 bg-[#0c0c0e] relative flex items-center justify-center">
+            <canvas
+              ref={canvasRef}
+              width={540}
+              height={360}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              onTouchStart={startDrawing}
+              onTouchMove={draw}
+              onTouchEnd={stopDrawing}
+              className="max-w-full h-auto cursor-crosshair touch-none aspect-[3/2] block bg-[#1e1e22]"
+            />
+          </div>
+
+          {/* Right: Controls & Presets */}
+          <div className="w-full md:w-[180px] flex flex-col justify-between gap-4">
+            
+            {/* Tool Selection */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Tools</span>
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setTool('brush')}
+                  className={`py-2 px-1 rounded-md text-xs font-bold transition-all border flex flex-col items-center gap-1 ${
+                    tool === 'brush' 
+                      ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300' 
+                      : 'bg-zinc-950 border-zinc-850 text-zinc-450 hover:bg-zinc-900'
+                  }`}
+                >
+                  <Paintbrush className="h-4 w-4" />
+                  <span>Brush</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTool('bucket')}
+                  className={`py-2 px-1 rounded-md text-xs font-bold transition-all border flex flex-col items-center gap-1 ${
+                    tool === 'bucket' 
+                      ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300' 
+                      : 'bg-zinc-950 border-zinc-850 text-zinc-450 hover:bg-zinc-900'
+                  }`}
+                >
+                  <Layers className="h-4 w-4" />
+                  <span>Fill</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTool('eraser')}
+                  className={`py-2 px-1 rounded-md text-xs font-bold transition-all border flex flex-col items-center gap-1 ${
+                    tool === 'eraser' 
+                      ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300' 
+                      : 'bg-zinc-950 border-zinc-850 text-zinc-450 hover:bg-zinc-900'
+                  }`}
+                >
+                  <Minus className="h-4 w-4" />
+                  <span>Eraser</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Brush Size */}
+            {tool !== 'bucket' && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                  <span>Size</span>
+                  <span className="text-zinc-400">{brushSize}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="2"
+                  max="40"
+                  value={brushSize}
+                  onChange={(e) => setBrushSize(parseInt(e.target.value, 10))}
+                  className="w-full accent-indigo-500 h-1.5 bg-zinc-900 rounded-lg cursor-pointer"
+                />
+              </div>
+            )}
+
+            {/* Color Palette */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Palette</span>
+              <div className="grid grid-cols-4 gap-1.5">
+                {colors.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      setColor(c);
+                      if (tool === 'eraser') setTool('brush');
+                    }}
+                    style={{ backgroundColor: c }}
+                    className={`h-7 w-7 rounded-full border transition-all ${
+                      color === c && tool !== 'eraser' 
+                        ? 'ring-2 ring-indigo-500 scale-105 border-white' 
+                        : 'border-zinc-900 hover:scale-[1.08]'
+                    }`}
+                  />
+                ))}
+                
+                {/* Custom Color Selector Container */}
+                <label className="h-7 w-7 rounded-full border border-zinc-800 bg-zinc-950 flex items-center justify-center cursor-pointer hover:border-zinc-650 transition-colors relative overflow-hidden group">
+                  <span className="text-[9px] text-zinc-400 select-none group-hover:text-white">+</span>
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => {
+                      setColor(e.target.value);
+                      if (tool === 'eraser') setTool('brush');
+                    }}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Reset Panel */}
+            <button
+              type="button"
+              onClick={clearCanvas}
+              className="w-full py-1.5 rounded-md bg-zinc-950 border border-zinc-800 text-[11px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
+            >
+              Clear Canvas
+            </button>
+
+          </div>
+
+        </div>
+
+        {/* Footer split */}
+        <div className="flex items-center justify-end gap-3 border-t border-zinc-800/60 pt-3 mt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="py-2 px-4 rounded-lg text-sm font-bold text-zinc-400 hover:text-white transition-colors"
+          >
+            Cancel
+          </button>
+          
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="py-2.5 px-6 rounded-lg text-sm font-bold shadow-lg text-white bg-gradient-to-r from-emerald-600 to-emerald-500 hover:brightness-110 active:scale-[0.98] disabled:bg-zinc-800 disabled:text-zinc-650 disabled:pointer-events-none transition-all flex items-center justify-center gap-2"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Sharing...
+              </>
+            ) : (
+              <>Send Drawing</>
+            )}
+          </button>
+        </div>
+
       </div>
     </div>
   );
