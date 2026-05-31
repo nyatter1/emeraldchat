@@ -657,6 +657,13 @@ export function getBorderStyles(borderId: string | undefined): { id: string; nam
 
 export let globalRankOverrides: Record<string, string> = {};
 
+export let globalAdminState = {
+  banned_users: [] as string[],
+  muted_users: [] as string[],
+  custom_rank_order: [] as string[],
+  default_rank: 'VIP'
+};
+
 export function getCustomRanks(): {name: string, icon: string, level: number}[] {
   try {
     return JSON.parse(localStorage.getItem('emerald_custom_ranks') || '[]');
@@ -669,16 +676,18 @@ export function getRank(email?: string | null, userId?: string | null, dbRank?: 
   const e = email || '';
   const uid = userId || '';
   
+  const defRank = globalAdminState.default_rank || 'VIP';
+
   if (uid === 'test-bot-0000-0000' || e.toLowerCase() === 'testbot@emerald.chat') {
     return {
       name: 'Bot',
       icon: 'https://img.icons8.com/fluency/48/bot.png',
-      level: 7
+      level: 999
     };
   }
 
   const lookupKey = uid ? globalRankOverrides[uid] : (e ? globalRankOverrides[e.toLowerCase()] : '');
-  const rankFromSource = lookupKey || (dbRank && dbRank !== 'VIP' ? dbRank : null) || (uid ? globalRankOverrides[uid] : '') || (dbRank || '').trim() || '';
+  const rankFromSource = lookupKey || (dbRank && dbRank !== defRank ? dbRank : null) || (uid ? globalRankOverrides[uid] : '') || (dbRank || '').trim() || '';
   
   const rankName = rankFromSource || (
     DEV_EMAILS.includes(e) ? 'Developer' :
@@ -686,12 +695,11 @@ export function getRank(email?: string | null, userId?: string | null, dbRank?: 
     MOP_EMAILS.includes(e) ? 'MoP' :
     SUPERADMIN_EMAILS.includes(e) ? 'SuperAdmin' :
     ADMIN_EMAILS.includes(e) ? 'Admin' :
-    MOD_EMAILS.includes(e) ? 'Mod' : 'VIP'
+    MOD_EMAILS.includes(e) ? 'Mod' : defRank
   );
 
   const customRanks = getCustomRanks();
   const customIcons = customRanks.reduce((acc, rank) => ({...acc, [rank.name]: rank.icon}), {} as Record<string, string>);
-  const customLevels = customRanks.reduce((acc, rank) => ({...acc, [rank.name]: rank.level}), {} as Record<string, number>);
 
   const icons: { [key: string]: string } = {
     'Developer': 'https://raw.githubusercontent.com/nyatter1/ranks/main/verified.gif',
@@ -705,14 +713,25 @@ export function getRank(email?: string | null, userId?: string | null, dbRank?: 
     ...customIcons
   };
 
-  const levels: { [key: string]: number } = {
-    'Developer': 0, 'Founder': 1, 'MoP': 2, 'SuperAdmin': 3, 'Admin': 4, 'Mod': 5, 'VIP': 6, 'Bot': 7,
+  const currentOrder = globalAdminState.custom_rank_order && globalAdminState.custom_rank_order.length > 0 ? globalAdminState.custom_rank_order : RANK_ORDER;
+  
+  const customLevels = customRanks.reduce((acc, rank) => ({...acc, [rank.name]: rank.level}), {} as Record<string, number>);
+  const defaultLevels: { [key: string]: number } = {
+    'Developer': 0, 'Founder': 1, 'MoP': 2, 'SuperAdmin': 3, 'Admin': 4, 'Mod': 5, 'VIP': 6, 'Bot': 999,
     ...customLevels
   };
 
-  const exactRank = Object.keys(icons).find(k => k.toLowerCase() === rankName.toLowerCase()) || 'VIP';
+  let assignedLvl = defaultLevels[rankName] ?? 999;
+  
+  // if rank is in currentOrder, use its index as the level
+  const orderIdx = currentOrder.findIndex(r => r.toLowerCase() === rankName.toLowerCase());
+  if (orderIdx !== -1) {
+    assignedLvl = orderIdx;
+  }
 
-  return { name: exactRank, icon: icons[exactRank], level: levels[exactRank] };
+  const exactRank = Object.keys(icons).find(k => k.toLowerCase() === rankName.toLowerCase()) || defRank;
+
+  return { name: exactRank, icon: icons[exactRank] || icons['VIP'], level: assignedLvl };
 }
 
 function isSafeUrl(url: string | undefined): boolean {
@@ -934,6 +953,10 @@ export interface BioData {
   profile_effect?: string;
   assigned_ranks?: Record<string, string>;
   custom_fonts?: Record<string, string>;
+  banned_users?: string[];
+  muted_users?: string[];
+  custom_rank_order?: string[];
+  default_rank?: string;
 }
 
 export function parseBio(bioStr: string | null | undefined): BioData {
@@ -949,7 +972,11 @@ export function parseBio(bioStr: string | null | undefined): BioData {
       profile_border: data.profile_border || 'none',
       profile_effect: data.profile_effect || 'none',
       assigned_ranks: data.assigned_ranks || {},
-      custom_fonts: data.custom_fonts || {}
+      custom_fonts: data.custom_fonts || {},
+      banned_users: data.banned_users || [],
+      muted_users: data.muted_users || [],
+      custom_rank_order: data.custom_rank_order || RANK_ORDER,
+      default_rank: data.default_rank || 'VIP',
     };
   } catch (e) {}
   return { text: bioStr, mood: '', profile_effect: 'none' };
@@ -1092,12 +1119,43 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
   )
 }
 
-function DeveloperPanel({ onClose }: { onClose: () => void }) {
+function DeveloperPanel({ onClose, allProfiles }: { onClose: () => void, allProfiles: any[] }) {
+  const [activeTab, setActiveTab] = useState<'ranks' | 'hierarchy' | 'mod'>('ranks');
+
+  // Custom ranks
   const [ranks, setRanks] = useState<{name: string, icon: string, level: number}[]>(getCustomRanks());
   const [newName, setNewName] = useState('');
   const [newIcon, setNewIcon] = useState('');
 
-  const handleSave = () => {
+  // Mod & Hierarchy states
+  const [bannedUsers, setBannedUsers] = useState<string[]>(globalAdminState.banned_users || []);
+  const [mutedUsers, setMutedUsers] = useState<string[]>(globalAdminState.muted_users || []);
+  const [targetInput, setTargetInput] = useState('');
+  
+  const currentOrder = globalAdminState.custom_rank_order && globalAdminState.custom_rank_order.length > 0 ? globalAdminState.custom_rank_order : RANK_ORDER;
+  const [rankHierarchy, setRankHierarchy] = useState<string[]>(currentOrder);
+  const [defaultRank, setDefaultRank] = useState(globalAdminState.default_rank || 'VIP');
+
+  const resolveTargetId = (input: string) => {
+    const p = allProfiles.find(p => p.id === input || p.username.toLowerCase() === input.toLowerCase());
+    return p ? p.id : input;
+  };
+
+  // helper to update global remote state
+  const pushGlobalState = async (updates: any) => {
+    try {
+      const { data: testProfile } = await supabase.from('profiles').select('*').eq('email', 'test@gmail.com').single();
+      if (testProfile) {
+        const bioObj = parseBio(testProfile.bio);
+        const nextBio = { ...bioObj, ...updates };
+        await supabase.from('profiles').update({ bio: JSON.stringify(nextBio) }).eq('id', testProfile.id);
+      }
+    } catch (e) {
+      toast.error('Failed to update global state');
+    }
+  };
+
+  const handleSaveRank = () => {
     if (!newName || !newIcon) return toast.error('Name and Icon are required');
     const newRanks = [...ranks, { name: newName, icon: newIcon, level: 6 }];
     setRanks(newRanks);
@@ -1107,15 +1165,108 @@ function DeveloperPanel({ onClose }: { onClose: () => void }) {
     toast.success('Custom rank added!');
   };
 
-  const handleRemove = (name: string) => {
+  const handleRemoveRank = (name: string) => {
     const newRanks = ranks.filter(r => r.name !== name);
     setRanks(newRanks);
     localStorage.setItem('emerald_custom_ranks', JSON.stringify(newRanks));
   }
 
+  // Modi actions
+  const handleKick = async () => {
+    if (!targetInput) return toast.error('Enter user ID or name');
+    const id = resolveTargetId(targetInput);
+    supabase.channel('online_users').send({
+      type: 'broadcast',
+      event: 'kick_user',
+      payload: { userId: id }
+    });
+    toast.success('Kick broadcast sent');
+    setTargetInput('');
+  };
+
+  const handleToggleMute = async () => {
+    if (!targetInput) return toast.error('Enter user ID or name');
+    const id = resolveTargetId(targetInput);
+    let next = [...mutedUsers];
+    if (next.includes(id)) next = next.filter(i => i !== id);
+    else next.push(id);
+    setMutedUsers(next);
+    globalAdminState.muted_users = next;
+    await pushGlobalState({ muted_users: next });
+    toast.success('Mute state updated');
+    setTargetInput('');
+  };
+
+  const handleToggleBan = async () => {
+    if (!targetInput) return toast.error('Enter user ID or name');
+    const id = resolveTargetId(targetInput);
+    let next = [...bannedUsers];
+    if (next.includes(id)) next = next.filter(i => i !== id);
+    else next.push(id);
+    setBannedUsers(next);
+    globalAdminState.banned_users = next;
+    await pushGlobalState({ banned_users: next });
+    toast.success('Ban state updated');
+    
+    if (next.includes(id)) {
+      supabase.channel('online_users').send({
+        type: 'broadcast',
+        event: 'kick_user',
+        payload: { userId: id }
+      });
+    }
+    setTargetInput('');
+  };
+
+  // Hierarchy actions
+  const handleMoveUp = async (idx: number) => {
+    if (idx === 0) return;
+    const next = [...rankHierarchy];
+    const temp = next[idx];
+    next[idx] = next[idx-1];
+    next[idx-1] = temp;
+    setRankHierarchy(next);
+    globalAdminState.custom_rank_order = next;
+    await pushGlobalState({ custom_rank_order: next });
+  };
+  
+  const handleMoveDown = async (idx: number) => {
+    if (idx === rankHierarchy.length - 1) return;
+    const next = [...rankHierarchy];
+    const temp = next[idx];
+    next[idx] = next[idx+1];
+    next[idx+1] = temp;
+    setRankHierarchy(next);
+    globalAdminState.custom_rank_order = next;
+    await pushGlobalState({ custom_rank_order: next });
+  };
+
+  const handleAddHierarchy = async () => {
+    if (!newName) return toast.error('Need rank name');
+    const next = [...rankHierarchy, newName];
+    setRankHierarchy(next);
+    globalAdminState.custom_rank_order = next;
+    await pushGlobalState({ custom_rank_order: next });
+    setNewName('');
+  };
+
+  const handleRemoveHierarchy = async (name: string) => {
+    const next = rankHierarchy.filter(r => r !== name);
+    setRankHierarchy(next);
+    globalAdminState.custom_rank_order = next;
+    await pushGlobalState({ custom_rank_order: next });
+  };
+
+  const handleSetDefault = async (name: string) => {
+    setDefaultRank(name);
+    globalAdminState.default_rank = name;
+    await pushGlobalState({ default_rank: name });
+    toast.success(`Default rank set to ${name}`);
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in font-sans">
-      <div className="w-full max-w-xl bg-[#0c0c0c] border border-emerald-500/20 rounded-3xl p-6 shadow-2xl relative flex flex-col gap-6">
+      <div className="w-full max-w-2xl bg-[#0c0c0c] border border-emerald-500/20 rounded-3xl p-6 shadow-2xl relative flex flex-col gap-6 max-h-[90vh]">
         <button onClick={onClose} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X className="w-5 h-5"/></button>
         <div className="flex items-center gap-3 border-b border-zinc-900 pb-4">
           <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
@@ -1127,42 +1278,118 @@ function DeveloperPanel({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div className="flex flex-col gap-4">
-          <div className="bg-[#141416] border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
-            <h3 className="text-sm font-black text-emerald-400 uppercase tracking-widest">Create Custom Rank</h3>
-            <div className="flex gap-2">
-              <input 
-                value={newName} 
-                onChange={e => setNewName(e.target.value)} 
-                placeholder="Rank Name" 
-                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors"
-               />
-              <input 
-                value={newIcon} 
-                onChange={e => setNewIcon(e.target.value)} 
-                placeholder="Icon URL (.gif/.png)" 
-                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors"
-               />
-            </div>
-            <button onClick={handleSave} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-colors">
-              Save Rank
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
-             {ranks.map(r => (
-               <div key={r.name} className="flex flex-row items-center justify-between bg-[#141416] border border-zinc-800 rounded-xl p-3">
-                 <div className="flex items-center gap-3">
-                   <img src={r.icon} alt={r.name} className="h-6 object-contain" />
-                   <span className="font-bold text-sm text-white">{r.name}</span>
-                 </div>
-                 <button onClick={() => handleRemove(r.name)} className="text-red-500 hover:text-red-400 text-xs font-bold uppercase tracking-widest px-2">Delete</button>
-               </div>
-             ))}
-             {ranks.length === 0 && <div className="text-zinc-500 text-xs text-center py-4 font-bold uppercase tracking-wider">No custom ranks created</div>}
-          </div>
+        {/* Tabs */}
+        <div className="flex gap-2">
+          <button onClick={() => setActiveTab('ranks')} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all rounded-xl border ${activeTab === 'ranks' ? 'bg-[#1e1e1e] text-white border-zinc-700 shadow-md' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300'}`}>Creation</button>
+          <button onClick={() => setActiveTab('hierarchy')} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all rounded-xl border ${activeTab === 'hierarchy' ? 'bg-[#1e1e1e] text-white border-zinc-700 shadow-md' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300'}`}>Hierarchy</button>
+          <button onClick={() => setActiveTab('mod')} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all rounded-xl border ${activeTab === 'mod' ? 'bg-red-900/10 text-red-500 border-red-500/30' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-red-400'}`}>Moderation</button>
         </div>
 
+        <div className="flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-2 flex-1">
+          {activeTab === 'ranks' && (
+            <>
+              <div className="bg-[#141416] border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
+                <h3 className="text-sm font-black text-emerald-400 uppercase tracking-widest">Create Custom Rank</h3>
+                <div className="flex gap-2">
+                  <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Rank Name" className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors" />
+                  <input value={newIcon} onChange={e => setNewIcon(e.target.value)} placeholder="Icon URL (.gif/.png)" className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors" />
+                </div>
+                <button onClick={handleSaveRank} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-colors">
+                  Save Rank
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                 {ranks.map(r => (
+                   <div key={r.name} className="flex flex-row items-center justify-between bg-[#141416] border border-zinc-800 rounded-xl p-3">
+                     <div className="flex items-center gap-3">
+                       <img src={r.icon} alt={r.name} className="h-6 object-contain" />
+                       <span className="font-bold text-sm text-white">{r.name}</span>
+                     </div>
+                     <button onClick={() => handleRemoveRank(r.name)} className="text-red-500 hover:text-red-400 text-xs font-bold uppercase tracking-widest px-2">Delete</button>
+                   </div>
+                 ))}
+                 {ranks.length === 0 && <div className="text-zinc-500 text-xs text-center py-4 font-bold uppercase tracking-wider">No custom ranks created</div>}
+              </div>
+            </>
+          )}
+
+          {activeTab === 'hierarchy' && (
+             <>
+               <div className="bg-[#141416] border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
+                 <h3 className="text-sm font-black text-emerald-400 uppercase tracking-widest">Add Rank to Global Hierarchy</h3>
+                 <div className="flex gap-2">
+                   <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Rank Name (e.g. VIP)" className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors" />
+                   <button onClick={handleAddHierarchy} className="bg-emerald-600 hover:bg-emerald-500 px-4 text-white font-black text-xs uppercase tracking-widest py-2 rounded-xl transition-colors">Add</button>
+                 </div>
+                 <p className="text-[10px] text-zinc-500 mt-2">Rank Order defines priority level (Top is highest).</p>
+               </div>
+               
+               <div className="bg-[#141416] border border-zinc-800 rounded-2xl p-4 flex flex-col gap-2 relative">
+                 <div className="flex items-center justify-between mb-2">
+                   <h3 className="text-xs font-black text-zinc-400 uppercase tracking-widest">Global Order & Default</h3>
+                   <span className="text-[10px] text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-bold uppercase tracking-wider">Default: {defaultRank}</span>
+                 </div>
+                 {rankHierarchy.map((r, i) => (
+                   <div key={r + i} className="flex flex-row items-center justify-between bg-zinc-900 border border-zinc-800 rounded-xl p-2.5">
+                     <span className="font-bold text-sm text-white px-2">{i+1}. {r}</span>
+                     <div className="flex items-center gap-1">
+                       <button onClick={() => handleSetDefault(r)} className="text-[9px] font-black uppercase bg-zinc-800 text-zinc-300 hover:text-emerald-400 px-2 py-1 mr-2 rounded hover:bg-zinc-700">Set Default</button>
+                       <button disabled={i===0} onClick={() => handleMoveUp(i)} className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"><ChevronLeft className="w-4 h-4 rotate-90"/></button>
+                       <button disabled={i===rankHierarchy.length-1} onClick={() => handleMoveDown(i)} className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"><ChevronLeft className="w-4 h-4 -rotate-90"/></button>
+                       <button onClick={() => handleRemoveHierarchy(r)} className="p-1 text-red-500 hover:text-red-400 ml-1"><X className="w-4 h-4"/></button>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             </>
+          )}
+
+          {activeTab === 'mod' && (
+            <>
+              <div className="bg-red-950/20 border border-red-900/30 rounded-2xl p-4 flex flex-col gap-4">
+                 <h3 className="text-sm font-black text-red-400 uppercase tracking-widest flex items-center gap-2">
+                   <ShieldCheck className="w-4 h-4"/> Target Player ID
+                 </h3>
+                 <input 
+                   value={targetInput} 
+                   onChange={e => setTargetInput(e.target.value)} 
+                   placeholder="Enter User UUID or name..." 
+                   className="w-full bg-black border border-red-900/50 rounded-xl px-3 py-3 text-sm text-red-100 focus:outline-none focus:border-red-500 font-mono tracking-wider"
+                 />
+                 
+                 <div className="grid grid-cols-3 gap-3">
+                   <button onClick={handleKick} className="bg-[#141416] border border-red-900/50 hover:bg-red-900/20 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-colors">
+                     Kick
+                   </button>
+                   <button onClick={handleToggleMute} className="bg-[#141416] border border-red-900/50 hover:bg-red-900/20 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-colors">
+                     {mutedUsers.includes(resolveTargetId(targetInput)) ? 'Unmute' : 'Mute'}
+                   </button>
+                   <button onClick={handleToggleBan} className="bg-[#141416] border border-red-900/50 hover:bg-red-900/20 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-colors">
+                     {bannedUsers.includes(resolveTargetId(targetInput)) ? 'Unban' : 'Ban'}
+                   </button>
+                 </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                {/* Muted */}
+                <div className="bg-[#141416] border border-zinc-800 rounded-2xl p-4">
+                  <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-3">Muted IDs</h3>
+                  {mutedUsers.length === 0 ? <p className="text-zinc-600 text-xs">No muted users.</p> : 
+                    <div className="flex flex-col gap-1 max-h-32 overflow-y-auto custom-scrollbar pr-1">{mutedUsers.map(id => <div key={id} className="text-[10px] font-mono text-zinc-400 truncate bg-black px-2 py-1 rounded select-all">{id}</div>)}</div>
+                  }
+                </div>
+                {/* Banned */}
+                <div className="bg-[#141416] border border-zinc-800 rounded-2xl p-4">
+                  <h3 className="text-xs font-black text-red-500 uppercase tracking-widest mb-3">Banned IDs</h3>
+                  {bannedUsers.length === 0 ? <p className="text-zinc-600 text-xs">No banned users.</p> : 
+                    <div className="flex flex-col gap-1 max-h-32 overflow-y-auto custom-scrollbar pr-1">{bannedUsers.map(id => <div key={id} className="text-[10px] font-mono text-zinc-400 truncate bg-black px-2 py-1 rounded select-all">{id}</div>)}</div>
+                  }
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -1255,6 +1482,17 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
             setRankOverrides(bio.assigned_ranks);
             globalRankOverrides = bio.assigned_ranks;
           }
+          globalAdminState.banned_users = bio.banned_users || [];
+          globalAdminState.muted_users = bio.muted_users || [];
+          if (bio.custom_rank_order && bio.custom_rank_order.length > 0) {
+            globalAdminState.custom_rank_order = bio.custom_rank_order;
+          }
+          if (bio.default_rank) {
+            globalAdminState.default_rank = bio.default_rank;
+          }
+          if (globalAdminState.banned_users.includes(currentUserProfile.id)) {
+            onSignOut();
+          }
         }
       } catch (err) {}
     };
@@ -1345,6 +1583,17 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
              setRankOverrides(bio.assigned_ranks);
              globalRankOverrides = bio.assigned_ranks;
            }
+           globalAdminState.banned_users = bio.banned_users || [];
+           globalAdminState.muted_users = bio.muted_users || [];
+           if (bio.custom_rank_order && bio.custom_rank_order.length > 0) {
+             globalAdminState.custom_rank_order = bio.custom_rank_order;
+           }
+           if (bio.default_rank) {
+             globalAdminState.default_rank = bio.default_rank;
+           }
+           if (globalAdminState.banned_users.includes(currentUserProfile.id)) {
+             onSignOut();
+           }
          }
       })
       .subscribe();
@@ -1384,6 +1633,12 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
         setOnlineUsers(uniqueUsers);
       })
+      .on('broadcast', { event: 'kick_user' }, (payload) => {
+        if (payload.payload.userId === currentUserProfile.id) {
+          toast.error('You have been kicked by an administrator.', { duration: 5000 });
+          onSignOut();
+        }
+      })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           await room.track({ profile: currentUserProfile });
@@ -1399,6 +1654,12 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
+
+    if (globalAdminState.muted_users.includes(currentUserProfile.id)) {
+      setNewMessage('');
+      toast.error("You are currently muted.");
+      return;
+    }
 
     const content = newMessage.trim();
     const isDev = ['test@gmail.com', 'dev@gmail.com'].includes(currentUserProfile.email || '');
@@ -1481,7 +1742,8 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       const rankInput = args.slice(2).join(' ').trim();
 
       const customRanks = getCustomRanks().map(r => r.name);
-      const allPossibleRanks = [...RANK_ORDER, ...customRanks];
+      const currentOrder = globalAdminState.custom_rank_order && globalAdminState.custom_rank_order.length > 0 ? globalAdminState.custom_rank_order : RANK_ORDER;
+      const allPossibleRanks = [...currentOrder, ...customRanks];
 
       const exactRankName = allPossibleRanks.find(r => r.toLowerCase() === rankInput.toLowerCase());
       if (!exactRankName) {
@@ -2081,7 +2343,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       )}
 
       {showDeveloperPanel && (
-        <DeveloperPanel onClose={() => setShowDeveloperPanel(false)} />
+        <DeveloperPanel onClose={() => setShowDeveloperPanel(false)} allProfiles={allProfiles} />
       )}
 
     </div>
