@@ -125,3 +125,10 @@
     scrollbar-color: #3f3f46 transparent;
   }
 }
+
+/* Compact layout zoom scaling on mobile/tablet to fit everything elegantly */
+@media (max-width: 1024px) {
+  html, body {
+    zoom: 0.83;
+  }
+}
