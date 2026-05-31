@@ -1137,7 +1137,8 @@ function DeveloperPanel({ onClose, allProfiles }: { onClose: () => void, allProf
   const [defaultRank, setDefaultRank] = useState(globalAdminState.default_rank || 'VIP');
 
   const resolveTargetId = (input: string) => {
-    const p = allProfiles.find(p => p.id === input || p.username.toLowerCase() === input.toLowerCase());
+    if (!input) return '';
+    const p = allProfiles.find(p => p.id === input || (p.username && p.username.toLowerCase() === input.toLowerCase()));
     return p ? p.id : input;
   };
 
@@ -1528,9 +1529,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         if (profileData) {
           if (payload.new.user_id !== currentUserProfile.id) {
             // Check if user is mentioned
-            const mentionText = currentUserProfile.username.toLowerCase();
-            const messageText = payload.new.content.toLowerCase();
-            const isMentioned = messageText.includes(mentionText);
+            const isMentioned = currentUserProfile.username && payload.new.content ? payload.new.content.toLowerCase().includes(currentUserProfile.username.toLowerCase()) : false;
             
             if (isMentioned) {
               playSound(audioQuote);
@@ -2171,7 +2170,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                 <div 
                   key={renderMsg.id || index} 
                   className={`flex flex-col group py-1.5 hover:bg-zinc-900/50 transition-colors -mx-4 px-4 rounded-lg ${
-                    renderMsg.content.toLowerCase().includes(currentUserProfile.username.toLowerCase()) && renderMsg.user_id !== currentUserProfile.id 
+                    (currentUserProfile.username && renderMsg.content && renderMsg.content.toLowerCase().includes(currentUserProfile.username.toLowerCase()) && renderMsg.user_id !== currentUserProfile.id) 
                     ? 'bg-emerald-500/5 border-l-2 border-emerald-500' 
                     : ''
                   }`}
