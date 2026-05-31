@@ -126,9 +126,11 @@
   }
 }
 
-/* Compact layout zoom scaling on mobile/tablet to fit everything elegantly */
-@media (max-width: 1024px) {
-  html, body {
-    zoom: 0.83;
-  }
+html, body, #root {
+  background-color: #09090b !important;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  zoom: 0.8;
 }
