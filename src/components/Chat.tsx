@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile, Message, News, ProfileLike } from '../types';
-import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check } from 'lucide-react';
+import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import { PROFILE_EFFECTS, PROFILE_COMBOS, EFFECTS_KEYFRAMES, ProfileEffectRenderer } from './ProfileEffects';
 
 const SPOTIFY_URL_REGEX = /https:\/\/open\.spotify\.com\/(track|album|playlist|episode)\/([a-zA-Z0-9]+)(\?.*)?/;
 const IMAGE_EXT_REGEX = /\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i;
@@ -26,8 +27,7 @@ export const PROFILE_BORDERS = [
     id: 'none',
     name: 'No border (Classic)',
     className: 'border-zinc-800',
-    cardStyle: {},
-    avatarStyle: {}
+    cardStyle: {}
   },
   {
     id: 'neon-emerald',
@@ -37,10 +37,6 @@ export const PROFILE_BORDERS = [
       border: '3px solid #10b981',
       boxShadow: '0 0 25px rgba(16, 185, 129, 0.65), inset 0 0 10px rgba(16, 185, 129, 0.3)',
       animation: 'borderPulseEmerald 2.5s infinite ease-in-out'
-    },
-    avatarStyle: {
-      border: '2.5px solid #10b981',
-      boxShadow: '0 0 8px #10b981'
     }
   },
   {
@@ -51,10 +47,6 @@ export const PROFILE_BORDERS = [
       border: '3px solid #ef4444',
       boxShadow: '0 0 30px rgba(239, 68, 68, 0.75), inset 0 0 12px rgba(239, 68, 68, 0.4)',
       animation: 'borderPulseCrimson 2s infinite ease-in-out'
-    },
-    avatarStyle: {
-      border: '2.5px solid #ef4444',
-      boxShadow: '0 0 8px #ef4444'
     }
   },
   {
@@ -65,10 +57,6 @@ export const PROFILE_BORDERS = [
       border: '3px solid #a855f7',
       boxShadow: '0 0 25px rgba(168, 85, 247, 0.7), inset 0 0 12px rgba(168, 85, 247, 0.35)',
       animation: 'borderPulseCosmic 2.5s infinite ease-in-out'
-    },
-    avatarStyle: {
-      border: '2.5px solid #a855f7',
-      boxShadow: '0 0 8px #a855f7'
     }
   },
   {
@@ -79,10 +67,6 @@ export const PROFILE_BORDERS = [
       border: '3px solid #fbbf24',
       boxShadow: '0 0 30px rgba(251, 191, 36, 0.8), inset 0 0 15px rgba(251, 191, 36, 0.4)',
       animation: 'borderRotateGold 4s linear infinite'
-    },
-    avatarStyle: {
-      border: '2.5px solid #fbbf24',
-      boxShadow: '0 0 8px #fbbf24'
     }
   },
   {
@@ -96,13 +80,6 @@ export const PROFILE_BORDERS = [
       backgroundClip: 'padding-box, border-box',
       boxShadow: '0 0 30px rgba(255, 0, 100, 0.5)',
       animation: 'borderChromaWave 3s linear infinite'
-    },
-    avatarStyle: {
-      border: '2px solid transparent',
-      backgroundImage: 'linear-gradient(#141416, #141416), linear-gradient(to right, #ff0055, #00ff55, #0055ff, #ff0055)',
-      backgroundOrigin: 'border-box',
-      backgroundClip: 'padding-box, border-box',
-      boxShadow: '0 0 8px rgba(255, 0, 100, 0.5)'
     }
   },
   {
@@ -113,10 +90,6 @@ export const PROFILE_BORDERS = [
       border: '3px solid #67e8f9',
       boxShadow: '0 0 25px rgba(103, 232, 249, 0.75), inset 0 0 14px rgba(103, 232, 249, 0.3)',
       animation: 'borderPulseCyan 2.8s infinite ease-in-out'
-    },
-    avatarStyle: {
-      border: '2.5px solid #67e8f9',
-      boxShadow: '0 0 8px #67e8f9'
     }
   },
   {
@@ -127,10 +100,6 @@ export const PROFILE_BORDERS = [
       border: '3px double #34d399',
       boxShadow: '0 0 20px rgba(52, 211, 153, 0.6), inset 0 0 10px rgba(52, 211, 153, 0.25)',
       animation: 'matrixFlicker 1.5s infinite steps(2)'
-    },
-    avatarStyle: {
-      border: '2.5px double #34d399',
-      boxShadow: '0 0 8px #34d399'
     }
   },
   {
@@ -141,44 +110,440 @@ export const PROFILE_BORDERS = [
       border: '3px solid #f472b6',
       boxShadow: '0 0 25px rgba(244, 114, 182, 0.7), inset 0 0 12px rgba(244, 114, 182, 0.3)',
       animation: 'borderPulseBubblegum 2s infinite ease-in-out'
-    },
-    avatarStyle: {
-      border: '2.5px solid #f472b6',
-      boxShadow: '0 0 8px #f472b6'
+    }
+  },
+  {
+    id: 'solar-wind',
+    name: 'Solar Wind Orange',
+    className: 'border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.5)]',
+    cardStyle: {
+      border: '3px solid #f59e0b',
+      boxShadow: '0 0 25px rgba(245, 158, 11, 0.7), inset 0 0 10px rgba(245, 158, 11, 0.3)',
+      animation: 'solarFlare 2.5s infinite ease-in-out'
+    }
+  },
+  {
+    id: 'toxic-waste',
+    name: 'Toxic Waste Radioactive',
+    className: 'border-lime-500 shadow-[0_0_20px_rgba(132,204,22,0.6)]',
+    cardStyle: {
+      border: '3px dashed #84cc16',
+      boxShadow: '0 0 25px rgba(132, 204, 22, 0.75)',
+      animation: 'toxicWaste 1.8s infinite linear'
+    }
+  },
+  {
+    id: 'vaporwave-80s',
+    name: 'Vaporwave Neon Grid',
+    className: 'border-fuchsia-500 shadow-[0_0_22px_rgba(217,70,239,0.55)]',
+    cardStyle: {
+      border: '3px solid #d946ef',
+      boxShadow: '0 0 25px #d946ef, inset 0 0 12px #3b82f6',
+      animation: 'vaporGlow 3s infinite ease-in-out'
+    }
+  },
+  {
+    id: 'abyssal-void',
+    name: 'Obsidian Abyssal Void',
+    className: 'border-zinc-950 shadow-[0_0_15px_rgba(0,0,0,0.9)]',
+    cardStyle: {
+      border: '5px solid #09090b',
+      boxShadow: '0 0 20px #000, inset 0 0 15px #000'
+    }
+  },
+  {
+    id: 'electric-buzz',
+    name: 'Electric Cobalt Pulse',
+    className: 'border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.6)]',
+    cardStyle: {
+      border: '3px double #3b82f6',
+      boxShadow: '0 0 25px rgba(59, 130, 246, 0.8)',
+      animation: 'electricBuzz 0.5s infinite alternate'
+    }
+  },
+  {
+    id: 'cherry-blossom',
+    name: 'Japanese Cherry Blossom',
+    className: 'border-pink-300 shadow-[0_0_15px_rgba(252,165,185,0.4)]',
+    cardStyle: {
+      border: '3.5px solid #fca5a5',
+      boxShadow: '0 0 20px rgba(252, 165, 185, 0.5), inset 0 0 8px rgba(252, 165, 185, 0.2)'
+    }
+  },
+  {
+    id: 'chalkboard',
+    name: 'Chalk Outline',
+    className: 'border-zinc-100 shadow-[0_0_15px_rgba(255,255,255,0.4)]',
+    cardStyle: {
+      border: '4px solid #f4f4f5',
+      boxShadow: '0 0 15px rgba(255, 255, 255, 0.3)'
+    }
+  },
+  {
+    id: 'toxic-sludge',
+    name: 'Toxic Biohazard Sludge',
+    className: 'border-green-500 shadow-[0_0_18px_rgba(34,197,94,0.5)]',
+    cardStyle: {
+      border: '3px double #22c55e',
+      boxShadow: '0 0 25px rgba(34,197,94,0.65)'
+    }
+  },
+  {
+    id: 'overlord',
+    name: 'Dark Overlord Dread',
+    className: 'border-red-700 shadow-[0_0_25px_rgba(185,28,28,0.7)]',
+    cardStyle: {
+      border: '3.5px solid #18181b',
+      outline: '3.5px solid #b91c1c',
+      boxShadow: '0 0 30px rgba(185, 28, 28, 0.8)'
+    }
+  },
+  {
+    id: 'minty-fresh',
+    name: 'Spearmint Crisp',
+    className: 'border-teal-400 shadow-[0_0_15px_rgba(45,212,191,0.5)]',
+    cardStyle: {
+      border: '3px solid #2dd4bf',
+      boxShadow: '0 0 20px rgba(45, 212, 191, 0.6), inset 0 0 10px rgba(45, 212, 191, 0.2)'
+    }
+  },
+  {
+    id: 'candy-cane',
+    name: 'Mint Candy Cane',
+    className: 'border-transparent',
+    cardStyle: {
+      border: '4px dashed #ef4444',
+      outline: '2.5px solid #f4f4f5',
+      boxShadow: '0 0 15px rgba(239, 68, 68, 0.5)'
+    }
+  },
+  {
+    id: 'deep-space',
+    name: 'Infinite Deep Space',
+    className: 'border-indigo-950 shadow-[0_0_30px_rgba(99,102,241,0.4)]',
+    cardStyle: {
+      border: '3px solid #1e1b4b',
+      boxShadow: '0 0 35px rgba(99, 102, 241, 0.5), inset 0 0 15px #312e81'
+    }
+  },
+  {
+    id: 'phoenix-ember',
+    name: 'Phoenix Sun Ember',
+    className: 'border-amber-600 shadow-[0_0_20px_rgba(245,158,11,0.5)]',
+    cardStyle: {
+      border: '3.5px solid #d97706',
+      boxShadow: '0 0 25px rgba(245, 158, 11, 0.85)',
+      animation: 'solarFlare 2s infinite ease-in-out'
+    }
+  },
+  {
+    id: 'ocean-spray',
+    name: 'Aqua Teal Wave',
+    className: 'border-cyan-500 shadow-[0_0_18px_rgba(6,182,212,0.5)]',
+    cardStyle: {
+      border: '3px double #06b6d4',
+      boxShadow: '0 0 22px rgba(6, 182, 212, 0.65)'
+    }
+  },
+  {
+    id: 'chocolate-cookie',
+    name: 'Cookie Crumble',
+    className: 'border-amber-900 shadow-[0_0_12px_rgba(120,53,4,0.4)]',
+    cardStyle: {
+      border: '4.5px dotted #78350f',
+      boxShadow: '0 0 15px rgba(120, 53, 4, 0.3)'
+    }
+  },
+  {
+    id: 'stealth-smoke',
+    name: 'Stealth Smoke Shadow',
+    className: 'border-zinc-700 shadow-[0_0_20px_rgba(63,63,70,0.5)]',
+    cardStyle: {
+      border: '3px solid rgba(63, 63, 70, 0.6)',
+      boxShadow: '0 0 25px rgba(63, 63, 70, 0.7)'
+    }
+  },
+  {
+    id: 'gothic-crypt',
+    name: 'Gothic Crypt Shadow',
+    className: 'border-zinc-900 shadow-[0_0_25px_rgba(0,0,0,1)]',
+    cardStyle: {
+      border: '3px solid #000',
+      outline: '2.5px solid #581c87',
+      boxShadow: '0 0 30px rgba(88, 28, 135, 0.65)'
+    }
+  },
+  {
+    id: 'cotton-candy',
+    name: 'Spun Cotton Candy',
+    className: 'border-transparent',
+    cardStyle: {
+      border: '3.5px solid transparent',
+      backgroundImage: 'linear-gradient(#141416, #141416), linear-gradient(to right, #f472b6, #38bdf8)',
+      backgroundOrigin: 'border-box',
+      backgroundClip: 'padding-box, border-box',
+      boxShadow: '0 0 22px rgba(244, 114, 182, 0.5)'
+    }
+  },
+  {
+    id: 'retro-arcade',
+    name: '8-Bit Retro Pixel',
+    className: 'border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]',
+    cardStyle: {
+      border: '4px ridge #fbbf24',
+      boxShadow: '0 0 18px #fbbf24'
+    }
+  },
+  {
+    id: 'copper-spark',
+    name: 'Charged Copper Wire',
+    className: 'border-amber-700',
+    cardStyle: {
+      border: '3.5px dashed #b45309',
+      boxShadow: '0 0 15px rgba(180, 83, 9, 0.5)'
+    }
+  },
+  {
+    id: 'haunted-muck',
+    name: 'Bog Haunted Muck',
+    className: 'border-green-900 shadow-[0_0_20px_rgba(20,83,45,0.6)]',
+    cardStyle: {
+      border: '4px groove #14532d',
+      boxShadow: '0 0 25px rgba(20, 83, 45, 0.7)'
+    }
+  },
+  {
+    id: 'pastel-lilac',
+    name: 'Soft Lavender Lilac',
+    className: 'border-purple-300 shadow-[0_0_15px_rgba(216,180,254,0.4)]',
+    cardStyle: {
+      border: '3px solid #d8b4fe',
+      boxShadow: '0 0 18px rgba(216, 180, 254, 0.5)'
+    }
+  },
+  {
+    id: 'cyber-hex',
+    name: 'Cybersec Firewall',
+    className: 'border-blue-700 shadow-[0_0_20px_rgba(29,78,216,0.6)]',
+    cardStyle: {
+      border: '3px double #1d4ed8',
+      outline: '1.5px solid #1e3a8a',
+      boxShadow: '0 0 25px rgba(29, 78, 216, 0.7)'
+    }
+  },
+  {
+    id: 'glitch-noise',
+    name: 'Digital Static Glitch',
+    className: 'border-rose-500 shadow-[-4px_0_0_rgba(239,68,68,0.5),_4px_0_0_rgba(6,182,212,0.5)]',
+    cardStyle: {
+      border: '3px solid #f43f5e',
+      animation: 'glitchGlow 1.2s infinite ease-in-out'
+    }
+  },
+  {
+    id: 'golden-ticket',
+    name: "Charlie's Golden Ticket",
+    className: 'border-yellow-400',
+    cardStyle: {
+      border: '4px dashed #facc15',
+      boxShadow: '0 0 22px rgba(250, 204, 21, 0.7)'
+    }
+  },
+  {
+    id: 'bubble-pop',
+    name: 'Carbonated Aqua Bubble',
+    className: 'border-cyan-200',
+    cardStyle: {
+      border: '4px dotted #a5f3fc',
+      boxShadow: '0 0 15px rgba(165, 243, 252, 0.5)'
+    }
+  },
+  {
+    id: 'stardust-trail',
+    name: 'Stardust Nebula Sparkle',
+    className: 'border-yellow-200 shadow-[0_0_20px_rgba(254,240,138,0.5)]',
+    cardStyle: {
+      border: '3px solid #fef08a',
+      boxShadow: '0 0 25px rgba(254,240,138,0.7), inset 0 0 8px rgba(254,240,138,0.3)'
+    }
+  },
+  {
+    id: 'blizzard-frost',
+    name: 'Arctic Blizzard Frost',
+    className: 'border-blue-100 shadow-[0_0_25px_rgba(255,255,255,0.7)]',
+    cardStyle: {
+      border: '3.5px solid #f1f5f9',
+      boxShadow: '0 0 30px #ffffff, inset 0 0 10px #bfdbfe'
+    }
+  },
+  {
+    id: 'zebra-stripe',
+    name: 'Zebra Crossing Monochrome',
+    className: 'border-transparent',
+    cardStyle: {
+      border: '4px dashed #000000',
+      outline: '3px solid #ffffff',
+      boxShadow: '0 0 15px rgba(255,255,255,0.3)'
+    }
+  },
+  {
+    id: 'sunflower',
+    name: 'Radiant Sunflower fields',
+    className: 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.5)]',
+    cardStyle: {
+      border: '3.5px solid #eab308',
+      boxShadow: '0 0 22px rgba(234, 179, 8, 0.65)'
+    }
+  },
+  {
+    id: 'hot-chili',
+    name: 'Sizzling Hot Ghost Pepper',
+    className: 'border-red-600 shadow-[0_0_22px_rgba(220,38,38,0.6)]',
+    cardStyle: {
+      border: '4px double #dc2626',
+      boxShadow: '0 0 25px #dc2626'
+    }
+  },
+  {
+    id: 'sub-zero',
+    name: 'Subzero Cryogenic',
+    className: 'border-blue-400 shadow-[0_0_25px_rgba(96,165,250,0.6)]',
+    cardStyle: {
+      border: '3px solid #60a5fa',
+      boxShadow: '0 0 30px #3b82f6, inset 0 0 12px #1d4ed8'
+    }
+  },
+  {
+    id: 'banana-milk',
+    name: 'Creamy Banana Milkshake',
+    className: 'border-yellow-100 shadow-[0_0_15px_rgba(253,224,71,0.3)]',
+    cardStyle: {
+      border: '3px solid #fef08a',
+      boxShadow: '0 0 18px rgba(253, 224, 71, 0.4)'
+    }
+  },
+  {
+    id: 'laser-pointer',
+    name: 'Tactical Red Laser Indicator',
+    className: 'border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.7)]',
+    cardStyle: {
+      border: '1.5px solid #ef4444',
+      boxShadow: '0 0 15px #ef4444'
+    }
+  },
+  {
+    id: 'rust-shack',
+    name: 'Post-Apocalyptic Rusty Iron',
+    className: 'border-amber-800 shadow-[0_0_12px_rgba(146,64,14,0.4)]',
+    cardStyle: {
+      border: '4.5px groove #92400e',
+      boxShadow: '0 0 15px rgba(146, 64, 14, 0.3)'
+    }
+  },
+  {
+    id: 'alien-ufo',
+    name: 'Extraterrestrial Plasma Beam',
+    className: 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.6)]',
+    cardStyle: {
+      border: '3px solid #4ade80',
+      boxShadow: '0 0 25px rgba(74, 222, 128, 0.8)',
+      animation: 'ufoPlasma 2.8s infinite ease-in-out'
+    }
+  },
+  {
+    id: 'deep-sea',
+    name: 'Mariana Trench Abyss',
+    className: 'border-cyan-900 shadow-[0_0_22px_rgba(8,145,178,0.5)]',
+    cardStyle: {
+      border: '3.5px solid #0891b2',
+      boxShadow: '0 0 28px #0891b2, inset 0 0 14px #155e75'
+    }
+  },
+  {
+    id: 'radio-wave',
+    name: 'Frequency Resonance',
+    className: 'border-orange-500 shadow-[0_0_18px_rgba(249,115,22,0.5)]',
+    cardStyle: {
+      border: '3px dashed #f97316',
+      boxShadow: '0 0 22px rgba(249, 115, 22, 0.65)'
+    }
+  },
+  {
+    id: 'magic-potion',
+    name: "Witch's Witchcraft Elixir",
+    className: 'border-fuchsia-600 shadow-[0_0_22px_rgba(192,38,211,0.6)]',
+    cardStyle: {
+      border: '3px double #c026d3',
+      boxShadow: '0 0 25px rgba(192, 38, 211, 0.75)',
+      animation: 'potionPulse 2s infinite ease-in-out'
+    }
+  },
+  {
+    id: 'pixel-emerald',
+    name: '8-Bit Emerald Block',
+    className: 'border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]',
+    cardStyle: {
+      border: '4.5px ridge #10b981',
+      boxShadow: '0 0 18px #10b981'
+    }
+  },
+  {
+    id: 'glamour-gold',
+    name: 'Hollywood Glamour Luxury',
+    className: 'border-yellow-600 shadow-[0_0_25px_rgba(202,138,4,0.6)]',
+    cardStyle: {
+      border: '4px solid #ca8a04',
+      boxShadow: '0 0 30px #ca8a04, inset 0 0 12px #854d0e'
+    }
+  },
+  {
+    id: 'monochrome-grey',
+    name: 'Slate Grey Concrete',
+    className: 'border-zinc-500 shadow-[0_0_12px_rgba(113,113,122,0.3)]',
+    cardStyle: {
+      border: '3.5px solid #71717a',
+      boxShadow: '0 0 15px rgba(113, 113, 122, 0.4)'
+    }
+  },
+  {
+    id: 'rainbow-neon',
+    name: 'Rainbow Neon',
+    className: 'border-transparent',
+    cardStyle: {
+      border: '3.5px solid transparent',
+      backgroundImage: 'linear-gradient(#141416, #141416), linear-gradient(to right, #ef4444, #eab308, #3b82f6)',
+      backgroundOrigin: 'border-box',
+      backgroundClip: 'padding-box, border-box',
+      boxShadow: '0 0 25px rgba(59, 130, 246, 0.5)',
+      animation: 'borderChromaWave 3s linear infinite'
     }
   }
 ];
 
 export const BORDER_KEYFRAMES = `
 @keyframes borderPulseEmerald {
-  0% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.35), inset 0 0 8px rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.7); }
-  50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.8), inset 0 0 15px rgba(16, 185, 129, 0.45); border-color: rgba(16, 185, 129, 1); }
-  100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.35), inset 0 0 8px rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.7); }
+  0%, 100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.35); border-color: rgba(16, 185, 129, 0.7); }
+  50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.8); border-color: rgba(16, 185, 129, 1); }
 }
 @keyframes borderPulseCrimson {
-  0% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.4), inset 0 0 8px rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.7); }
-  50% { box-shadow: 0 0 35px rgba(239, 68, 68, 0.9), inset 0 0 15px rgba(239, 68, 68, 0.5); border-color: rgba(239, 68, 68, 1); }
-  100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.4), inset 0 0 8px rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.7); }
+  0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); border-color: rgba(239, 68, 68, 0.7); }
+  50% { box-shadow: 0 0 35px rgba(239, 68, 68, 0.9); border-color: rgba(239, 68, 68, 1); }
 }
 @keyframes borderPulseCosmic {
-  0% { box-shadow: 0 0 15px rgba(168, 85, 247, 0.45), inset 0 0 8px rgba(168, 85, 247, 0.2); border-color: rgba(168, 85, 247, 0.75); }
-  50% { box-shadow: 0 0 30px rgba(168, 85, 247, 0.85), inset 0 0 15px rgba(168, 85, 247, 0.5); border-color: rgba(168, 85, 247, 1); }
-  100% { box-shadow: 0 0 15px rgba(168, 85, 247, 0.45), inset 0 0 8px rgba(168, 85, 247, 0.2); border-color: rgba(168, 85, 247, 0.75); }
+  0%, 100% { box-shadow: 0 0 15px rgba(168, 85, 247, 0.45); border-color: rgba(168, 85, 247, 0.75); }
+  50% { box-shadow: 0 0 30px rgba(168, 85, 247, 0.85); border-color: rgba(168, 85, 247, 1); }
 }
 @keyframes borderPulseCyan {
-  0% { box-shadow: 0 0 15px rgba(6, 182, 212, 0.4), inset 0 0 8px rgba(6, 182, 212, 0.2); border-color: rgba(6, 182, 212, 0.7); }
-  50% { box-shadow: 0 0 32px rgba(6, 182, 212, 0.85), inset 0 0 15px rgba(6, 182, 212, 0.5); border-color: rgba(6, 182, 212, 1); }
-  100% { box-shadow: 0 0 15px rgba(6, 182, 212, 0.4), inset 0 0 8px rgba(6, 182, 212, 0.2); border-color: rgba(6, 182, 212, 0.7); }
+  0%, 100% { box-shadow: 0 0 15px rgba(6, 182, 212, 0.4); border-color: rgba(6, 182, 212, 0.7); }
+  50% { box-shadow: 0 0 32px rgba(6, 182, 212, 0.85); border-color: rgba(6, 182, 212, 1); }
 }
 @keyframes borderPulseBubblegum {
-  0% { box-shadow: 0 0 15px rgba(244, 114, 182, 0.45), inset 0 0 8px rgba(244, 114, 182, 0.2); border-color: rgba(244, 114, 182, 0.7); }
-  50% { box-shadow: 0 0 30px rgba(244, 114, 182, 0.85), inset 0 0 15px rgba(244, 114, 182, 0.5); border-color: rgba(244, 114, 182, 1); }
-  100% { box-shadow: 0 0 15px rgba(244, 114, 182, 0.45), inset 0 0 8px rgba(244, 114, 182, 0.2); border-color: rgba(244, 114, 182, 0.7); }
+  0%, 100% { box-shadow: 0 0 15px rgba(244, 114, 182, 0.45); border-color: rgba(244, 114, 182, 0.7); }
+  50% { box-shadow: 0 0 30px rgba(244, 114, 182, 0.85); border-color: rgba(244, 114, 182, 1); }
 }
 @keyframes borderRotateGold {
-  0% { border-color: #fbbf24; box-shadow: 0 0 15px rgba(251, 191, 36, 0.5); }
+  0%, 100% { border-color: #fbbf24; box-shadow: 0 0 15px rgba(251, 191, 36, 0.5); }
   50% { border-color: #f59e0b; box-shadow: 0 0 32px rgba(251, 191, 36, 0.9); }
-  100% { border-color: #fbbf24; box-shadow: 0 0 15px rgba(251, 191, 36, 0.5); }
 }
 @keyframes borderChromaWave {
   0% { filter: hue-rotate(0deg); }
@@ -188,7 +553,107 @@ export const BORDER_KEYFRAMES = `
   0%, 100% { opacity: 0.95; box-shadow: 0 0 15px rgba(52, 211, 153, 0.5); }
   50% { opacity: 1; box-shadow: 0 0 25px rgba(52, 211, 153, 0.8); }
 }
+@keyframes solarFlare {
+  0%, 100% { border-color: #f59e0b; box-shadow: 0 0 15px rgba(245, 158, 11, 0.4); }
+  50% { border-color: #ea580c; box-shadow: 0 0 28px rgba(245, 158, 11, 0.85); }
+}
+@keyframes toxicWaste {
+  0%, 100% { box-shadow: 0 0 12px rgba(132, 204, 22, 0.4); }
+  50% { box-shadow: 0 0 28px rgba(132, 204, 22, 0.8); }
+}
+@keyframes vaporGlow {
+  0%, 100% { border-color: #d946ef; box-shadow: 0 0 20px #d946ef, inset 0 0 8px #d946ef; }
+  50% { border-color: #3b82f6; box-shadow: 0 0 30px #3b82f6, inset 0 0 12px #3b82f6; }
+}
+@keyframes electricBuzz {
+  0% { opacity: 0.85; border-color: #3b82f6; box-shadow: 0 0 10px #3b82f6; }
+  100% { opacity: 1; border-color: #60a5fa; box-shadow: 0 0 25px #60a5fa; }
+}
+@keyframes glitchGlow {
+  0%, 100% { transform: translate(0, 0); box-shadow: -2px 0 0 rgba(239,68,68,0.5), 2px 0 0 rgba(6,182,212,0.5); }
+  20% { transform: translate(-1px, 1px); }
+  40% { transform: translate(1px, -1px); box-shadow: -3px 0 0 rgba(6,182,212,0.6), 3px 0 0 rgba(239,68,68,0.6); }
+  60% { transform: translate(-1px, -1px); }
+  80% { transform: translate(1px, 1px); }
+}
+@keyframes ufoPlasma {
+  0%, 100% { border-color: #4ade80; box-shadow: 0 0 18px rgba(74, 222, 128, 0.5); }
+  50% { border-color: #22c55e; box-shadow: 0 0 30px rgba(34, 197, 94, 0.85); }
+}
+@keyframes potionPulse {
+  0%, 100% { border-color: #c026d3; box-shadow: 0 0 15px rgba(192, 38, 211, 0.5); }
+  50% { border-color: #f5d0fe; box-shadow: 0 0 30px rgba(192, 38, 211, 0.85); }
+}
+@keyframes textChromaWave {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.rainbow-text {
+  background-image: linear-gradient(to right, #ff0055, #00ff55, #0055ff, #facc15, #ff0055);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textChromaWave 3s linear infinite;
+  display: inline-block;
+}
 `;
+
+export function getBorderStyles(borderId: string | undefined): { id: string; name: string; className: string; cardStyle: React.CSSProperties } {
+  if (!borderId || borderId === 'none') {
+    return {
+      id: 'none',
+      name: 'No border (Classic)',
+      className: 'border-zinc-800',
+      cardStyle: {}
+    };
+  }
+
+  if (borderId.startsWith('custom:')) {
+    try {
+      const configStr = borderId.slice(7);
+      const config = JSON.parse(configStr);
+      const color = config.color || '#3b82f6';
+      const style = config.style || 'solid';
+      const width = config.width || 3;
+      const glowColor = config.glowColor || '';
+      const glowIntensity = config.glowIntensity || 0;
+      
+      const shadow = glowColor && glowIntensity > 0
+        ? `0 0 ${glowIntensity}px ${glowColor}, inset 0 0 ${Math.ceil(glowIntensity/2)}px ${glowColor}`
+        : 'none';
+
+      return {
+        id: borderId,
+        name: config.name || 'Custom Masterpiece',
+        className: 'border-transparent',
+        cardStyle: {
+          border: `${width}px ${style} ${color}`,
+          boxShadow: shadow,
+        }
+      };
+    } catch (err) {
+      // Fallback
+    }
+  }
+
+  const found = PROFILE_BORDERS.find(b => b.id === borderId);
+  if (found) {
+    return {
+      id: found.id,
+      name: found.name,
+      className: found.className || '',
+      cardStyle: found.cardStyle || {}
+    };
+  }
+
+  return {
+    id: 'none',
+    name: 'No border (Classic)',
+    className: 'border-zinc-800',
+    cardStyle: {}
+  };
+}
 
 export let globalRankOverrides: Record<string, string> = {};
 
@@ -452,12 +917,13 @@ export interface BioData {
   profile_music_source?: string;
   profile_card_bg?: string;
   profile_border?: string;
+  profile_effect?: string;
   assigned_ranks?: Record<string, string>;
   custom_fonts?: Record<string, string>;
 }
 
 export function parseBio(bioStr: string | null | undefined): BioData {
-  if (!bioStr) return { text: '', mood: '' };
+  if (!bioStr) return { text: '', mood: '', profile_effect: 'none' };
   try {
     const data = JSON.parse(bioStr);
     return {
@@ -467,11 +933,12 @@ export function parseBio(bioStr: string | null | undefined): BioData {
       profile_music_source: data.profile_music_source || '',
       profile_card_bg: data.profile_card_bg || '',
       profile_border: data.profile_border || 'none',
+      profile_effect: data.profile_effect || 'none',
       assigned_ranks: data.assigned_ranks || {},
       custom_fonts: data.custom_fonts || {}
     };
   } catch (e) {}
-  return { text: bioStr, mood: '' };
+  return { text: bioStr, mood: '', profile_effect: 'none' };
 }
 
 export function stringifyBio(data: BioData): string {
@@ -513,8 +980,7 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
            return (
              <img 
                src={news.profiles?.avatar_url} 
-               style={uBorder.avatarStyle}
-               className={`w-10 h-10 rounded-full object-cover border shrink-0 ${uBorderConfig.profile_border && uBorderConfig.profile_border !== 'none' ? 'border-transparent' : 'border-zinc-700'}`} 
+               className="w-10 h-10 rounded-full object-cover border border-zinc-700 shrink-0" 
                alt="" 
              />
            );
@@ -566,8 +1032,7 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
                      return (
                        <img 
                          src={comment.profiles?.avatar_url} 
-                         style={cBorder.avatarStyle}
-                         className={`w-7 h-7 rounded-full object-cover border shrink-0 ${cBorderConfig.profile_border && cBorderConfig.profile_border !== 'none' ? 'border-transparent' : 'border-zinc-700'}`} 
+                         className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" 
                          alt="" 
                        />
                      );
@@ -617,6 +1082,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [onlineUsers, setOnlineUsers] = useState<Profile[]>([TEST_BOT]);
+  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [leftPanelMode, setLeftPanelMode] = useState<'none' | 'menu' | 'news' | 'rules'>('none');
   const [newsFeed, setNewsFeed] = useState<News[]>([]);
@@ -654,6 +1120,18 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   }, [messages]);
 
   useEffect(() => {
+    // Initial fetch of all profiles for offline rendering
+    const fetchAllProfiles = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*');
+      if (!error && data) {
+        setAllProfiles(data);
+      }
+    };
+
+    fetchAllProfiles();
+
     // Initial fetch of messages
     const fetchMessages = async () => {
       const { data, error } = await supabase
@@ -766,6 +1244,10 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async (payload: any) => {
          fetchNews();
+         const { data: updatedData } = await supabase.from('profiles').select('*');
+         if (updatedData) {
+           setAllProfiles(updatedData);
+         }
          if (payload.new && payload.new.email === 'test@gmail.com') {
            const bio = parseBio(payload.new.bio);
            if (bio.assigned_ranks) {
@@ -806,7 +1288,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           if (isB_Bot && !isA_Bot) return 1;
 
           if (rankA !== rankB) return rankA - rankB;
-          return a.username.localeCompare(b.username);
+          return (a.username || '').localeCompare(b.username || '');
         });
 
         setOnlineUsers(uniqueUsers);
@@ -1337,8 +1819,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                         <img 
                           src={renderMsg.profiles?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=default'} 
                           alt="Avatar" 
-                          style={msgBorder.avatarStyle}
-                          className={`h-[42px] w-[42px] rounded-md object-cover shrink-0 mt-0.5 cursor-pointer border ${msgBorderId === 'none' ? 'border-zinc-800' : 'border-transparent'}`}
+                          className="h-[42px] w-[42px] rounded-md object-cover shrink-0 mt-0.5 cursor-pointer border border-zinc-800"
                           onClick={() => setSelectedProfileId(renderMsg.user_id)}
                         />
                       );
@@ -1414,8 +1895,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                       <img 
                         src={user.avatar_url} 
                         alt="Avatar" 
-                        style={onlineBorder.avatarStyle}
-                        className={`h-[34px] w-[34px] rounded-full object-cover border ${onlineBorderId === 'none' ? 'border-transparent' : 'border-transparent'}`} 
+                        className="h-[34px] w-[34px] rounded-full object-cover border border-zinc-800" 
                       />
                     );
                   })()}
@@ -1429,6 +1909,55 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                 </div>
               </button>
             ))}
+
+            {/* Offline Section containing all current members who are offline */}
+            {(() => {
+              const offlineUsersList = allProfiles.filter(p => !onlineUsers.some(ou => ou.id === p.id) && p.id !== TEST_BOT.id);
+              const sortedOfflineUsers = [...offlineUsersList].sort((a, b) => {
+                const rankA = getRank(a.email, a.id, a.rank).level;
+                const rankB = getRank(b.email, b.id, b.rank).level;
+                const isA_Dev = rankA === 0;
+                const isB_Dev = rankB === 0;
+
+                if (isA_Dev && !isB_Dev) return -1;
+                if (isB_Dev && !isA_Dev) return 1;
+
+                if (rankA !== rankB) return rankA - rankB;
+                return (a.username || '').localeCompare(b.username || '');
+              });
+
+              if (sortedOfflineUsers.length === 0) return null;
+
+              return (
+                <>
+                  <div className="pt-4 pb-2 px-1 border-t border-zinc-800/20 mt-4">
+                    <span className="text-xs font-bold tracking-wider text-zinc-500 uppercase">Offline — {sortedOfflineUsers.length}</span>
+                  </div>
+                  {sortedOfflineUsers.map(user => (
+                    <button
+                      key={user.id}
+                      onClick={() => setSelectedProfileId(user.id)}
+                      className="flex w-full items-center gap-3 rounded-lg bg-[#141416]/50 px-3 py-2.5 transition-colors hover:bg-[#1e1e22]/50 focus:outline-none mb-1.5 border border-zinc-900/40 opacity-60 hover:opacity-90"
+                    >
+                      <div className="relative shrink-0">
+                        <img 
+                          src={user.avatar_url} 
+                          alt="Avatar" 
+                          className="h-[34px] w-[34px] rounded-full object-cover border border-zinc-900/80 filter grayscale" 
+                        />
+                        <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#141416] bg-zinc-600"></div>
+                      </div>
+                      <div className="flex flex-col items-start overflow-hidden w-full">
+                        <div className="flex items-center gap-1.5 max-w-full">
+                          <img src={getRank(user.email, user.id, user.rank).icon} alt={getRank(user.email, user.id, user.rank).name} className="h-4 object-contain filter grayscale" />
+                          <span className="truncate text-[14px] font-bold text-zinc-400">{user.username}</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -1455,7 +1984,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
-  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | 'border' | null>(null);
+  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | 'border' | 'border_borders' | 'border_effects' | 'border_combos' | 'border_creator' | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'bio'>('bio');
   const [isPlaying, setIsPlaying] = useState(false);
   
@@ -1608,15 +2137,17 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
   if (!profile && !loading) return null;
 
   const viewerBorderId = bioData.profile_border || 'none';
-  const viewerBorder = PROFILE_BORDERS.find(b => b.id === viewerBorderId) || PROFILE_BORDERS[0];
+  const viewerBorder = getBorderStyles(viewerBorderId);
+  const isProfileRainbowActive = viewerBorderId === 'rainbow-wave' || viewerBorderId === 'rainbow-neon' || bioData.profile_effect === 'psychedelic';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
       <style dangerouslySetInnerHTML={{ __html: BORDER_KEYFRAMES }} />
+      <style dangerouslySetInnerHTML={{ __html: EFFECTS_KEYFRAMES }} />
       <UserProfileFontsLoader bio={profile?.bio} />
       <div 
         style={viewerBorder.cardStyle}
-        className={`w-full max-w-md overflow-hidden rounded-2xl bg-[#141416] border shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 ${viewerBorder.className || ''}`}
+        className={`w-full max-w-xl overflow-hidden rounded-2xl bg-[#141416] border shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 ${viewerBorder.className || ''}`}
       >
         
         <button onClick={onClose} className="absolute right-3 top-3 z-10 p-1.5 bg-black/40 text-white rounded-full hover:bg-black/60 transition-colors">
@@ -1638,7 +2169,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
             </div>
             
             <div 
-              style={bioData.profile_card_bg ? {
+              style={(!bioData.profile_effect || bioData.profile_effect === 'none') && bioData.profile_card_bg ? {
                 backgroundImage: `url(${bioData.profile_card_bg})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
@@ -1646,16 +2177,17 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
               } : undefined}
               className="flex-1 flex flex-col relative overflow-hidden"
             >
-              {bioData.profile_card_bg && (
+              {(!bioData.profile_effect || bioData.profile_effect === 'none') && bioData.profile_card_bg && (
                 <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-[1px] z-0 pointer-events-none" />
               )}
+              
+              <ProfileEffectRenderer effectId={bioData.profile_effect || 'none'} />
               
               <div className="relative z-10 flex flex-col h-full overflow-y-auto pb-4 custom-scrollbar">
                 <div className="px-6 pb-4 relative shrink-0">
                   <div className="flex justify-between items-end">
                     <div 
-                      style={viewerBorder.avatarStyle}
-                      className={`relative group mt-4 mb-4 border-4 rounded-full h-24 w-24 bg-zinc-800 shrink-0 ${viewerBorderId === 'none' ? 'border-[#141416]' : 'border-transparent'}`}
+                      className="relative group mt-3 mb-3 border-4 border-[#141416] rounded-full h-24 w-24 bg-zinc-800 shrink-0 overflow-hidden"
                     >
                        <img src={profile!.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
                        {editMode && (
@@ -1679,7 +2211,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
 
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-xl font-bold text-white">{profile!.username}</h3>
+                      <h3 className={`text-xl font-bold ${isProfileRainbowActive ? 'rainbow-text' : 'text-white'}`}>{profile!.username}</h3>
                       {!isSelf && profile!.id !== TEST_BOT.id && (
                         <button onClick={handleLikeProfile} className="flex items-center gap-1.5 focus:outline-none transition-transform hover:scale-110 active:scale-95 group" title="Like Profile">
                           <Heart className={`w-5 h-5 transition-colors ${profile.profile_likes?.some((l: any) => l.user_id === currentUserId) ? 'fill-emerald-500 text-emerald-500' : 'text-zinc-500 group-hover:text-emerald-400'}`} />
@@ -1695,10 +2227,10 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                     </div>
                     <div className="flex items-center gap-1.5 mt-1 mb-1">
                       <img src={getRank(profile!.email, profile!.id, profile!.rank).icon} alt={getRank(profile!.email, profile!.id, profile!.rank).name} className="h-4 object-contain" />
-                      <span className="text-[13px] font-bold text-zinc-300">{getRank(profile!.email, profile!.id, profile!.rank).name}</span>
+                      <span className={`text-[13px] font-bold ${isProfileRainbowActive ? 'rainbow-text' : 'text-zinc-300'}`}>{getRank(profile!.email, profile!.id, profile!.rank).name}</span>
                     </div>
                     {bioData.mood && (
-                      <p className="text-sm mt-1 mb-1 text-emerald-400 font-medium">{bioData.mood}</p>
+                      <p className={`text-sm mt-1 mb-1 font-medium ${isProfileRainbowActive ? 'rainbow-text' : 'text-emerald-400'}`}>{bioData.mood}</p>
                     )}
                   </div>
                 </div>
@@ -1786,14 +2318,17 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                   </div>
                 ) : (
                   <div className="px-6 pb-6 pt-2 z-10 relative">
-                    <div className="flex flex-col gap-2">
-                      <button onClick={() => setActiveEditModal('mood')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Mood</button>
-                      <button onClick={() => setActiveEditModal('bio')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Bio</button>
-                      <button onClick={() => setActiveEditModal('info')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Age & Gender</button>
-                      <button onClick={() => setActiveEditModal('username')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Username</button>
-                      <button onClick={() => setActiveEditModal('music')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Music className="w-4 h-4 text-emerald-500" /> Edit Profile Music</button>
-                      <button onClick={() => setActiveEditModal('card_bg')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><ImageIcon className="w-4 h-4 text-emerald-500" /> Edit Profile Card Background</button>
-                      <button onClick={() => setActiveEditModal('border')} className="w-full py-2 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><ShieldCheck className="w-4 h-4 text-emerald-500" /> Edit Profile Border</button>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button onClick={() => setActiveEditModal('username')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Username</button>
+                      <button onClick={() => setActiveEditModal('mood')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Mood</button>
+                      <button onClick={() => setActiveEditModal('info')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Age & Gender</button>
+                      <button onClick={() => setActiveEditModal('bio')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Bio</button>
+                      <button onClick={() => setActiveEditModal('music')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Music className="w-4 h-4 text-emerald-500" /> Edit Music</button>
+                      <button onClick={() => setActiveEditModal('card_bg')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><ImageIcon className="w-4 h-4 text-emerald-500" /> Edit Background</button>
+                      <button onClick={() => setActiveEditModal('border_borders')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Borders</button>
+                      <button onClick={() => setActiveEditModal('border_effects')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Effects</button>
+                      <button onClick={() => setActiveEditModal('border_combos')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Combos</button>
+                      <button onClick={() => setActiveEditModal('border_creator')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Creator</button>
                     </div>
                   </div>
                 )}
@@ -1856,15 +2391,57 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
           {(props) => <CardBgEditForm profile={profile!} {...props} />}
         </EditModal>
       )}
-      {activeEditModal === 'border' && (
-        <ProfileBorderForm 
+      {activeEditModal === 'border_borders' && (
+        <ProfileBordersModal 
           profile={profile!} 
           bioData={bioData} 
           onClose={() => setActiveEditModal(null)} 
           onSave={(val: any) => {
             const newBio = stringifyBio({ 
               ...bioData, 
-              profile_border: val.profile_border
+              ...val
+            });
+            updateProfileData({ bio: newBio });
+          }} 
+        />
+      )}
+      {activeEditModal === 'border_effects' && (
+        <ProfileEffectsModal 
+          profile={profile!} 
+          bioData={bioData} 
+          onClose={() => setActiveEditModal(null)} 
+          onSave={(val: any) => {
+            const newBio = stringifyBio({ 
+              ...bioData, 
+              ...val
+            });
+            updateProfileData({ bio: newBio });
+          }} 
+        />
+      )}
+      {activeEditModal === 'border_combos' && (
+        <ProfileCombosModal 
+          profile={profile!} 
+          bioData={bioData} 
+          onClose={() => setActiveEditModal(null)} 
+          onSave={(val: any) => {
+            const newBio = stringifyBio({ 
+              ...bioData, 
+              ...val
+            });
+            updateProfileData({ bio: newBio });
+          }} 
+        />
+      )}
+      {activeEditModal === 'border_creator' && (
+        <ProfileCreatorModal 
+          profile={profile!} 
+          bioData={bioData} 
+          onClose={() => setActiveEditModal(null)} 
+          onSave={(val: any) => {
+            const newBio = stringifyBio({ 
+              ...bioData, 
+              ...val
             });
             updateProfileData({ bio: newBio });
           }} 
@@ -1874,13 +2451,1545 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
   );
 }
 
-function ProfileBorderForm({ profile, onClose, onSave, bioData }: any) {
+function CosmeticCardPreview({ profile, borderId, effectId, bioData }: { profile: Profile; borderId: string; effectId: string; bioData: any }) {
+  const [activeTab, setActiveTab] = useState<'bio' | 'info'>('bio');
+  
+  const resolvedBorder = getBorderStyles(borderId) || {
+    id: 'none',
+    name: 'No border',
+    className: '',
+    cardStyle: {}
+  };
+
+  const isRainbowActive = borderId === 'rainbow-wave' || borderId === 'rainbow-neon' || effectId === 'psychedelic';
+
+  const infoCountry = (profile as any).country || 'United States';
+  const infoLanguage = (profile as any).language || 'English';
+  const infoFriends = '18 Online';
+  const previewGender = profile.gender || 'Not Specified';
+  const previewAge = profile.age || 'Age N/A';
+
+  return (
+    <div className="w-full md:w-[350px] shrink-0 flex flex-col bg-[#141416]/40 border border-[#1e1e22] rounded-2xl p-4 gap-4 justify-between animate-fade-in font-sans">
+      <div className="w-full text-center">
+        <span className="text-[10px] uppercase tracking-[0.2em] font-black text-zinc-550">Live card preview</span>
+      </div>
+
+      <div 
+        style={resolvedBorder.cardStyle} 
+        className={`w-full overflow-hidden rounded-2xl bg-[#141416] border shadow-2xl relative select-none shrink-0 transition-all duration-300 ${resolvedBorder.className || ''} flex flex-col h-[400px]`}
+      >
+        {/* Banner staying in background */}
+        <div className="h-24 w-full relative shrink-0 z-0 border-b border-zinc-900/40 opacity-90">
+          <img 
+            src={profile.banner_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop'} 
+            alt="Banner" 
+            className="h-full w-full object-cover" 
+          />
+        </div>
+
+        {/* Card Background image center layer */}
+        <div 
+          style={effectId === 'none' && bioData?.profile_card_bg ? {
+            backgroundImage: `url(${bioData.profile_card_bg})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+          } : undefined}
+          className="flex-1 flex flex-col relative overflow-hidden animate-fade-in"
+        >
+          {effectId === 'none' && bioData?.profile_card_bg && (
+            <div className="absolute inset-0 bg-zinc-950/85 backdrop-blur-[1px] z-0 pointer-events-none" />
+          )}
+
+          <ProfileEffectRenderer effectId={effectId} />
+
+          <div className="relative z-10 flex flex-col h-full overflow-y-auto pb-4 custom-scrollbar">
+            <div className="px-5 pb-3 relative shrink-0">
+              <div className="flex justify-between items-end">
+                {/* Profile picture sits correctly on top of card with negative margin */}
+                <div className="relative border-4 border-[#141416] rounded-full h-18 w-18 bg-zinc-800 shrink-0 overflow-hidden -mt-9 z-20">
+                  <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover rounded-full" />
+                </div>
+              </div>
+
+              <div className="mt-2 text-left">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className={`text-base font-bold ${isRainbowActive ? 'rainbow-text' : 'text-white'}`}>{profile.username}</h3>
+                  <div className="flex items-center gap-1 cursor-default text-emerald-505 ml-1">
+                    <Heart className="w-4 h-4 fill-emerald-500 animate-pulse text-emerald-500" />
+                    <span className="text-[11px] font-bold text-emerald-500">{profile.profile_likes?.length || 0}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 mt-1 mb-1">
+                  <img src={getRank(profile.email, profile.id, profile.rank).icon} alt={getRank(profile.email, profile.id, profile.rank).name} className="h-3.5 object-contain" />
+                  <span className={`text-xs font-bold ${isRainbowActive ? 'rainbow-text' : 'text-zinc-300'}`}>{getRank(profile.email, profile.id, profile.rank).name}</span>
+                </div>
+                {bioData?.mood && (
+                  <p className={`text-xs mt-0.5 font-medium ${isRainbowActive ? 'rainbow-text' : 'text-emerald-450'}`}>{bioData.mood}</p>
+                )}
+              </div>
+            </div>
+
+            {/* About Me versus Info content tabs */}
+            <div className="flex flex-col flex-1 pb-4 shadow-inner">
+              <div className="flex gap-4 border-b border-zinc-800/80 px-5 shrink-0 h-8">
+                <button 
+                  type="button" 
+                  onClick={() => setActiveTab('bio')} 
+                  className={`pb-0.5 flex items-center border-b-2 font-medium transition-colors text-xs ${activeTab === 'bio' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+                >
+                  About Me
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setActiveTab('info')} 
+                  className={`pb-0.5 flex items-center border-b-2 font-medium transition-colors text-xs ${activeTab === 'info' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+                >
+                  Info
+                </button>
+              </div>
+
+              <div className="h-32 overflow-y-auto px-5 py-2.5 custom-scrollbar z-10 relative">
+                {activeTab === 'bio' ? (
+                  <div className="text-[11px] text-zinc-350 leading-relaxed text-left font-sans">
+                    {bioData?.text ? (
+                      <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+                        {scrubContent(bioData.text)}
+                      </Markdown>
+                    ) : (
+                      <p className="text-zinc-500">No bio provided yet.</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2 text-[11px] text-zinc-350 text-left font-sans">
+                    <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
+                      <span className="text-zinc-404">Last online</span>
+                      <span>{profile.updated_at ? format(new Date(profile.updated_at), 'dd MMM yyyy, HH:mm') : 'Online Now'}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
+                      <span className="text-zinc-404">👥 Friends</span>
+                      <span>{infoFriends}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
+                      <span className="text-zinc-404">🌐 Country</span>
+                      <span>{infoCountry}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
+                      <span className="text-zinc-404">💬 Language</span>
+                      <span>{infoLanguage}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
+                      <span className="text-zinc-404">Gender</span>
+                      <span>{previewGender}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
+                      <span className="text-zinc-404">Age</span>
+                      <span>{previewAge}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileBordersModal({ profile, bioData, onClose, onSave }: any) {
+  const [screen, setScreen] = useState<'preview' | 'grid'>('preview');
+  const [previewBorderId, setPreviewBorderId] = useState(() => bioData?.profile_border || 'none');
+  const [index, setIndex] = useState(() => {
+    const currentId = bioData?.profile_border || 'none';
+    const foundIdx = PROFILE_BORDERS.findIndex(b => b.id === currentId);
+    return foundIdx >= 0 ? foundIdx : 0;
+  });
+
+  useEffect(() => {
+    if (previewBorderId && !previewBorderId.startsWith('custom:')) {
+      const idx = PROFILE_BORDERS.findIndex(b => b.id === previewBorderId);
+      if (idx >= 0) setIndex(idx);
+    }
+  }, [previewBorderId]);
+
+  const currentBorder = PROFILE_BORDERS[index] || PROFILE_BORDERS[0];
+
+  const handlePrev = () => {
+    const nextIdx = (index - 1 + PROFILE_BORDERS.length) % PROFILE_BORDERS.length;
+    setIndex(nextIdx);
+    setPreviewBorderId(PROFILE_BORDERS[nextIdx].id);
+  };
+
+  const handleNext = () => {
+    const nextIdx = (index + 1) % PROFILE_BORDERS.length;
+    setIndex(nextIdx);
+    setPreviewBorderId(PROFILE_BORDERS[nextIdx].id);
+  };
+
+  const handleSave = () => {
+    onSave({ profile_border: previewBorderId });
+    onClose();
+    toast.success('Profile border applied successfully!');
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto select-none font-sans">
+      <style dangerouslySetInnerHTML={{ __html: BORDER_KEYFRAMES }} />
+      <style dangerouslySetInnerHTML={{ __html: EFFECTS_KEYFRAMES }} />
+      <div className="w-full max-w-4xl bg-[#09090b] border border-zinc-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 relative shadow-[0_0_50px_rgba(0,0,0,0.9)] max-h-[92vh] overflow-y-auto md:overflow-hidden animate-fade-in duration-200">
+        
+        <CosmeticCardPreview profile={profile} borderId={previewBorderId} effectId={bioData?.profile_effect || 'none'} bioData={bioData} />
+
+        <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1 select-none custom-scrollbar justify-between">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-900 text-left">
+              <span className="text-white font-black text-sm tracking-wide uppercase">
+                Profile Borders Shop
+              </span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-[#888] bg-zinc-900 border border-zinc-850 rounded-full px-3 py-1">
+                Border Cosmetics
+              </span>
+            </div>
+
+            {screen === 'preview' ? (
+              <div className="flex flex-col gap-5 py-4 animate-in fade-in duration-200">
+                <div className="p-4 bg-zinc-950/40 border border-zinc-900 rounded-xl text-left">
+                  <span className="text-[10px] uppercase tracking-[0.25em] font-black text-zinc-505">Selected Frame</span>
+                  <h4 className="text-lg font-black text-emerald-400 mt-1">{currentBorder?.name}</h4>
+                  <p className="text-xs text-zinc-400 mt-2 leading-relaxed font-normal">
+                    This premium card frame borders your profile card with professional high-glow visual elements.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <button 
+                    type="button" 
+                    onClick={handlePrev}
+                    className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
+                    title="Previous Border"
+                  >
+                    <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={() => setScreen('grid')}
+                    className="flex-1 h-12 rounded-xl bg-[#141416] border border-zinc-800 hover:bg-zinc-800 hover:text-white flex items-center justify-center gap-2 text-zinc-300 text-xs font-black tracking-wider uppercase active:scale-95 transition-all outline-none"
+                  >
+                    <Grid className="w-4 h-4 text-emerald-400" />
+                    <span>View Grid</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={handleNext}
+                    className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
+                    title="Next Border"
+                  >
+                    <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                <button
+                  type="button"
+                  onClick={() => setScreen('preview')}
+                  className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 transition-colors border border-zinc-800"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Back to Custom Preview</span>
+                </button>
+
+                <div className="grid grid-cols-5 gap-2.5 max-h-[300px] overflow-y-auto pr-1 select-none custom-scrollbar pb-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreviewBorderId('none');
+                      setIndex(0);
+                      setScreen('preview');
+                    }}
+                    className={`aspect-square text-xs font-black rounded-xl flex items-center justify-center transition-all ${
+                      previewBorderId === 'none' 
+                        ? 'bg-emerald-500/10 border-2 border-emerald-500 shadow-lg text-emerald-404 font-extrabold' 
+                        : 'bg-[#141416]/40 border border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:bg-zinc-805'
+                    }`}
+                  >
+                    ⦸
+                  </button>
+
+                  {PROFILE_BORDERS.slice(1).map((border, bIdx) => {
+                    const borderActualIdx = bIdx + 1;
+                    const isSelected = previewBorderId === border.id;
+
+                    return (
+                      <button
+                        key={border.id}
+                        type="button"
+                        onClick={() => {
+                          setPreviewBorderId(border.id);
+                          setIndex(borderActualIdx);
+                          setScreen('preview');
+                        }}
+                        style={border.cardStyle}
+                        className={`aspect-square text-[10px] font-black rounded-lg flex items-center justify-center transition-all relative ${
+                          isSelected 
+                            ? 'ring-2 ring-emerald-500 scale-105 z-10' 
+                            : 'hover:scale-105 bg-zinc-850/10 border border-zinc-800 hover:bg-zinc-800'
+                        }`}
+                        title={border.name}
+                      >
+                        <span className="absolute inset-0.5 bg-[#09090b]/85 rounded-lg z-0 flex items-center justify-center font-mono font-black text-white text-[11px]">
+                          {borderActualIdx}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="w-full flex flex-col gap-2 pt-4 border-t border-zinc-900 mt-auto">
+            <button 
+              type="button"
+              onClick={handleSave}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs tracking-wider uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-emerald-500/50"
+            >
+              <Check className="w-4 h-4 stroke-[3]" />
+              <span>Save Border</span>
+            </button>
+            <button 
+              type="button"
+              onClick={onClose}
+              className="w-full py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 font-extrabold uppercase tracking-widest text-center transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+function ProfileEffectsModal({ profile, bioData, onClose, onSave }: any) {
+  const [screen, setScreen] = useState<'preview' | 'grid'>('preview');
+  const [previewEffectId, setPreviewEffectId] = useState(() => bioData?.profile_effect || 'none');
+  const [index, setIndex] = useState(() => {
+    const currentId = bioData?.profile_effect || 'none';
+    const foundIdx = PROFILE_EFFECTS.findIndex(e => e.id === currentId);
+    return foundIdx >= 0 ? foundIdx : 0;
+  });
+
+  useEffect(() => {
+    const idx = PROFILE_EFFECTS.findIndex(e => e.id === previewEffectId);
+    if (idx >= 0) setIndex(idx);
+  }, [previewEffectId]);
+
+  const currentEffect = PROFILE_EFFECTS[index] || PROFILE_EFFECTS[0];
+
+  const handlePrev = () => {
+    const nextIdx = (index - 1 + PROFILE_EFFECTS.length) % PROFILE_EFFECTS.length;
+    setIndex(nextIdx);
+    setPreviewEffectId(PROFILE_EFFECTS[nextIdx].id);
+  };
+
+  const handleNext = () => {
+    const nextIdx = (index + 1) % PROFILE_EFFECTS.length;
+    setIndex(nextIdx);
+    setPreviewEffectId(PROFILE_EFFECTS[nextIdx].id);
+  };
+
+  const handleSave = () => {
+    const shouldClearBg = previewEffectId !== 'none';
+    onSave({ 
+      profile_effect: previewEffectId,
+      ...(shouldClearBg ? { profile_card_bg: '' } : {})
+    });
+    onClose();
+    toast.success('Profile effect applied successfully!');
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto select-none font-sans">
+      <style dangerouslySetInnerHTML={{ __html: BORDER_KEYFRAMES }} />
+      <style dangerouslySetInnerHTML={{ __html: EFFECTS_KEYFRAMES }} />
+      <div className="w-full max-w-4xl bg-[#09090b] border border-zinc-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 relative shadow-[0_0_50px_rgba(0,0,0,0.9)] max-h-[92vh] overflow-y-auto md:overflow-hidden animate-fade-in duration-200">
+        
+        <CosmeticCardPreview profile={profile} borderId={bioData?.profile_border || 'none'} effectId={previewEffectId} bioData={bioData} />
+
+        <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1 select-none custom-scrollbar justify-between">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-900 text-left">
+              <span className="text-white font-black text-sm tracking-wide uppercase">
+                Profile Effects Shop
+              </span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-[#888] bg-zinc-900 border border-zinc-850 rounded-full px-3 py-1">
+                Visual Cosmos
+              </span>
+            </div>
+
+            {screen === 'preview' ? (
+              <div className="flex flex-col gap-5 py-4 animate-in fade-in duration-200">
+                <div className="p-4 bg-zinc-950/40 border border-zinc-900 rounded-xl text-left">
+                  <span className="text-[10px] uppercase tracking-[0.25em] font-black text-zinc-500">Selected Atmos</span>
+                  <span className="text-xs uppercase px-2 py-0.5 rounded border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 float-right font-black tracking-wide">
+                    {currentEffect?.category}
+                  </span>
+                  <h4 className="text-lg font-black text-emerald-400 mt-1">{currentEffect?.name}</h4>
+                  <p className="text-xs text-zinc-350 font-medium italic mt-1 bg-black/20 p-2 rounded border border-zinc-900 leading-normal mb-2.5 font-normal">
+                    "{currentEffect?.tagline}"
+                  </p>
+                  <p className="text-xs text-zinc-400 leading-relaxed font-normal animate-fade-in">
+                    {currentEffect?.description}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <button 
+                    type="button" 
+                    onClick={handlePrev}
+                    className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
+                    title="Previous Effect"
+                  >
+                    <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={() => setScreen('grid')}
+                    className="flex-1 h-12 rounded-xl bg-[#141416] border border-zinc-800 hover:bg-zinc-800 hover:text-white flex items-center justify-center gap-2 text-zinc-300 text-xs font-black tracking-wider uppercase active:scale-95 transition-all outline-none"
+                  >
+                    <Grid className="w-4 h-4 text-emerald-400" />
+                    <span>View Grid</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={handleNext}
+                    className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
+                    title="Next Effect"
+                  >
+                    <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                <button
+                  type="button"
+                  onClick={() => setScreen('preview')}
+                  className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 transition-colors border border-zinc-800"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Back to Custom Preview</span>
+                </button>
+
+                <div className="grid grid-cols-2 gap-2.5 max-h-[300px] overflow-y-auto pr-1 select-none custom-scrollbar pb-1">
+                  {PROFILE_EFFECTS.map((eff) => {
+                    const isSelected = previewEffectId === eff.id;
+                    const catIcon = eff.category === 'cyber' ? '🤖' :
+                                    eff.category === 'retro' ? '📼' :
+                                    eff.category === 'nature' ? '🌿' :
+                                    eff.category === 'cosmic' ? '🌌' :
+                                    eff.category === 'premium' ? '👑' :
+                                    eff.category === 'mystic' ? '🔮' : '✨';
+
+                    return (
+                      <button
+                        key={eff.id}
+                        type="button"
+                        onClick={() => {
+                          setPreviewEffectId(eff.id);
+                          setScreen('preview');
+                        }}
+                        className={`p-3 rounded-xl flex flex-col items-start text-left min-h-[95px] transition-all border relative overflow-hidden ${
+                          isSelected 
+                            ? 'border-emerald-500 bg-emerald-500/10 text-white ring-1 ring-emerald-500 font-bold font-sans' 
+                            : 'border-zinc-850 bg-[#141416]/40 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/10 hover:text-white'
+                        }`}
+                      >
+                        <span className="text-base">{catIcon}</span>
+                        <span className="text-[11px] font-black mt-1.5 leading-tight">{eff.name}</span>
+                        <span className="text-[9px] text-zinc-500 mt-1 line-clamp-2 leading-snug">{eff.description}</span>
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 text-emerald-400 font-black text-xs">●</div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="w-full flex flex-col gap-2 pt-4 border-t border-zinc-900 mt-auto">
+            <button 
+              type="button"
+              onClick={handleSave}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs tracking-wider uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-emerald-500/50"
+            >
+              <Check className="w-4 h-4 stroke-[3]" />
+              <span>Save Effect</span>
+            </button>
+            <button 
+              type="button"
+              onClick={onClose}
+              className="w-full py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 font-extrabold uppercase tracking-widest text-center transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+function ProfileCombosModal({ profile, bioData, onClose, onSave }: any) {
+  const [screen, setScreen] = useState<'preview' | 'grid'>('preview');
+  const [index, setIndex] = useState(() => {
+    const curBorder = bioData?.profile_border || 'none';
+    const curEffect = bioData?.profile_effect || 'none';
+    const foundIdx = PROFILE_COMBOS.findIndex(c => c.borderId === curBorder && c.effectId === curEffect);
+    return foundIdx >= 0 ? foundIdx : 0;
+  });
+
+  const currentCombo = PROFILE_COMBOS[index] || PROFILE_COMBOS[0];
+  const [previewBorderId, setPreviewBorderId] = useState(() => currentCombo.borderId);
+  const [previewEffectId, setPreviewEffectId] = useState(() => currentCombo.effectId);
+
+  useEffect(() => {
+    if (currentCombo) {
+      setPreviewBorderId(currentCombo.borderId);
+      setPreviewEffectId(currentCombo.effectId);
+    }
+  }, [index, currentCombo]);
+
+  const handlePrev = () => {
+    const nextIdx = (index - 1 + PROFILE_COMBOS.length) % PROFILE_COMBOS.length;
+    setIndex(nextIdx);
+  };
+
+  const handleNext = () => {
+    const nextIdx = (index + 1) % PROFILE_COMBOS.length;
+    setIndex(nextIdx);
+  };
+
+  const handleSave = () => {
+    const shouldClearBg = previewEffectId !== 'none';
+    onSave({ 
+      profile_border: previewBorderId,
+      profile_effect: previewEffectId,
+      ...(shouldClearBg ? { profile_card_bg: '' } : {})
+    });
+    onClose();
+    toast.success('Curated combo preset applied successfully!');
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto select-none font-sans animate-fade-in">
+      <style dangerouslySetInnerHTML={{ __html: BORDER_KEYFRAMES }} />
+      <style dangerouslySetInnerHTML={{ __html: EFFECTS_KEYFRAMES }} />
+      <div className="w-full max-w-4xl bg-[#09090b] border border-zinc-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 relative shadow-[0_0_50px_rgba(0,0,0,0.9)] max-h-[92vh] overflow-y-auto md:overflow-hidden animate-fade-in duration-200">
+        
+        <CosmeticCardPreview profile={profile} borderId={previewBorderId} effectId={previewEffectId} bioData={bioData} />
+
+        <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1 select-none custom-scrollbar justify-between">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-900 text-left">
+              <span className="text-white font-black text-sm tracking-wide uppercase">
+                Curated Combos Shop
+              </span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-[#888] bg-zinc-900 border border-zinc-850 rounded-full px-3 py-1">
+                Curated Presets
+              </span>
+            </div>
+
+            {screen === 'preview' ? (
+              <div className="flex flex-col gap-5 py-4 animate-in fade-in duration-200">
+                <div className="p-4 bg-zinc-950/40 border border-zinc-900 rounded-xl relative overflow-hidden text-left">
+                  <span className="text-[10px] uppercase tracking-[0.25em] font-black text-zinc-500">Selected Combo</span>
+                  <span 
+                    style={{ borderColor: currentCombo?.themeColor, color: currentCombo?.themeColor, backgroundColor: `${currentCombo?.themeColor}10` }}
+                    className="text-[8px] font-black uppercase px-2 py-0.5 rounded border float-right font-mono animate-pulse"
+                  >
+                    {currentCombo?.badge}
+                  </span>
+                  
+                  <h4 className="text-lg font-black text-emerald-400 mt-1">{currentCombo?.name}</h4>
+                  <p className="text-xs text-zinc-400 mt-2.5 leading-relaxed font-normal">
+                    This curated aesthetic combo pairs the legendary <strong className="text-zinc-200 font-bold">{(getBorderStyles(currentCombo?.borderId) || { name: 'Custom Border' }).name}</strong> frame with the atmospheric <strong className="text-zinc-200 font-bold">{PROFILE_EFFECTS.find(e => e.id === currentCombo?.effectId)?.name || 'Classic'}</strong> visual overlay.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <button 
+                    type="button" 
+                    onClick={handlePrev}
+                    className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-805 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
+                    title="Previous Combo"
+                  >
+                    <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={() => setScreen('grid')}
+                    className="flex-1 h-12 rounded-xl bg-[#141416] border border-zinc-80D hover:bg-zinc-800 hover:text-white flex items-center justify-center gap-2 text-zinc-300 text-xs font-black tracking-wider uppercase active:scale-95 transition-all outline-none"
+                  >
+                    <Grid className="w-4 h-4 text-emerald-400" />
+                    <span>View Grid</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={handleNext}
+                    className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-805 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
+                    title="Next Combo"
+                  >
+                    <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4 animate-in fade-in duration-200 font-sans">
+                <button
+                  type="button"
+                  onClick={() => setScreen('preview')}
+                  className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 transition-colors border border-zinc-800"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Back to Custom Preview</span>
+                </button>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1 select-none custom-scrollbar pb-1">
+                  {PROFILE_COMBOS.map((combo, cIdx) => {
+                    const isSelected = index === cIdx;
+                    const borderObj = getBorderStyles(combo.borderId);
+                    const effectObj = PROFILE_EFFECTS.find(e => e.id === combo.effectId);
+
+                    return (
+                      <button
+                        key={combo.id}
+                        type="button"
+                        onClick={() => {
+                          setIndex(cIdx);
+                          setScreen('preview');
+                        }}
+                        className={`p-3.5 rounded-xl flex flex-col text-left transition-all border relative overflow-hidden group ${
+                          isSelected 
+                            ? 'border-emerald-500 bg-emerald-500/10 text-white ring-1 ring-emerald-500 font-bold' 
+                            : 'border-zinc-850 bg-[#141416]/40 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/30'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full gap-2 font-sans">
+                          <span className="text-[11px] font-bold text-white group-hover:text-emerald-400 transition-colors truncate">{combo.name}</span>
+                          <span 
+                            style={{ borderColor: combo.themeColor, color: combo.themeColor, backgroundColor: `${combo.themeColor}10` }}
+                            className="text-[8px] font-black uppercase px-2 py-0.5 rounded border shrink-0 font-mono"
+                          >
+                            {combo.badge}
+                          </span>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                          <span className="text-[8px] font-mono bg-[#09090b] border border-zinc-850 px-1.5 py-0.5 rounded text-zinc-400 font-bold">
+                            ⚙️ {borderObj ? borderObj.name : 'Custom'}
+                          </span>
+                          <span className="text-[8px] font-mono bg-[#09090b] border border-zinc-850 px-1.5 py-0.5 rounded text-zinc-400 font-bold">
+                            🔮 {effectObj ? effectObj.name : 'None'}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="w-full flex flex-col gap-2 pt-4 border-t border-zinc-900 mt-auto">
+            <button 
+              type="button"
+              onClick={handleSave}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs tracking-wider uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-emerald-500/50 animate-fade-in"
+            >
+              <Check className="w-4 h-4 stroke-[3]" />
+              <span>Save Combo</span>
+            </button>
+            <button 
+              type="button"
+              onClick={onClose}
+              className="w-full py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 font-extrabold uppercase tracking-widest text-center transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+function ProfileCreatorModal({ profile, bioData, onClose, onSave }: any) {
+  const [customConfig, setCustomConfig] = useState(() => {
+    const currentId = bioData?.profile_border || '';
+    if (currentId.startsWith('custom:')) {
+      try {
+        return JSON.parse(currentId.slice(7));
+      } catch (err) {}
+    }
+    return {
+      name: 'My Masterpiece',
+      color: '#10b981',
+      style: 'solid' as const,
+      width: 3,
+      glowColor: '#10b981',
+      glowIntensity: 15
+    };
+  });
+
+  const previewBorderId = `custom:${JSON.stringify(customConfig)}`;
+
+  const handleSave = () => {
+    onSave({ profile_border: previewBorderId });
+    onClose();
+    toast.success('Custom border applied successfully!');
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto select-none font-sans animate-fade-in">
+      <style dangerouslySetInnerHTML={{ __html: BORDER_KEYFRAMES }} />
+      <style dangerouslySetInnerHTML={{ __html: EFFECTS_KEYFRAMES }} />
+      <div className="w-full max-w-4xl bg-[#09090b] border border-zinc-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 relative shadow-[0_0_50px_rgba(0,0,0,0.9)] max-h-[92vh] overflow-y-auto md:overflow-hidden animate-fade-in duration-200">
+        
+        <CosmeticCardPreview profile={profile} borderId={previewBorderId} effectId={bioData?.profile_effect || 'none'} bioData={bioData} />
+
+        <div className="flex-1 flex flex-col gap-3.5 max-h-[460px] overflow-y-auto custom-scrollbar justify-between select-none">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-900 text-left">
+              <span className="text-white font-black text-sm tracking-wide uppercase font-sans">
+                Border Creator Lab
+              </span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-[#888] bg-zinc-900 border border-zinc-850 rounded-full px-3 py-1">
+                Builder Lab
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-3.5 bg-zinc-950/60 p-4 border border-zinc-900 rounded-xl text-left font-sans animate-fade-in">
+              <div className="flex flex-col gap-1.5 font-sans">
+                <label className="text-[10px] text-zinc-500 uppercase tracking-widest font-black">Border Name</label>
+                <input
+                  type="text"
+                  maxLength={24}
+                  value={customConfig.name}
+                  onChange={(e) => setCustomConfig({ ...customConfig, name: e.target.value })}
+                  placeholder="e.g. My Masterpiece"
+                  className="w-full bg-[#141416] border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-zinc-650 focus:outline-none focus:border-zinc-700 font-medium"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <div className="flex justify-between items-center text-[10px] text-zinc-500 uppercase tracking-widest font-black font-sans">
+                  <span>Border Thickness</span>
+                  <span className="text-emerald-400 font-mono font-bold">{customConfig.width}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="8"
+                  value={customConfig.width}
+                  onChange={(e) => setCustomConfig({ ...customConfig, width: parseInt(e.target.value) })}
+                  className="w-full accent-emerald-500 cursor-pointer h-1 bg-zinc-800 rounded"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] text-zinc-500 uppercase tracking-widest font-black">Stroke Style</label>
+                <div className="grid grid-cols-3 gap-1.5 text-[9px] font-bold text-zinc-400 uppercase tracking-tight font-sans">
+                  {(['solid', 'dashed', 'dotted', 'double', 'groove', 'ridge'] as const).map((pattern) => (
+                    <button
+                      key={pattern}
+                      type="button"
+                      onClick={() => setCustomConfig({...customConfig, style: pattern})}
+                      className={`py-1 rounded border text-center transition-all truncate ${
+                        customConfig.style === pattern 
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white font-extrabold shadow-sm' 
+                          : 'border-zinc-800 bg-[#141416] hover:bg-zinc-850'
+                      }`}
+                    >
+                      {pattern}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <div className="flex justify-between items-center text-[10px] text-zinc-500 uppercase tracking-widest font-black">
+                  <span>Outline Tint</span>
+                  <span className="text-zinc-400 font-mono text-[9px]">{customConfig.color}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap gap-1.5 flex-1 font-sans">
+                    {['#10b981', '#ef4444', '#a855f7', '#fbbf24', '#06b6d4', '#f472b6', '#ffffff', '#000000'].map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setCustomConfig({ ...customConfig, color })}
+                        style={{ backgroundColor: color }}
+                        className={`w-5 h-5 rounded-full border transition-all ${
+                          customConfig.color === color ? 'ring-2 ring-white scale-110' : 'border-zinc-800 opacity-80 hover:opacity-100'
+                        }`}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                  <input
+                    type="color"
+                    value={customConfig.color}
+                    onChange={(e) => setCustomConfig({ ...customConfig, color: e.target.value })}
+                    className="w-7 h-7 bg-transparent border-0 cursor-pointer rounded shrink-0 p-0"
+                    title="Choose Custom Color"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <div className="flex justify-between items-center text-[10px] text-zinc-505 uppercase tracking-widest font-black font-sans">
+                  <span>Glow Strength</span>
+                  <span className="text-zinc-400 font-mono text-[9px]">{customConfig.glowIntensity}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="30"
+                  value={customConfig.glowIntensity}
+                  onChange={(e) => setCustomConfig({ ...customConfig, glowIntensity: parseInt(e.target.value) })}
+                  className="w-full accent-emerald-500 cursor-pointer h-1 bg-zinc-800 rounded align-middle"
+                />
+
+                {customConfig.glowIntensity > 0 && (
+                  <div className="flex items-center gap-2 mt-1 animate-in fade-in slide-in-from-top-1 font-sans">
+                    <div className="flex flex-wrap gap-1.5 flex-1 font-sans">
+                      {['#10b981', '#ef4444', '#a855f7', '#fbbf24', '#06b6d4', '#f472b6', '#ffffff'].map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setCustomConfig({ ...customConfig, glowColor: color })}
+                          style={{ backgroundColor: color }}
+                          className={`w-5 h-5 rounded-full border transition-all ${
+                            customConfig.glowColor === color ? 'ring-2 ring-white scale-110' : 'border-zinc-850 opacity-80 hover:opacity-100'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <input
+                      type="color"
+                      value={customConfig.glowColor}
+                      onChange={(e) => setCustomConfig({ ...customConfig, glowColor: e.target.value })}
+                      className="w-7 h-7 bg-transparent border-0 cursor-pointer rounded shrink-0 p-0"
+                      title="Choose Custom Glow"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="w-full flex flex-col gap-2 pt-4 border-t border-zinc-900 mt-auto font-sans">
+            <button 
+              type="button"
+              onClick={handleSave}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs tracking-wider uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-emerald-500/50"
+            >
+              <Check className="w-4 h-4 stroke-[3]" />
+              <span>Save Custom Design</span>
+            </button>
+            <button 
+              type="button"
+              onClick={onClose}
+              className="w-full py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 font-extrabold uppercase tracking-widest text-center transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+function ProfileBorderForm({ profile, onClose, onSave, bioData, initialTab }: any) {
+  const [activeTab, setActiveTab] = useState<'combos' | 'effects' | 'borders' | 'creator'>(() => {
+    if (initialTab === 'borders' || initialTab === 'effects' || initialTab === 'combos' || initialTab === 'creator') {
+      return initialTab;
+    }
+    return 'combos';
+  });
+  const [previewActiveTab, setPreviewActiveTab] = useState<'bio' | 'info'>('bio');
+  
+  const [previewBorderId, setPreviewBorderId] = useState(() => bioData?.profile_border || 'none');
+  const [previewEffectId, setPreviewEffectId] = useState(() => bioData?.profile_effect || 'none');
+
+  const [index, setIndex] = useState(() => {
+    const currentId = bioData?.profile_border || 'none';
+    const foundIdx = PROFILE_BORDERS.findIndex(b => b.id === currentId);
+    return foundIdx >= 0 ? foundIdx : 0;
+  });
+
+  // State for Custom Border Designer
+  const [customConfig, setCustomConfig] = useState(() => {
+    const currentId = bioData?.profile_border || '';
+    if (currentId.startsWith('custom:')) {
+      try {
+        return JSON.parse(currentId.slice(7));
+      } catch (err) {}
+    }
+    return {
+      name: 'My Masterpiece',
+      color: '#10b981',
+      style: 'solid' as const,
+      width: 3,
+      glowColor: '#10b981',
+      glowIntensity: 15
+    };
+  });
+
+  // Keep index state in sync if standard border is selected
+  useEffect(() => {
+    if (previewBorderId && !previewBorderId.startsWith('custom:')) {
+      const idx = PROFILE_BORDERS.findIndex(b => b.id === previewBorderId);
+      if (idx >= 0) setIndex(idx);
+    }
+  }, [previewBorderId]);
+
+  const resolvedBorder = getBorderStyles(previewBorderId) || {
+    id: 'none',
+    name: 'No border',
+    className: '',
+    cardStyle: {}
+  };
+
+  const handleSave = () => {
+    const shouldClearBg = previewEffectId !== 'none';
+    onSave({
+      profile_border: previewBorderId,
+      profile_effect: previewEffectId,
+      ...(shouldClearBg ? { profile_card_bg: '' } : {})
+    });
+    onClose();
+    toast.success('Cosmetics saved successfully!');
+  };
+
+  const previewGender = profile.gender || 'Not Specified';
+  const previewAge = profile.age || 'Age N/A';
+
+  if (profile) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto select-none">
+      {/* Width expanded into a clean bento-grid double-column atelier layout */}
+      <div className="w-full max-w-4xl bg-[#09090b] border border-zinc-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 relative shadow-[0_0_50px_rgba(0,0,0,0.9)] max-h-[92vh] overflow-y-auto md:overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        {/* LEFT COLUMN: VISUAL PREVIEW CARD */}
+        {(() => {
+          const isLivePreviewRainbow = previewBorderId === 'rainbow-wave' || previewBorderId === 'rainbow-neon' || previewEffectId === 'psychedelic';
+          return (
+            <div className="md:w-[350px] shrink-0 flex flex-col bg-[#141416]/40 border border-[#1e1e22] rounded-2xl p-4 gap-4 justify-between">
+              <div className="w-full text-center">
+                <span className="text-[10px] uppercase tracking-[0.2em] font-black text-zinc-500">Live card preview</span>
+              </div>
+
+              {/* Persistent Live Card Preview */}
+              <div 
+                style={resolvedBorder.cardStyle} 
+                className={`w-full overflow-hidden rounded-2xl bg-[#141416] border shadow-2xl relative select-none shrink-0 transition-all duration-300 ${resolvedBorder.className || ''} flex flex-col h-[400px]`}
+              >
+                {/* Banner block */}
+                <div className="h-24 w-full relative shrink-0 z-0 border-b border-zinc-900/40">
+                  <img 
+                    src={profile.banner_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop'} 
+                    alt="Banner" 
+                    className="h-full w-full object-cover" 
+                  />
+                </div>
+
+                {/* Card Background image content overlay */}
+                <div 
+                  style={previewEffectId === 'none' && bioData.profile_card_bg ? {
+                    backgroundImage: `url(${bioData.profile_card_bg})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                  } : undefined}
+                  className="flex-1 flex flex-col relative overflow-hidden"
+                >
+                  {previewEffectId === 'none' && bioData.profile_card_bg && (
+                    <div className="absolute inset-0 bg-zinc-950/85 backdrop-blur-[1px] z-0 pointer-events-none" />
+                  )}
+
+                  <ProfileEffectRenderer effectId={previewEffectId} />
+
+                  <div className="relative z-10 flex flex-col h-full overflow-y-auto pb-4 custom-scrollbar">
+                    <div className="px-5 pb-3 relative shrink-0">
+                      <div className="flex justify-between items-end">
+                        <div className="relative border-4 border-[#141416] rounded-full h-18 w-18 bg-zinc-800 shrink-0 overflow-hidden -mt-9">
+                          <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover rounded-full" />
+                        </div>
+                      </div>
+
+                      <div className="mt-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className={`text-base font-bold ${isLivePreviewRainbow ? 'rainbow-text' : 'text-white'}`}>{profile.username}</h3>
+                          <div className="flex items-center gap-1 cursor-default text-emerald-500 ml-1">
+                            <Heart className="w-4 h-4 fill-emerald-500 animate-pulse" />
+                            <span className="text-[11px] font-bold">{profile.profile_likes?.length || 0}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1 mb-1">
+                          <img src={getRank(profile.email, profile.id, profile.rank).icon} alt={getRank(profile.email, profile.id, profile.rank).name} className="h-3.5 object-contain" />
+                          <span className={`text-xs font-bold ${isLivePreviewRainbow ? 'rainbow-text' : 'text-zinc-300'}`}>{getRank(profile.email, profile.id, profile.rank).name}</span>
+                        </div>
+                        {bioData.mood && (
+                          <p className={`text-xs mt-0.5 font-medium ${isLivePreviewRainbow ? 'rainbow-text' : 'text-emerald-400'}`}>{bioData.mood}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Preview interactive Tabs */}
+                    <div className="flex flex-col flex-1 pb-4 shadow-inner">
+                      <div className="flex gap-4 border-b border-zinc-800/80 px-5 shrink-0 h-8">
+                        <button 
+                          type="button" 
+                          onClick={() => setPreviewActiveTab('bio')} 
+                          className={`pb-0.5 flex items-center border-b-2 font-medium transition-colors text-xs ${previewActiveTab === 'bio' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+                        >
+                          About Me
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => setPreviewActiveTab('info')} 
+                          className={`pb-0.5 flex items-center border-b-2 font-medium transition-colors text-xs ${previewActiveTab === 'info' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+                        >
+                          Info
+                        </button>
+                      </div>
+
+                      <div className="h-32 overflow-y-auto px-5 py-2.5 custom-scrollbar z-10 relative">
+                        {previewActiveTab === 'bio' ? (
+                          <div className="text-[11px] text-zinc-350 leading-relaxed">
+                            {bioData.text ? (
+                              <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+                                {scrubContent(bioData.text)}
+                              </Markdown>
+                            ) : (
+                              <p className="text-zinc-500">No bio provided yet.</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-2 text-[11px] text-zinc-350">
+                            <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
+                              <span className="text-zinc-400">Last online</span>
+                              <span>{profile.updated_at ? format(new Date(profile.updated_at), 'dd MMM yyyy, HH:mm') : 'Online Now'}</span>
+                            </div>
+                            <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
+                              <span className="text-zinc-400">Gender</span>
+                              <span>{previewGender}</span>
+                            </div>
+                            <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
+                              <span className="text-zinc-400">Age</span>
+                              <span>{previewAge}</span>
+                            </div>
+                            <div className="flex justify-between items-center pb-1.5 border-b border-zinc-900">
+                              <span className="text-zinc-400">Current Room</span>
+                              <span className="text-emerald-500 font-medium">Main</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Save / Cancel triggers aligned below persistent preview */}
+              <div className="w-full flex flex-col gap-2 pt-2 border-t border-zinc-900/60 mt-auto">
+                <button 
+                  type="button"
+                  onClick={handleSave}
+                  className="w-full py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-[11px] tracking-wider uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-emerald-500/50"
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>Save Cosmetics</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={onClose}
+                  className="w-full py-1 text-[10px] text-zinc-500 hover:text-zinc-300 font-extrabold uppercase tracking-widest text-center transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* RIGHT COLUMN: COSMETICS WORKSPACE */}
+        <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1 select-none custom-scrollbar">
+          
+          {/* Profile Borders Header with 0 coins badge */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-zinc-900 gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-white font-black text-sm tracking-wide uppercase">
+                Profile Borders
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-850 rounded-full px-3 py-1 text-[11px] font-bold text-yellow-500 self-start">
+              <span>0 coins</span>
+            </div>
+          </div>
+
+          {/* Workspace category tabs */}
+          <div className="grid grid-cols-4 gap-1 bg-[#141416] p-1 rounded-xl border border-zinc-900 animate-in fade-in duration-300">
+            <button 
+              onClick={() => setActiveTab('combos')} 
+              className={`py-2 rounded-lg text-xs font-extrabold flex items-center justify-center transition-all ${
+                activeTab === 'combos' 
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm font-black' 
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+              }`}
+            >
+              <span>Combos</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('effects')} 
+              className={`py-2 rounded-lg text-xs font-extrabold flex items-center justify-center transition-all ${
+                activeTab === 'effects' 
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm font-black' 
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+              }`}
+            >
+              <span>Effects</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('borders')} 
+              className={`py-2 rounded-lg text-xs font-extrabold flex items-center justify-center transition-all ${
+                activeTab === 'borders' 
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm font-black' 
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+              }`}
+            >
+              <span>Borders</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('creator')} 
+              className={`py-2 rounded-lg text-xs font-extrabold flex items-center justify-center transition-all ${
+                activeTab === 'creator' 
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm font-black' 
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800/40'
+              }`}
+            >
+              <span>Creator</span>
+            </button>
+          </div>
+
+          {/* ACTIVE TAB PANEL VIEWPORT CONTAINER */}
+          <div className="flex-1 min-h-[360px] max-h-[460px] overflow-y-auto custom-scrollbar">
+            
+            {/* PANEL 1: MATCHING COMBO PRESETS */}
+            {activeTab === 'combos' && (
+              <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                <div className="p-3 bg-zinc-950/40 border border-zinc-900 rounded-xl">
+                  <p className="text-[10px] text-zinc-400 font-medium leading-relaxed">
+                    🎯 Presets created by designers combining premium borders and visual effects. Clicking any preset immediately applies both styles to see how they look together. Like what you see? Click <strong className="text-emerald-400 font-bold">Save Cosmetics</strong> to apply!
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2">
+                  {PROFILE_COMBOS.map((combo) => {
+                    const isSelected = previewBorderId === combo.borderId && previewEffectId === combo.effectId;
+                    const borderObj = getBorderStyles(combo.borderId);
+                    const effectObj = PROFILE_EFFECTS.find(e => e.id === combo.effectId);
+                    return (
+                      <button
+                        key={combo.id}
+                        type="button"
+                        onClick={() => {
+                          setPreviewBorderId(combo.borderId);
+                          setPreviewEffectId(combo.effectId);
+                        }}
+                        className={`p-3.5 rounded-xl flex flex-col text-left transition-all border relative overflow-hidden group ${
+                          isSelected 
+                            ? 'border-emerald-500 bg-emerald-500/10 text-white ring-1 ring-emerald-500' 
+                            : 'border-zinc-850 bg-[#141416]/40 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/30 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full gap-2">
+                          <span className="text-[11px] font-black tracking-wide text-white group-hover:text-emerald-400 transition-colors truncate">{combo.name}</span>
+                          <span 
+                            style={{ borderColor: combo.themeColor, color: combo.themeColor, backgroundColor: `${combo.themeColor}10` }}
+                            className="text-[8px] font-black uppercase px-2 py-0.5 rounded border shrink-0"
+                          >
+                            {combo.badge}
+                          </span>
+                        </div>
+                        <p className="text-[9px] text-zinc-500 font-medium leading-relaxed mt-1">Curated styling combination matching preset #{combo.id}.</p>
+                        
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                          <span className="text-[8px] font-bold bg-[#09090b] border border-zinc-850 px-1.5 py-0.5 rounded text-zinc-400">
+                            ⚙️ {borderObj ? borderObj.name : 'Custom Border'}
+                          </span>
+                          <span className="text-[8px] font-bold bg-[#09090b] border border-zinc-850 px-1.5 py-0.5 rounded text-zinc-400">
+                            🔮 {effectObj ? effectObj.name : 'No Effect'}
+                          </span>
+                        </div>
+                        
+                        {isSelected && (
+                          <div className="absolute bottom-3 right-3 bg-emerald-500 text-black rounded-full p-0.5">
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* PANEL 2: OVER 25+ CUSTOM PROFILE EFFECTS GRID */}
+            {activeTab === 'effects' && (
+              <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                <div className="p-3 bg-zinc-950/40 border border-zinc-900 rounded-xl">
+                  <p className="text-[10px] text-zinc-400 font-medium leading-relaxed">
+                    🌠 Visual overlays rendering beautiful animated effects across the entire card space. Custom effects take precedence over card background images (these backgrounds are automatically disabled when an active effect runs).
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pb-2">
+                  {/* "None" template box */}
+                  <button
+                    type="button"
+                    onClick={() => setPreviewEffectId('none')}
+                    className={`p-3 rounded-xl flex flex-col items-center justify-center text-center transition-all border min-h-[101px] ${
+                      previewEffectId === 'none' 
+                        ? 'border-emerald-500 bg-emerald-500/10 text-white font-extrabold' 
+                        : 'border-zinc-850 bg-[#141416]/40 text-zinc-400 hover:border-zinc-700 hover:text-white'
+                    }`}
+                  >
+                    <span className="text-xl">🎚️</span>
+                    <span className="text-xs font-bold mt-1.5">No Effect</span>
+                    <span className="text-[9px] text-zinc-500 mt-1">Revert card bg</span>
+                  </button>
+
+                  {PROFILE_EFFECTS.map((eff) => {
+                    const isSelected = previewEffectId === eff.id;
+                    const categoryIcon = eff.category === 'cyber' ? '🤖' :
+                                         eff.category === 'retro' ? '📼' :
+                                         eff.category === 'nature' ? '🌿' :
+                                         eff.category === 'cosmic' ? '🌌' :
+                                         eff.category === 'premium' ? '👑' :
+                                         eff.category === 'mystic' ? '🔮' : '✨';
+                    return (
+                      <button
+                        key={eff.id}
+                        type="button"
+                        onClick={() => setPreviewEffectId(eff.id)}
+                        className={`p-3 rounded-xl flex flex-col items-start text-left min-h-[101px] transition-all border relative overflow-hidden ${
+                          isSelected 
+                            ? 'border-emerald-500 bg-emerald-500/10 text-white ring-1 ring-emerald-500' 
+                            : 'border-zinc-850 bg-[#141416]/40 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/10 hover:text-white'
+                        }`}
+                      >
+                        <span className="text-lg">{categoryIcon}</span>
+                        <span className="text-[11px] font-extrabold mt-1.5 leading-tight">{eff.name}</span>
+                        <span className="text-[9px] text-zinc-500 mt-1 line-clamp-2 leading-snug">{eff.description}</span>
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 text-emerald-400 font-black text-xs">●</div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* PANEL 3: BORDERS PRESETS GRID */}
+            {activeTab === 'borders' && (
+              <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                <div className="p-3 bg-zinc-950/40 border border-zinc-900 rounded-xl">
+                  <p className="text-[10px] text-zinc-400 font-medium leading-relaxed">
+                    📐 Select from the standard library of custom-built card border frames. These range from minimal thin structures to elaborate glowing animated neon cages.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-6 gap-2 select-none pb-2">
+                    {/* None template box */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewBorderId('none');
+                        setIndex(0);
+                      }}
+                      className={`w-full aspect-square text-xs font-black rounded-lg flex items-center justify-center transition-all border ${
+                        previewBorderId === 'none' 
+                          ? 'bg-emerald-500/10 border-2 border-emerald-500 shadow-lg text-emerald-400 font-extrabold' 
+                          : 'bg-[#141416]/40 border-zinc-850 text-zinc-500 hover:border-zinc-700 hover:bg-zinc-850'
+                      }`}
+                      title="No Border"
+                    >
+                      ⦸
+                    </button>
+
+                    {/* Static 1 to 52 borders fully styled! */}
+                    {PROFILE_BORDERS.slice(1).map((border, bIdx) => {
+                      const borderActualIdx = bIdx + 1;
+                      const isSelected = previewBorderId === border.id;
+                      
+                      return (
+                        <button
+                          key={border.id}
+                          type="button"
+                          onClick={() => {
+                            setPreviewBorderId(border.id);
+                            setIndex(borderActualIdx);
+                          }}
+                          style={border.cardStyle}
+                          className={`w-full aspect-square text-[10px] font-black rounded-lg flex items-center justify-center transition-all relative ${
+                            isSelected 
+                              ? 'ring-2 ring-emerald-500 scale-105 z-10' 
+                              : 'hover:scale-105 bg-zinc-800/20 border-zinc-850 hover:bg-zinc-800'
+                          }`}
+                          title={border.name}
+                        >
+                          <span className="absolute inset-0.5 bg-[#09090b]/80 rounded-sm z-0 flex items-center justify-center font-mono font-extrabold text-white text-[10px]">
+                            {borderActualIdx}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="text-center select-none py-1.5 border-t border-zinc-900 leading-snug">
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
+                      Selected frame: <span className="text-emerald-400 font-bold">{resolvedBorder ? resolvedBorder.name : 'No border'}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PANEL 4: CUSTOM BORDER DESIGN BUILDER */}
+            {activeTab === 'creator' && (
+              <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                <div className="p-3 bg-zinc-950/40 border border-zinc-900 rounded-xl">
+                  <p className="text-[10px] text-zinc-400 font-medium leading-relaxed">
+                    🛠️ Design your own completely customized card boundary with full control of layout borders, custom hex tints, dash structures, outer glowing dropshadow colors, and live intensity levels.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3.5 bg-zinc-950/60 p-4 border border-zinc-900 rounded-xl">
+                  
+                  {/* Border Name */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] text-[#888] uppercase tracking-widest font-black">Border Name</label>
+                    <input
+                      type="text"
+                      maxLength={24}
+                      value={customConfig.name}
+                      onChange={(e) => {
+                        const next = { ...customConfig, name: e.target.value };
+                        setCustomConfig(next);
+                        setPreviewBorderId(`custom:${JSON.stringify(next)}`);
+                      }}
+                      placeholder="e.g. Gamer Legend"
+                      className="w-full bg-[#141416] border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-zinc-650 focus:outline-none focus:border-zinc-700 font-medium"
+                    />
+                  </div>
+
+                  {/* Stroke Width Slider */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between items-center text-[10px] text-[#888] uppercase tracking-widest font-black">
+                      <span>Border Thickness</span>
+                      <span className="text-emerald-400 font-mono font-bold">{customConfig.width}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="8"
+                      value={customConfig.width}
+                      onChange={(e) => {
+                        const next = { ...customConfig, width: parseInt(e.target.value) };
+                        setCustomConfig(next);
+                        setPreviewBorderId(`custom:${JSON.stringify(next)}`);
+                      }}
+                      className="w-full accent-emerald-500 cursor-pointer h-1 bg-zinc-800 rounded"
+                    />
+                  </div>
+
+                  {/* Stroke Pattern selection */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] text-[#888] uppercase tracking-widest font-black">Stroke Style</label>
+                    <div className="grid grid-cols-3 gap-1.5 text-[9px] font-bold text-zinc-400 uppercase tracking-tight">
+                      {(['solid', 'dashed', 'dotted', 'double', 'groove', 'ridge'] as const).map((pattern) => (
+                        <button
+                          key={pattern}
+                          type="button"
+                          onClick={() => {
+                            const next = { ...customConfig, style: pattern };
+                            setCustomConfig(next);
+                            setPreviewBorderId(`custom:${JSON.stringify(next)}`);
+                          }}
+                          className={`py-1 rounded border text-center transition-all truncate ${
+                            customConfig.style === pattern 
+                              ? 'border-emerald-500 bg-emerald-500/10 text-white font-extrabold' 
+                              : 'border-zinc-800 bg-[#141416] hover:bg-zinc-800'
+                          }`}
+                        >
+                          {pattern}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Outline Color presets and picker */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between items-center text-[10px] text-[#888] uppercase tracking-widest font-black">
+                      <span>Outline Tint</span>
+                      <span className="text-zinc-450 font-mono text-[9px]">{customConfig.color}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap gap-1.5 flex-1">
+                        {['#10b981', '#ef4444', '#a855f7', '#fbbf24', '#06b6d4', '#f472b6', '#ffffff', '#000000'].map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => {
+                              const next = { ...customConfig, color };
+                              setCustomConfig(next);
+                              setPreviewBorderId(`custom:${JSON.stringify(next)}`);
+                            }}
+                            style={{ backgroundColor: color }}
+                            className={`w-5 h-5 rounded-full border transition-all ${
+                              customConfig.color === color ? 'ring-2 ring-white scale-110' : 'border-zinc-800 opacity-80 hover:opacity-100'
+                            }`}
+                            title={color}
+                          />
+                        ))}
+                      </div>
+                      <input
+                        type="color"
+                        value={customConfig.color}
+                        onChange={(e) => {
+                          const next = { ...customConfig, color: e.target.value };
+                          setCustomConfig(next);
+                          setPreviewBorderId(`custom:${JSON.stringify(next)}`);
+                        }}
+                        className="w-7 h-7 bg-transparent border-0 cursor-pointer rounded shrink-0 p-0"
+                        title="Choose Custom Color"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Glow Color presets and intensity sliders */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between items-center text-[10px] text-[#888] uppercase tracking-widest font-black">
+                      <span>Glow Strength</span>
+                      <span className="text-zinc-450 font-mono text-[9px]">{customConfig.glowIntensity}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="30"
+                      value={customConfig.glowIntensity}
+                      onChange={(e) => {
+                        const next = { ...customConfig, glowIntensity: parseInt(e.target.value) };
+                        setCustomConfig(next);
+                        setPreviewBorderId(`custom:${JSON.stringify(next)}`);
+                      }}
+                      className="w-full accent-emerald-500 cursor-pointer h-1 bg-zinc-800 rounded"
+                    />
+
+                    {customConfig.glowIntensity > 0 && (
+                      <div className="flex items-center gap-2 mt-1 animate-in fade-in slide-in-from-top-1">
+                        <div className="flex flex-wrap gap-1.5 flex-1">
+                          {['#10b981', '#ef4444', '#a855f7', '#fbbf24', '#06b6d4', '#f472b6', '#ffffff'].map((color) => (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() => {
+                                const next = { ...customConfig, glowColor: color };
+                                setCustomConfig(next);
+                                setPreviewBorderId(`custom:${JSON.stringify(next)}`);
+                              }}
+                              style={{ backgroundColor: color }}
+                              className={`w-5 h-5 rounded-full border transition-all ${
+                                customConfig.glowColor === color ? 'ring-2 ring-white scale-110' : 'border-zinc-800 opacity-85 hover:opacity-100'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <input
+                          type="color"
+                          value={customConfig.glowColor}
+                          onChange={(e) => {
+                            const next = { ...customConfig, glowColor: e.target.value };
+                            setCustomConfig(next);
+                            setPreviewBorderId(`custom:${JSON.stringify(next)}`);
+                          }}
+                          className="w-7 h-7 bg-transparent border-0 cursor-pointer rounded shrink-0 p-0"
+                          title="Choose Custom Glow"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+function ProfileBorderFormOld({ profile, onClose, onSave, bioData }: any) {
+  const [screen, setScreen] = useState<'preview' | 'grid' | 'custom_creator'>('preview');
+  
   const [index, setIndex] = useState(() => {
     const currentId = bioData.profile_border || 'none';
     const foundIdx = PROFILE_BORDERS.findIndex(b => b.id === currentId);
     return foundIdx >= 0 ? foundIdx : 0;
   });
-  const [showGrid, setShowGrid] = useState(false);
+
+  // State for Custom Border Designer
+  const [customConfig, setCustomConfig] = useState(() => {
+    const currentId = bioData.profile_border || '';
+    if (currentId.startsWith('custom:')) {
+      try {
+        return JSON.parse(currentId.slice(7));
+      } catch (err) {}
+    }
+    return {
+      name: 'My Masterpiece',
+      color: '#10b981',
+      style: 'solid' as const,
+      width: 3,
+      glowColor: '#10b981',
+      glowIntensity: 15
+    };
+  });
 
   const currentBorder = PROFILE_BORDERS[index];
 
@@ -1892,181 +4001,443 @@ function ProfileBorderForm({ profile, onClose, onSave, bioData }: any) {
     setIndex(prev => (prev + 1) % PROFILE_BORDERS.length);
   };
 
-  const handleSave = () => {
+  const handleSavePreset = () => {
     onSave({ profile_border: currentBorder.id });
   };
 
+  const handleSaveCustom = () => {
+    const customStr = `custom:${JSON.stringify(customConfig)}`;
+    onSave({ profile_border: customStr });
+  };
+
+  // Resolve custom border for real-time preview in form
+  const customResolvedBorder = {
+    id: 'custom-preview',
+    name: customConfig.name,
+    className: 'border-transparent',
+    cardStyle: {
+      border: `${customConfig.width}px ${customConfig.style} ${customConfig.color}`,
+      boxShadow: customConfig.glowColor && customConfig.glowIntensity > 0
+        ? `0 0 ${customConfig.glowIntensity}px ${customConfig.glowColor}, inset 0 0 ${Math.ceil(customConfig.glowIntensity / 2)}px ${customConfig.glowColor}`
+        : 'none',
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto select-none">
-      <div className="w-full max-w-sm rounded-2xl bg-[#09090b] border border-zinc-800 p-6 flex flex-col gap-6 relative shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto select-none">
+      <div className="w-full max-w-xl rounded-2xl bg-[#09090b] border border-zinc-800 p-6 flex flex-col gap-6 relative shadow-[0_0_50px_rgba(0,0,0,0.9)] max-h-[92vh] overflow-y-auto custom-scrollbar">
         
-        {/* Header bar aligned with mockup */}
-        <div className="flex items-center justify-between">
+        {/* Dynamic header depending on the active screen tab */}
+        <div className="flex items-center justify-between pb-3 border-b border-zinc-900">
           <div className="flex items-center gap-2">
             <span className="text-white font-extrabold text-sm tracking-widest uppercase flex items-center gap-1.5">
-              🎨 Profile Borders
+              {screen === 'preview' && '🎨 Preview Border'}
+              {screen === 'grid' && '㗊 Profile Borders'}
+              {screen === 'custom_creator' && '🛠️ Border Architect'}
             </span>
           </div>
-          <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-full px-2.5 py-0.5 text-xs font-bold text-amber-400">
-            <span>🪙</span>
-            <span>1000</span>
+          <div className="flex items-center gap-1 bg-emerald-950/40 border border-emerald-800/40 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-emerald-400">
+            <span>✨</span>
+            <span>Unlocked</span>
           </div>
         </div>
 
-        {/* Style selection indicator */}
-        <div className="text-center">
-          <span className="text-[10px] uppercase tracking-[0.25em] font-black text-zinc-500">STYLE {index + 1} OF {PROFILE_BORDERS.length}</span>
-          <h4 className="text-sm font-bold text-emerald-400 mt-1">{currentBorder.name}</h4>
-        </div>
-
-        {/* Live Preview card exact mockup structure and wrapped in activeBorder styling! */}
-        <div className="flex justify-center w-full">
-          <div 
-            style={currentBorder.cardStyle} 
-            className={`w-full max-w-[270px] overflow-hidden rounded-2xl bg-[#141416] border shadow-2xl relative select-none shrink-0 transition-all duration-300 ${currentBorder.className || ''}`}
-          >
-            {/* Banner banner_url */}
-            <div className="h-16 w-full relative shrink-0">
-              <img src={profile.banner_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop'} alt="Banner" className="h-full w-full object-cover opacity-80" />
+        {/* SCREEN 1: PREVIEW MODE (SLIDER / PREVIEW FLIPPER) */}
+        {screen === 'preview' && (
+          <div className="flex flex-col gap-5 animate-in fade-in duration-200">
+            {/* Style name badge */}
+            <div className="text-center">
+              <span className="text-[9px] uppercase tracking-[0.25em] font-black text-zinc-500">STYLE {index + 1} OF {PROFILE_BORDERS.length}</span>
+              <h4 className="text-sm font-bold text-emerald-400 mt-0.5">{currentBorder.name}</h4>
             </div>
 
-            {/* Content card_bg container */}
-            <div 
-              style={bioData.profile_card_bg ? {
-                backgroundImage: `url(${bioData.profile_card_bg})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-              } : undefined}
-              className="px-3 pb-3 pt-1 relative"
-            >
-              {bioData.profile_card_bg && (
-                <div className="absolute inset-0 bg-zinc-950/85 backdrop-blur-[1px] z-0" />
-              )}
+            {/* Live Card Preview */}
+            <div className="flex justify-center w-full">
+              <div 
+                style={currentBorder.cardStyle} 
+                className={`w-full max-w-[320px] overflow-hidden rounded-2xl bg-[#141416] border shadow-2xl relative select-none shrink-0 transition-all duration-300 ${currentBorder.className || ''}`}
+              >
+                {/* Banner wrapper */}
+                <div className="h-16 w-full relative shrink-0">
+                  <img src={profile.banner_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop'} alt="Banner" className="h-full w-full object-cover opacity-80" />
+                </div>
 
-              <div className="relative z-10 flex flex-col items-center">
-                {/* Avatar with offset */}
+                {/* Card Background image content overlay */}
                 <div 
-                  style={currentBorder.avatarStyle}
-                  className={`mt-[-28px] border-4 rounded-full h-14 w-14 bg-zinc-800 relative z-20 shrink-0 overflow-hidden ${currentBorder.id === 'none' ? 'border-[#141416]' : 'border-transparent'}`}
+                  style={bioData.profile_card_bg ? {
+                    backgroundImage: `url(${bioData.profile_card_bg})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                  } : undefined}
+                  className="px-3 pb-3 pt-1 relative"
                 >
-                  <img src={profile.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
-                </div>
+                  {bioData.profile_card_bg && (
+                    <div className="absolute inset-0 bg-zinc-950/85 backdrop-blur-[1px] z-0" />
+                  )}
 
-                {/* Nickname and verified badges */}
-                <div className="text-center mt-1.5 w-full">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">💎 VIP</span>
-                  </div>
-                  <h3 className="text-sm font-extrabold text-white leading-tight mt-1">{profile.username}</h3>
-                  <span className="text-[8px] font-bold text-red-500 tracking-widest uppercase block mt-0.5 animate-pulse">Preview Mode</span>
-                </div>
+                  <div className="relative z-10 flex flex-col items-center">
+                    {/* Standard circle-cropped avatar representation */}
+                    <div className="mt-[-28px] border-4 border-[#141416] rounded-full h-14 w-14 bg-zinc-800 relative z-20 shrink-0 overflow-hidden">
+                      <img src={profile.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
+                    </div>
 
-                {/* Simulated content info tab exact match to image mockup */}
-                <div className="w-full bg-zinc-950/50 border border-zinc-900 rounded-lg p-2 mt-2.5 flex flex-col gap-1 text-[9px]">
-                  <div className="flex justify-between items-center text-zinc-500 border-b border-zinc-900/60 pb-1">
-                    <span>🌐 Country</span>
-                    <span className="text-zinc-300 font-bold">United States</span>
-                  </div>
-                  <div className="flex justify-between items-center text-zinc-500 border-b border-zinc-900/60 pb-1">
-                    <span>🧬 Gender</span>
-                    <span className="text-zinc-300 font-bold">{profile.gender || 'Not Specified'}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-zinc-500 pb-0.5">
-                    <span>🎂 Language</span>
-                    <span className="text-zinc-300 font-bold">English</span>
+                    {/* Meta tags and username */}
+                    <div className="text-center mt-1.5 w-full">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">💎 VIP</span>
+                      </div>
+                      <h3 className="text-sm font-extrabold text-white leading-tight mt-1">{profile.username}</h3>
+                      <span className="text-[8px] font-bold text-red-500 tracking-widest uppercase block mt-0.5 animate-pulse">Live Preview</span>
+                    </div>
+
+                    {/* Table stats */}
+                    <div className="w-full bg-zinc-950/50 border border-zinc-900 rounded-lg p-2 mt-2.5 flex flex-col gap-1 text-[9px]">
+                      <div className="flex justify-between items-center text-zinc-500 border-b border-zinc-900/60 pb-1">
+                        <span>🌐 Country</span>
+                        <span className="text-zinc-300 font-bold">United States</span>
+                      </div>
+                      <div className="flex justify-between items-center text-zinc-500 border-b border-zinc-900/60 pb-1">
+                        <span>🧬 Gender</span>
+                        <span className="text-zinc-300 font-bold">{profile.gender || 'Not Specified'}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-zinc-500 pb-0.5">
+                        <span>🍰 Language</span>
+                        <span className="text-zinc-300 font-bold">English</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* View Grid Overlay Drawer if open */}
-        {showGrid && (
-          <div className="absolute inset-x-0 bottom-0 bg-[#09090b] border-t border-zinc-800 rounded-t-2xl p-4 z-40 max-h-[80%] overflow-y-auto custom-scrollbar animate-in slide-in-from-bottom duration-200">
-            <div className="flex items-center justify-between mb-3.5 pb-2 border-b border-zinc-800/80">
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-zinc-400">Available Borders Grid</span>
-              <button onClick={() => setShowGrid(false)} className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider hover:text-emerald-300">Done</button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {PROFILE_BORDERS.map((border, bIdx) => (
-                <button
-                  key={border.id}
-                  onClick={() => {
-                    setIndex(bIdx);
-                    setShowGrid(false);
-                  }}
-                  className={`p-2.5 rounded-xl border text-left flex flex-col gap-0.5 transition-all ${
-                    index === bIdx 
-                      ? 'bg-emerald-500/10 border-emerald-500 text-white' 
-                      : 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
-                  }`}
+            {/* Selector arrow row and grid triggers */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3 shrink-0">
+                <button 
+                  type="button" 
+                  onClick={handlePrev}
+                  className="w-11 h-11 rounded-xl bg-zinc-900 border border-zinc-805/80 hover:bg-zinc-805 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
                 >
-                  <span className="text-[11px] font-bold truncate">{border.name}</span>
-                  <span className="text-[9px] text-zinc-500 font-mono">Free</span>
+                  <ChevronLeft className="w-5 h-5" />
                 </button>
-              ))}
+
+                <button 
+                  type="button" 
+                  onClick={() => setScreen('grid')}
+                  className="flex-1 h-11 rounded-xl bg-[#141416] border border-zinc-800 hover:bg-zinc-800 hover:text-white flex items-center justify-center gap-1.5 text-zinc-300 text-[11px] font-black tracking-wider uppercase active:scale-95 transition-all outline-none"
+                >
+                  <Grid className="w-4 h-4 text-emerald-400" />
+                  <span>View Grid View</span>
+                </button>
+
+                <button 
+                  type="button" 
+                  onClick={handleNext}
+                  className="w-11 h-11 rounded-xl bg-zinc-900 border border-zinc-805/80 hover:bg-zinc-850 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Quick toggle to custom design-maker directly */}
+              <button
+                type="button"
+                onClick={() => setScreen('custom_creator')}
+                className="w-full py-2.5 rounded-xl border border-dashed border-zinc-700 bg-zinc-900/30 text-zinc-400 hover:bg-zinc-900 hover:text-white text-[10px] uppercase tracking-wider font-extrabold flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <span>🛠️ Code / Design Custom Border</span>
+              </button>
+            </div>
+
+            {/* Action Bar */}
+            <div className="flex items-center gap-2.5 pt-3.5 border-t border-zinc-900">
+              <button 
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-2.5 text-[11px] font-bold text-zinc-500 hover:text-white text-center tracking-wide uppercase transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                type="button"
+                onClick={handleSavePreset}
+                className="flex-1 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] tracking-wider uppercase shadow-lg shadow-emerald-950/20 active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-emerald-500"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Apply Border</span>
+              </button>
             </div>
           </div>
         )}
 
-        {/* Navigation row mimicking exact layout of image */}
-        <div className="flex items-center justify-between gap-3 shrink-0">
-          <button 
-            type="button" 
-            onClick={handlePrev}
-            className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800/80 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
+        {/* SCREEN 2: ALL 50+ BORDERS VISUAL GRID SELECTOR (MATCHING MOCKUP LAYOUT!) */}
+        {screen === 'grid' && (
+          <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+            {/* Custom Grid title with Back Button representing visual mockup exactly */}
+            <button
+              onClick={() => setScreen('preview')}
+              className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 transition-colors border border-zinc-800"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Back to Preview Card</span>
+            </button>
 
-          <button 
-            type="button" 
-            onClick={() => setShowGrid(true)}
-            className="flex-1 h-10 rounded-xl bg-[#141416] border border-zinc-800 hover:bg-zinc-800 hover:text-white flex items-center justify-center gap-1.5 text-zinc-400 text-[10px] font-bold tracking-wider uppercase active:scale-95 transition-all outline-none"
-          >
-            <Grid className="w-3.5 h-3.5 text-emerald-400" />
-            <span>View Grid</span>
-          </button>
+            {/* 6-Columns exact visual styling matches screenshot */}
+            <div className="grid grid-cols-6 gap-2 max-h-[380px] overflow-y-auto pr-1 select-none custom-scrollbar pb-1">
+              
+              {/* None template box */}
+              <button
+                type="button"
+                onClick={() => setIndex(0)}
+                className={`w-full aspect-square text-xs font-black rounded-lg flex items-center justify-center transition-all ${
+                  index === 0 
+                    ? 'bg-emerald-500/10 border-2 border-emerald-500 shadow-lg text-emerald-400' 
+                    : 'bg-[#141416] border border-zinc-800 text-zinc-500 hover:border-zinc-650 hover:bg-zinc-850'
+                }`}
+                title="No Border"
+              >
+                ⦸
+              </button>
 
-          <button 
-            type="button" 
-            onClick={handleNext}
-            className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800/80 hover:bg-zinc-800 flex items-center justify-center text-white active:scale-95 transition-all outline-none"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+              {/* Static 1 to 52 elements fully styled with their actual card borders! */}
+              {PROFILE_BORDERS.slice(1).map((border, bIdx) => {
+                const borderActualIdx = bIdx + 1; // Align to absolute index
+                const isSelected = index === borderActualIdx;
+                
+                return (
+                  <button
+                    key={border.id}
+                    type="button"
+                    onClick={() => setIndex(borderActualIdx)}
+                    style={border.cardStyle}
+                    className={`w-full aspect-square text-[10px] font-black rounded-lg flex items-center justify-center transition-all relative ${
+                      isSelected 
+                        ? 'ring-2 ring-emerald-500 scale-105 z-10' 
+                        : 'hover:scale-105 hover:bg-zinc-800'
+                    }`}
+                    title={border.name}
+                  >
+                    {/* Shadow masking background in grid so the number remains neatly visible */}
+                    <span className="absolute inset-0.5 bg-[#09090b]/80 rounded-sm z-0 flex items-center justify-center font-mono font-extrabold text-white text-[11px]">
+                      {borderActualIdx}
+                    </span>
+                  </button>
+                );
+              })}
 
-        {/* Action button row matching 'Next Style ➔' and '✓ Save' of image! */}
-        <div className="flex items-center gap-2.5 shrink-0 border-t border-zinc-900 pt-3.5">
-          <button 
-            type="button"
-            onClick={onClose}
-            className="flex-1 py-2 text-[10px] font-bold text-zinc-400 hover:text-white text-center tracking-wide uppercase transition-colors"
-          >
-            Cancel
-          </button>
-          
-          <button 
-            type="button"
-            onClick={handleNext}
-            className="flex-1 py-2 rounded-full bg-zinc-900/60 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 font-bold text-[10px] tracking-wider uppercase transition-all flex items-center justify-center gap-1 active:scale-95"
-          >
-            <span>Next Style</span>
-            <ArrowRight className="w-3 h-3" />
-          </button>
+              {/* Special creator quick element to build custom styles */}
+              <button
+                type="button"
+                onClick={() => setScreen('custom_creator')}
+                className="w-full aspect-square text-[9px] font-bold rounded-lg flex flex-col items-center justify-center bg-zinc-900 border-2 border-dashed border-zinc-700 text-zinc-400 hover:text-white hover:border-emerald-500 transition-all gap-0.5"
+                title="Create custom border"
+              >
+                <span>🛠️</span>
+                <span className="text-[8px] transform uppercase tracking-tighter">Draft</span>
+              </button>
+            </div>
 
-          <button 
-            type="button"
-            onClick={handleSave}
-            className="flex-1 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] tracking-wider uppercase shadow-lg shadow-emerald-900/20 hover:shadow-emerald-950/30 active:scale-95 transition-all flex items-center justify-center gap-1 border border-emerald-500"
-          >
-            <Check className="w-3 h-3" />
-            <span>Save</span>
-          </button>
-        </div>
+            <div className="pt-2 text-center select-none">
+              <p className="text-[10px] text-zinc-500 uppercase tracking-widest leading-relaxed">
+                Click any number to preview instantly. <br/>
+                Selected: <span className="text-emerald-400 font-bold">{currentBorder.name}</span>
+              </p>
+            </div>
+
+            {/* Quick action bar */}
+            <div className="flex items-center gap-2 pt-3 border-t border-zinc-900">
+              <button 
+                type="button"
+                onClick={() => setScreen('preview')}
+                className="flex-1 py-2 rounded-xl bg-[#141416] border border-zinc-800 text-zinc-400 text-xs font-bold leading-none hover:text-white transition-all uppercase tracking-wider"
+              >
+                Preview Card
+              </button>
+              <button 
+                type="button"
+                onClick={handleSavePreset}
+                className="flex-1 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider transition-all"
+              >
+                Apply Selected
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* SCREEN 3: STATE-OF-THE-ART VALUE-TUNED CUSTOM BORDER BUILDER */}
+        {screen === 'custom_creator' && (
+          <div className="flex flex-col gap-5 animate-in fade-in duration-200">
+            
+            {/* Live custom creator real-time interactive preview frame */}
+            <div className="flex justify-center w-full">
+              <div 
+                style={customResolvedBorder.cardStyle} 
+                className="w-full max-w-[280px] overflow-hidden rounded-2xl bg-[#141416] border shadow-2xl relative select-none shrink-0 transition-all duration-150"
+              >
+                <div className="h-10 w-full relative shrink-0">
+                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-950 to-blue-950 opacity-60" />
+                </div>
+                <div className="px-3 pb-3 pt-0.5 relative">
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className="mt-[-20px] border-3 border-[#141416] rounded-full h-11 w-11 bg-zinc-850 shrink-0 overflow-hidden">
+                      <img src={profile.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
+                    </div>
+                    <div className="text-center w-full mt-1.5">
+                      <h3 className="text-xs font-black text-white leading-tight">{customConfig.name || 'Masterpiece'}</h3>
+                      <span className="text-[7px] text-zinc-500 uppercase tracking-widest font-extrabold mt-0.5 block">Constructing Style</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive design parameters panel */}
+            <div className="flex flex-col gap-3.5 bg-zinc-950/60 p-4 border border-zinc-900 rounded-xl max-h-[280px] overflow-y-auto custom-scrollbar">
+              
+              {/* Border Name */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] text-zinc-500 uppercase tracking-widest font-black">Border Name</label>
+                <input
+                  type="text"
+                  maxLength={24}
+                  value={customConfig.name}
+                  onChange={(e) => setCustomConfig({ ...customConfig, name: e.target.value })}
+                  placeholder="e.g. Gamer Legend"
+                  className="w-full bg-[#141416] border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-zinc-650 focus:outline-none focus:border-zinc-700"
+                />
+              </div>
+
+              {/* Stroke Width Slider */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex justify-between items-center text-[10px] text-zinc-500 uppercase tracking-widest font-black">
+                  <span>Border Thickness</span>
+                  <span className="text-emerald-400 font-mono font-bold">{customConfig.width}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="8"
+                  value={customConfig.width}
+                  onChange={(e) => setCustomConfig({ ...customConfig, width: parseInt(e.target.value) })}
+                  className="w-full accent-emerald-500 cursor-pointer h-1 bg-zinc-800 rounded"
+                />
+              </div>
+
+              {/* Stroke Pattern selection */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] text-zinc-500 uppercase tracking-widest font-black">Stroke Style</label>
+                <div className="grid grid-cols-3 gap-1.5 text-[9px] font-bold text-zinc-400 uppercase tracking-tight">
+                  {(['solid', 'dashed', 'dotted', 'double', 'groove', 'ridge'] as const).map((pattern) => (
+                    <button
+                      key={pattern}
+                      type="button"
+                      onClick={() => setCustomConfig({ ...customConfig, style: pattern })}
+                      className={`py-1 rounded border text-center transition-all truncate ${
+                        customConfig.style === pattern 
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white font-extrabold' 
+                          : 'border-zinc-800 bg-[#141416] hover:bg-zinc-850'
+                      }`}
+                    >
+                      {pattern}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Outline Color presets and picker */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex justify-between items-center text-[10px] text-zinc-500 uppercase tracking-widest font-black">
+                  <span>Outline Tint</span>
+                  <span className="text-zinc-400 font-mono text-[9px]">{customConfig.color}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap gap-1.5 flex-1">
+                    {['#10b981', '#ef4444', '#a855f7', '#fbbf24', '#06b6d4', '#f472b6', '#ffffff', '#000000'].map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setCustomConfig({ ...customConfig, color })}
+                        style={{ backgroundColor: color }}
+                        className={`w-5 h-5 rounded-full border transition-all ${
+                          customConfig.color === color ? 'ring-2 ring-white scale-110' : 'border-zinc-800 opacity-80 hover:opacity-100'
+                        }`}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                  <input
+                    type="color"
+                    value={customConfig.color}
+                    onChange={(e) => setCustomConfig({ ...customConfig, color: e.target.value })}
+                    className="w-7 h-7 bg-transparent border-0 cursor-pointer rounded shrink-0 p-0"
+                    title="Choose Custom Color"
+                  />
+                </div>
+              </div>
+
+              {/* Glow Color presets and intensity sliders */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex justify-between items-center text-[10px] text-zinc-500 uppercase tracking-widest font-black">
+                  <span>Glow Strength</span>
+                  <span className="text-zinc-400 font-mono text-[9px]">{customConfig.glowIntensity}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="30"
+                  value={customConfig.glowIntensity}
+                  onChange={(e) => setCustomConfig({ ...customConfig, glowIntensity: parseInt(e.target.value) })}
+                  className="w-full accent-emerald-500 cursor-pointer h-1 bg-zinc-800 rounded"
+                />
+
+                {customConfig.glowIntensity > 0 && (
+                  <div className="flex items-center gap-2 mt-1 animate-in fade-in slide-in-from-top-1">
+                    <div className="flex flex-wrap gap-1.5 flex-1">
+                      {['#10b981', '#ef4444', '#a855f7', '#fbbf24', '#06b6d4', '#f472b6', '#ffffff'].map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setCustomConfig({ ...customConfig, glowColor: color })}
+                          style={{ backgroundColor: color }}
+                          className={`w-5 h-5 rounded-full border transition-all ${
+                            customConfig.glowColor === color ? 'ring-2 ring-white scale-110' : 'border-zinc-800 opacity-80 hover:opacity-100'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <input
+                      type="color"
+                      value={customConfig.glowColor}
+                      onChange={(e) => setCustomConfig({ ...customConfig, glowColor: e.target.value })}
+                      className="w-7 h-7 bg-transparent border-0 cursor-pointer rounded shrink-0 p-0"
+                      title="Choose Custom Glow"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Back options and save details */}
+            <div className="flex items-center gap-2.5 pt-3.5 border-t border-zinc-900">
+              <button 
+                type="button"
+                onClick={() => setScreen('grid')}
+                className="flex-1 py-2.5 text-[11px] font-bold text-zinc-500 hover:text-white text-center tracking-wide uppercase transition-colors"
+              >
+                Back to Grid
+              </button>
+              <button 
+                type="button"
+                onClick={handleSaveCustom}
+                className="flex-1 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] tracking-wider uppercase shadow-lg shadow-emerald-950/20 active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-emerald-500"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Save Design</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2077,7 +4448,7 @@ function EditModal({ title, onClose, onSave, children }: any) {
   const [data, setData] = useState({});
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className={`w-full ${title === 'Edit Bio' ? 'max-w-lg md:max-w-xl' : 'max-w-sm'} rounded-xl bg-zinc-900 border border-zinc-700 p-6 transition-all`}>
+      <div className={`w-full ${title === 'Edit Bio' ? 'max-w-2xl md:max-w-3xl' : 'max-w-md md:max-w-lg'} rounded-xl bg-zinc-900 border border-zinc-700 p-6 transition-all`}>
         <h3 className="text-lg font-semibold text-white mb-4">{title}</h3>
         {children({ data, setData })}
         <div className="mt-6 flex justify-end gap-3">
