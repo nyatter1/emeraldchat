@@ -726,9 +726,13 @@ export function getRank(email?: string | null, userId?: string | null, dbRank?: 
     assignedLvl = orderIdx;
   }
 
-  const exactRank = Object.keys(icons).find(k => k && typeof k === 'string' && k.toLowerCase() === rankName.toLowerCase()) || defRank;
+  const exactRank = Object.keys(icons).find(k => k && typeof k === 'string' && k.toLowerCase() === rankName.toLowerCase());
 
-  return { name: exactRank, icon: icons[exactRank] || icons['VIP'], level: assignedLvl };
+  return { 
+    name: exactRank || rankName, 
+    icon: exactRank ? icons[exactRank] : icons['VIP'], 
+    level: assignedLvl 
+  };
 }
 
 function isSafeUrl(url: string | undefined): boolean {
