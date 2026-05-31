@@ -1620,10 +1620,13 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       if (partnerUser) {
         const partnerBio = parseBio(partnerUser.bio);
         if (partnerBio.dating_user_id !== currentUserProfile.id) {
-          // They broke up with us!
-          newDatingUserId = '';
-          newDatingUsername = '';
-          changed = true;
+          // They are only considered broken up if they do not have a pending/sent proposal to date us.
+          if (partnerBio.relationship_request_sent !== currentUserProfile.id) {
+            // They broke up with us!
+            newDatingUserId = '';
+            newDatingUsername = '';
+            changed = true;
+          }
         }
       } else {
         // Partner no longer exists in profiles database
