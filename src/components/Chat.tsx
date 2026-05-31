@@ -1004,6 +1004,97 @@ export function stringifyBio(data: BioData): string {
   return JSON.stringify(data);
 }
 
+export function getCardBgStyle(bg: string | undefined | null) {
+  if (!bg) return undefined;
+  if (bg.startsWith('http') || bg.startsWith('/') || bg.startsWith('data:')) {
+    return {
+      backgroundImage: `url(${bg})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+    };
+  }
+  return {
+    background: bg,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+  };
+}
+
+export interface CardPreset {
+  name: string;
+  category: string;
+  value: string;
+}
+
+export const CARD_PRESET_BACKGROUNDS: CardPreset[] = [
+  { name: 'None / Default Background', category: 'Default', value: '' },
+  
+  // --- CYBER & SCI-FI ---
+  { name: 'Matrix Digital Rain', category: 'Cyber & Sci-Fi', value: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=400' },
+  { name: 'Cyberpunk Grid', category: 'Cyber & Sci-Fi', value: 'https://images.unsplash.com/photo-1515621061946-eff1c2a352bd?q=80&w=400' },
+  { name: 'Fallout CRT Terminal', category: 'Cyber & Sci-Fi', value: 'repeating-linear-gradient(0deg, #141416 0px, #141416 2px, #0e2a30 2px, #0e2a30 4px)' },
+  { name: 'Hexagonal Tech Matrix', category: 'Cyber & Sci-Fi', value: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=400' },
+  { name: 'Hologram Neon Synth', category: 'Cyber & Sci-Fi', value: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?q=80&w=400' },
+  { name: 'Deus Ex Golden Alloy', category: 'Cyber & Sci-Fi', value: 'linear-gradient(135deg, rgba(245, 175, 25, 0.15) 0%, rgba(0,0,0,0.85) 100%)' },
+  { name: 'Biohazard Poison', category: 'Cyber & Sci-Fi', value: 'radial-gradient(circle at center, rgba(16, 185, 129, 0.2) 0%, #09090b 100%)' },
+  { name: 'Quantum Core', category: 'Cyber & Sci-Fi', value: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=400' },
+  { name: 'Red Neon Arcade', category: 'Cyber & Sci-Fi', value: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=400' },
+  { name: 'Circuit Board Green', category: 'Cyber & Sci-Fi', value: 'https://images.unsplash.com/photo-1555680202-c86f0e12f086?q=80&w=400' },
+
+  // --- GRADIENTS ---
+  { name: 'Retrowave Sunset', category: 'Gradients', value: 'linear-gradient(135deg, #ff007f 0%, #7f00ff 50%, #00f0ff 100%)' },
+  { name: 'Toxic Sludge Glow', category: 'Gradients', value: 'linear-gradient(135deg, #02110c 0%, #10b981 50%, #050505 100%)' },
+  { name: 'Cyber Lime Blast', category: 'Gradients', value: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)' },
+  { name: 'Midnight Purple Plasma', category: 'Gradients', value: 'linear-gradient(135deg, #6441a5 0%, #2a0845 100%)' },
+  { name: 'Dragon Hellfire', category: 'Gradients', value: 'linear-gradient(135deg, #f12711 0%, #f5af19 100%)' },
+  { name: 'Synthwave Night', category: 'Gradients', value: 'linear-gradient(135deg, #001219 0%, #003049 30%, #d62828 70%, #fcbf49 100%)' },
+  { name: 'Frozen Ocean Tundra', category: 'Gradients', value: 'linear-gradient(135deg, #00c6ff 0%, #0072ff 100%)' },
+  { name: 'Solar Aurora Flare', category: 'Gradients', value: 'linear-gradient(135deg, #0bf 0%, #f0f 50%, #ff0 100%)' },
+  { name: 'Peach Sorbet Sky', category: 'Gradients', value: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)' },
+  { name: 'Sweet Lavender Mist', category: 'Gradients', value: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)' },
+  { name: 'Acid Green Toxicity', category: 'Gradients', value: 'linear-gradient(135deg, #0d3b66 0%, #f4d35e 100%)' },
+
+  // --- ANIME, ART & RETRO ---
+  { name: 'Cartoon Comic Dots', category: 'Anime & Retro', value: 'radial-gradient(#27272a 20%, transparent 20%), radial-gradient(#18181b 20%, transparent 20%)' },
+  { name: 'Manga Screentone', category: 'Anime & Retro', value: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=400' },
+  { name: '80s Grid Playground', category: 'Anime & Retro', value: 'linear-gradient(rgba(18, 16, 31, 0.8), rgba(18, 16, 31, 0.95)), url(https://images.unsplash.com/photo-1515621061946-eff1c2a352bd?q=80&w=400)' },
+  { name: 'Pop-Art Halftone Wave', category: 'Anime & Retro', value: 'https://images.unsplash.com/photo-1543857778-c4a1a3e0b2eb?q=80&w=400' },
+  { name: 'Kawaii Sailor Moon Night', category: 'Anime & Retro', value: 'linear-gradient(rgba(131, 58, 180, 0.4), rgba(253, 29, 29, 0.4)), url(https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?q=80&w=400)' },
+  { name: 'Cyberpunk Oni Mask', category: 'Anime & Retro', value: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?q=80&w=400' },
+  { name: 'Sakura Petals Gale', category: 'Anime & Retro', value: 'https://images.unsplash.com/photo-1522441815192-d9f04eb0615c?q=80&w=400' },
+  { name: 'Retro Pixel Hearts', category: 'Anime & Retro', value: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?q=80&w=400' },
+  { name: 'Graffiti Wall Tag', category: 'Anime & Retro', value: 'https://images.unsplash.com/photo-1500462906740-42139873c6c5?q=80&w=400' },
+  { name: 'Chibi Cloud Kingdom', category: 'Anime & Retro', value: 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?q=80&w=400' },
+
+  // --- ABSTRACT & TEXTURES ---
+  { name: 'Sepia Vintage Scroll', category: 'Abstract & Textures', value: 'https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?q=80&w=400' },
+  { name: 'Aged Egyptian Papyrus', category: 'Abstract & Textures', value: 'linear-gradient(rgba(100, 70, 40, 0.3) 0%, rgba(10, 5, 2, 0.9) 100%), url(https://images.unsplash.com/photo-1587080266227-677cd237c267?q=80&w=400)' },
+  { name: 'Dark Carbon Fiber', category: 'Abstract & Textures', value: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=400' },
+  { name: 'Amethyst Mineral Cluster', category: 'Abstract & Textures', value: 'https://images.unsplash.com/photo-1551269901-5c5e14c25df7?q=80&w=400' },
+  { name: 'Black Velvet Silk', category: 'Abstract & Textures', value: 'https://images.unsplash.com/photo-1549490349-8643362247b5?q=80&w=400' },
+  { name: 'Marbled Liquid Gold', category: 'Abstract & Textures', value: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=400' },
+  { name: 'Crimson Blood Stain', category: 'Abstract & Textures', value: 'linear-gradient(rgba(180, 0, 0, 0.25) 0%, rgba(0,0,0,0.9) 100%), url(https://images.unsplash.com/photo-1605810230434-7631ac76ec81?q=80&w=400)' },
+  { name: 'Liquid Oil Slick', category: 'Abstract & Textures', value: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=400' },
+  { name: 'Onyx Dark Marble', category: 'Abstract & Textures', value: 'https://images.unsplash.com/photo-1618220179428-22790b461013?q=80&w=400' },
+  { name: 'Aesthetic Line Art', category: 'Abstract & Textures', value: 'https://images.unsplash.com/photo-1579783928121-7a13d66a6211?q=80&w=400' },
+  { name: 'Volcanic Lava Crust', category: 'Abstract & Textures', value: 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?q=80&w=400' },
+
+  // --- ATMOSPHERIC & COSMIC ---
+  { name: 'Deep Space Nebula', category: 'Atmospheric & Cosmic', value: 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?q=80&w=400' },
+  { name: 'Green Aurora Borealis', category: 'Atmospheric & Cosmic', value: 'https://images.unsplash.com/photo-1483168527879-c66136b56105?q=80&w=400' },
+  { name: 'Ethereal Forest Fog', category: 'Atmospheric & Cosmic', value: 'https://images.unsplash.com/photo-1475924156734-496f6cac6ec1?q=80&w=400' },
+  { name: 'Moonlit Night Sky', category: 'Atmospheric & Cosmic', value: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=400' },
+  { name: 'Vaporwave Ocean Surf', category: 'Atmospheric & Cosmic', value: 'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?q=80&w=400' },
+  { name: 'Volcanic Caldera Flare', category: 'Atmospheric & Cosmic', value: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=400' },
+  { name: 'Crimson Solar Eclipse', category: 'Atmospheric & Cosmic', value: 'https://images.unsplash.com/photo-1532798369041-b33eb576ef16?q=80&w=400' },
+  { name: 'Thunderstorm Lightning', category: 'Atmospheric & Cosmic', value: 'https://images.unsplash.com/photo-1492011221367-f47e3ccd77a0?q=80&w=400' },
+  { name: 'Galactic Horizon Spark', category: 'Atmospheric & Cosmic', value: 'https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?q=80&w=400' },
+  { name: 'Abyssal Deep Trench', category: 'Atmospheric & Cosmic', value: 'https://images.unsplash.com/photo-1518156677180-95a2893f3e9f?q=80&w=400' },
+  { name: 'Cyber Midnight Oasis', category: 'Atmospheric & Cosmic', value: 'https://images.unsplash.com/photo-1511447333015-45b65e60f6d5?q=80&w=400' },
+  { name: 'Stardust Supernova', category: 'Atmospheric & Cosmic', value: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?q=80&w=400' }
+];
+
 const TEST_BOT: Profile = {
   id: 'test-bot-0000-0000',
   username: 'TestBot',
@@ -3047,12 +3138,7 @@ function ProfileModal({ profileId, currentUserProfile, currentUserId, onClose, o
             </div>
             
             <div 
-              style={(!bioData.profile_effect || bioData.profile_effect === 'none') && bioData.profile_card_bg ? {
-                backgroundImage: `url(${bioData.profile_card_bg})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-              } : undefined}
+              style={(!bioData.profile_effect || bioData.profile_effect === 'none') && bioData.profile_card_bg ? getCardBgStyle(bioData.profile_card_bg) : undefined}
               className="flex-1 flex flex-col relative overflow-hidden"
             >
               {(!bioData.profile_effect || bioData.profile_effect === 'none') && bioData.profile_card_bg && (
@@ -3449,8 +3535,8 @@ function CosmeticCardPreview({ profile, borderId, effectId, bioData }: { profile
       {/* Background Effect */}
       {effectId === 'none' && bioData?.profile_card_bg && (
         <div 
-          style={{ backgroundImage: `url(${bioData.profile_card_bg})` }}
-          className="absolute inset-0 bg-cover bg-center opacity-20 pointer-events-none" 
+          style={getCardBgStyle(bioData.profile_card_bg)}
+          className="absolute inset-0 opacity-20 pointer-events-none" 
         />
       )}
       <div className="absolute inset-0 pointer-events-none z-0">
@@ -4083,12 +4169,7 @@ function ProfileBorderForm({ profile, onClose, onSave, bioData, initialTab }: an
 
                 {/* Card Background image content overlay */}
                 <div 
-                  style={previewEffectId === 'none' && bioData.profile_card_bg ? {
-                    backgroundImage: `url(${bioData.profile_card_bg})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat',
-                  } : undefined}
+                  style={previewEffectId === 'none' && bioData.profile_card_bg ? getCardBgStyle(bioData.profile_card_bg) : undefined}
                   className="flex-1 flex flex-col relative overflow-hidden"
                 >
                   {previewEffectId === 'none' && bioData.profile_card_bg && (
@@ -4716,12 +4797,7 @@ function ProfileBorderFormOld({ profile, onClose, onSave, bioData }: any) {
 
                 {/* Card Background image content overlay */}
                 <div 
-                  style={bioData.profile_card_bg ? {
-                    backgroundImage: `url(${bioData.profile_card_bg})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat',
-                  } : undefined}
+                  style={bioData.profile_card_bg ? getCardBgStyle(bioData.profile_card_bg) : undefined}
                   className="px-3 pb-3 pt-1 relative"
                 >
                   {bioData.profile_card_bg && (
@@ -5695,6 +5771,8 @@ function MusicEditForm({ profile, data, setData }: any) {
 function CardBgEditForm({ profile, data, setData }: any) {
   const [bgUrl, setBgUrl] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
 
   useEffect(() => {
     const bioData = parseBio(profile.bio);
@@ -5731,14 +5809,14 @@ function CardBgEditForm({ profile, data, setData }: any) {
     }
   };
 
-  const presets = [
-    { name: 'None / Default Background', url: '' },
-    { name: 'Deep Space Nebula', url: 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?q=80&w=600' },
-    { name: 'Dark Carbon Fiber', url: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=600' },
-    { name: 'Matrix Digital Rain', url: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=600' },
-    { name: 'Cyberpunk Grid', url: 'https://images.unsplash.com/photo-1515621061946-eff1c2a352bd?q=80&w=600' },
-    { name: 'Abstract Smooth Satin', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600' }
-  ];
+  const categories = ['All', 'Gradients', 'Cyber & Sci-Fi', 'Anime & Retro', 'Abstract & Textures', 'Atmospheric & Cosmic'];
+
+  const filteredPresets = CARD_PRESET_BACKGROUNDS.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          p.category.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory || p.category === 'Default';
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <div className="space-y-4 text-left">
@@ -5746,7 +5824,7 @@ function CardBgEditForm({ profile, data, setData }: any) {
         <label className="text-xs text-zinc-400 mb-1.5 block font-bold uppercase tracking-wider">Background image/texture URL</label>
         <input
           type="text"
-          placeholder="https://example.com/texture.jpg"
+          placeholder="https://example.com/texture.jpg or linear-gradient(...)"
           value={bgUrl}
           onChange={e => handleBgChange(e.target.value)}
           className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
@@ -5763,7 +5841,7 @@ function CardBgEditForm({ profile, data, setData }: any) {
       </div>
 
       <div>
-        <label className="text-xs text-zinc-400 mb-1 block">Upload background / texture</label>
+        <label className="text-xs text-zinc-400 mb-1 block font-semibold">Upload background / texture</label>
         <div className="flex items-center gap-2">
           <label className="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 text-xs rounded-lg border border-zinc-700 font-semibold transition-colors">
             <span>{uploading ? "Uploading..." : "Choose Image"}</span>
@@ -5786,19 +5864,77 @@ function CardBgEditForm({ profile, data, setData }: any) {
         </div>
       </div>
 
-      <div>
-        <label className="text-xs text-zinc-400 mb-1.5 block font-bold uppercase tracking-wider">Quick Preset Textures</label>
-        <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto custom-scrollbar p-1">
-          {presets.map(p => (
-            <button
-              key={p.name}
-              type="button"
-              onClick={() => handleBgChange(p.url)}
-              className={`text-left p-1.5 text-[10px] rounded-lg border transition-all ${bgUrl === p.url ? 'bg-emerald-600/25 border-emerald-500 text-emerald-400 font-bold' : 'bg-zinc-805 bg-zinc-800/50 border-zinc-800/70 text-zinc-400 hover:bg-zinc-805 hover:bg-zinc-800'}`}
-            >
-              {p.name}
-            </button>
-          ))}
+      <div className="border-t border-zinc-800/80 pt-3">
+        <div className="flex justify-between items-center mb-2.5">
+          <label className="text-xs text-zinc-300 font-bold uppercase tracking-wider">Premium Preset Usercards ({CARD_PRESET_BACKGROUNDS.length - 1} options)</label>
+          <span className="text-[10px] text-zinc-500">Over 50 styles!</span>
+        </div>
+
+        {/* Search Input and Filters */}
+        <div className="space-y-2">
+          <input
+            type="text"
+            placeholder="Search matching styles (e.g. matrix, sepia, comic)..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50"
+          />
+
+          {/* Categories Horizontal Tabs */}
+          <div className="flex gap-1 overflow-x-auto custom-scrollbar-slim pb-1 select-none">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-2 py-1 text-[10px] rounded-md transition-all whitespace-nowrap font-medium ${selectedCategory === cat ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-zinc-900 text-zinc-500 hover:bg-zinc-850 hover:text-zinc-300 border border-transparent'}`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Preset Cards Grid */}
+        <div className="grid grid-cols-2 gap-2 mt-3 max-h-52 overflow-y-auto custom-scrollbar p-1">
+          {filteredPresets.map(p => {
+            const bgStyle = p.value ? getCardBgStyle(p.value) : undefined;
+            return (
+              <button
+                key={p.name}
+                type="button"
+                onClick={() => handleBgChange(p.value)}
+                className={`relative h-12 rounded-lg border overflow-hidden p-2 flex flex-col justify-end text-left transition-all group ${
+                  bgUrl === p.value 
+                    ? 'border-emerald-500 ring-1 ring-emerald-500/30 text-white font-bold' 
+                    : 'border-zinc-800 text-zinc-300 hover:border-zinc-700'
+                }`}
+                style={bgStyle}
+              >
+                {/* Shade overlay for readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-zinc-900/50 to-transparent z-0 group-hover:from-zinc-950/95" />
+                
+                {/* Content Container */}
+                <div className="relative z-10 w-full flex flex-col">
+                  <span className="text-[10px] leading-tight truncate font-bold text-zinc-100">{p.name}</span>
+                  <span className="text-[8px] leading-none text-zinc-400 font-medium tracking-wide mt-0.5">{p.category}</span>
+                </div>
+
+                {bgUrl === p.value && (
+                  <div className="absolute top-1 right-1 bg-emerald-500 p-0.5 rounded-full z-15 shadow-md">
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            );
+          })}
+          {filteredPresets.length === 0 && (
+            <div className="col-span-2 text-center py-6 text-zinc-500 text-xs">
+              No matching preset usercards found.
+            </div>
+          )}
         </div>
       </div>
     </div>
