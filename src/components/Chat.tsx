@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile, Message, News, ProfileLike } from '../types';
-import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, CheckCircle, Sparkles, ArrowLeft, Globe, User, MessageSquare, Layers, Wallet, Settings, Plus, Coins, Paintbrush } from 'lucide-react';
+import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, CheckCircle, Sparkles, ArrowLeft, Globe, User, MessageSquare, Layers, Wallet, Settings, Plus, Coins, Paintbrush, UserPlus, UserMinus, UserCheck, HeartOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
@@ -981,10 +981,35 @@ export interface BioData {
   hide_bio?: boolean;
   sound_disabled?: boolean;
   usercard_bg?: string;
+  friend_requests_sent?: string[];
+  friends?: string[];
+  relationship_request_sent?: string;
+  dating_user_id?: string;
+  dating_username?: string;
+  hide_friends_on_profile?: boolean;
+  hide_me_from_friends?: boolean;
 }
 
 export function parseBio(bioStr: string | null | undefined): BioData {
-  if (!bioStr) return { text: '', mood: '', profile_effect: 'none', gems: 5, coins: 1000, invisible: false, hide_age_gender: false, hide_bio: false, sound_disabled: false, usercard_bg: 'none' };
+  if (!bioStr) return { 
+    text: '', 
+    mood: '', 
+    profile_effect: 'none', 
+    gems: 5, 
+    coins: 1000, 
+    invisible: false, 
+    hide_age_gender: false, 
+    hide_bio: false, 
+    sound_disabled: false, 
+    usercard_bg: 'none',
+    friend_requests_sent: [],
+    friends: [],
+    relationship_request_sent: '',
+    dating_user_id: '',
+    dating_username: '',
+    hide_friends_on_profile: false,
+    hide_me_from_friends: false
+  };
   try {
     const data = JSON.parse(bioStr);
     return {
@@ -1010,9 +1035,34 @@ export function parseBio(bioStr: string | null | undefined): BioData {
       hide_bio: !!data.hide_bio,
       sound_disabled: !!data.sound_disabled,
       usercard_bg: data.usercard_bg || 'none',
+      friend_requests_sent: Array.isArray(data.friend_requests_sent) ? data.friend_requests_sent : [],
+      friends: Array.isArray(data.friends) ? data.friends : [],
+      relationship_request_sent: data.relationship_request_sent || '',
+      dating_user_id: data.dating_user_id || '',
+      dating_username: data.dating_username || '',
+      hide_friends_on_profile: !!data.hide_friends_on_profile,
+      hide_me_from_friends: !!data.hide_me_from_friends,
     };
   } catch (e) {}
-  return { text: bioStr, mood: '', profile_effect: 'none', gems: 5, coins: 1000, invisible: false, hide_age_gender: false, hide_bio: false, sound_disabled: false, usercard_bg: 'none' };
+  return { 
+    text: bioStr, 
+    mood: '', 
+    profile_effect: 'none', 
+    gems: 5, 
+    coins: 1000, 
+    invisible: false, 
+    hide_age_gender: false, 
+    hide_bio: false, 
+    sound_disabled: false, 
+    usercard_bg: 'none',
+    friend_requests_sent: [],
+    friends: [],
+    relationship_request_sent: '',
+    dating_user_id: '',
+    dating_username: '',
+    hide_friends_on_profile: false,
+    hide_me_from_friends: false
+  };
 }
 
 export function stringifyBio(data: BioData): string {
@@ -1446,6 +1496,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [showAddons, setShowAddons] = useState(false);
   const [showConvertCoinsModal, setShowConvertCoinsModal] = useState(false);
   const [showPaintCanvasModal, setShowPaintCanvasModal] = useState(false);
+  const [showSocialRequestsModal, setShowSocialRequestsModal] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   
   const [onlineUsers, setOnlineUsers] = useState<Profile[]>([TEST_BOT]);
@@ -1459,6 +1510,154 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [newNewsContent, setNewNewsContent] = useState('');
   const [hasNewNews, setHasNewNews] = useState(false);
   const [rankOverrides, setRankOverrides] = useState<Record<string, string>>({});
+
+  // Computed incoming friend requests
+  const incomingFriendRequests = allProfiles.filter(other => {
+    if (other.id === currentUserProfile.id) return false;
+    const otherBio = parseBio(other.bio);
+    const myBio = parseBio(currentUserProfile.bio);
+    const sentToMe = otherBio.friend_requests_sent?.includes(currentUserProfile.id);
+    const alreadyFriends = myBio.friends?.includes(other.id);
+    const isIgnored = (myBio as any).ignored_friend_requests?.includes(other.id);
+    return sentToMe && !alreadyFriends && !isIgnored;
+  });
+
+  // Computed incoming relationship requests
+  const incomingRelationshipRequests = allProfiles.filter(other => {
+    if (other.id === currentUserProfile.id) return false;
+    const otherBio = parseBio(other.bio);
+    const myBio = parseBio(currentUserProfile.bio);
+    const sentToMe = otherBio.relationship_request_sent === currentUserProfile.id;
+    const alreadyDating = myBio.dating_user_id === other.id;
+    const areFriends = myBio.friends?.includes(other.id) && otherBio.friends?.includes(currentUserProfile.id);
+    const isIgnored = (myBio as any).ignored_relationship_requests?.includes(other.id);
+    return sentToMe && !alreadyDating && areFriends && !isIgnored;
+  });
+
+  const totalIncomingRequestsCount = incomingFriendRequests.length + incomingRelationshipRequests.length;
+
+  // Synchronize friends & relationship status automatically in the background
+  useEffect(() => {
+    if (!currentUserProfile || !allProfiles.length) return;
+    
+    // Parse current user bio
+    const myBioObj = parseBio(currentUserProfile.bio);
+    let changed = false;
+
+    // 1. Friend handshake: 
+    // If we have someone in our `friend_requests_sent` list, and they have added us to their `friends` list,
+    // we should complete the friend handshake by adding them to our `friends` list and removing from `friend_requests_sent`.
+    const newFriendRequestsSent = [...(myBioObj.friend_requests_sent || [])];
+    const newFriends = [...(myBioObj.friends || [])];
+
+    // Find any users who have us in their friends list
+    allProfiles.forEach(otherUser => {
+      if (otherUser.id === currentUserProfile.id) return;
+      const otherBio = parseBio(otherUser.bio);
+      const otherFriends = otherBio.friends || [];
+      const weAreInOtherFriends = otherFriends.includes(currentUserProfile.id);
+
+      // Case A: Handshake acceptance of our sent request
+      if (weAreInOtherFriends && newFriendRequestsSent.includes(otherUser.id)) {
+        // They accepted our friend request!
+        const idx = newFriendRequestsSent.indexOf(otherUser.id);
+        if (idx > -1) newFriendRequestsSent.splice(idx, 1);
+        if (!newFriends.includes(otherUser.id)) {
+          newFriends.push(otherUser.id);
+        }
+        changed = true;
+      }
+
+      // Case B: They added us to friends as a back-link that we need to acknowledge
+      // (If other user has us, and we are NOT in their friend_requests_sent, and they added us as friend, we should have them in ours too)
+      if (weAreInOtherFriends && !newFriends.includes(otherUser.id) && !newFriendRequestsSent.includes(otherUser.id)) {
+        newFriends.push(otherUser.id);
+        changed = true;
+      }
+
+      // Case C: Unfriended on their side
+      // If we have them in Our active friends, but they don't have us in Their active friends, 
+      // and they also don't have us in their friend_requests_sent (meaning we didn't just send a request),
+      // we should remove them from our friends too.
+      if (!weAreInOtherFriends && newFriends.includes(otherUser.id)) {
+        const otherRequestsSent = otherBio.friend_requests_sent || [];
+        // If we didn't just send them a pending request (or if it's already a full friend on our side, but they removed us)
+        if (!otherRequestsSent.includes(currentUserProfile.id)) {
+          const idx = newFriends.indexOf(otherUser.id);
+          if (idx > -1) newFriends.splice(idx, 1);
+          changed = true;
+        }
+      }
+    });
+
+    // 2. Relationship handshake:
+    // If we sent B a relationship request (`myBioObj.relationship_request_sent === B.id`), 
+    // and B's bio shows they are now dating us (`B.dating_user_id === A.id`),
+    // then we should set our dating state to B, and clear our sent request.
+    let newDatingUserId = myBioObj.dating_user_id || '';
+    let newDatingUsername = myBioObj.dating_username || '';
+    let newRelRequestSent = myBioObj.relationship_request_sent || '';
+
+    if (newRelRequestSent) {
+      const partnerUser = allProfiles.find(p => p.id === newRelRequestSent);
+      if (partnerUser) {
+        const partnerBio = parseBio(partnerUser.bio);
+        if (partnerBio.dating_user_id === currentUserProfile.id) {
+          newDatingUserId = partnerUser.id;
+          newDatingUsername = partnerUser.username;
+          newRelRequestSent = '';
+          changed = true;
+        }
+      }
+    }
+
+    // 3. Break Up handshake:
+    // If our bio says we are dating B (`myBioObj.dating_user_id === B.id`),
+    // but B's bio doesn't say they are dating us (or is empty), it means B broke up with us.
+    // We must clear our dating state.
+    if (newDatingUserId) {
+      const partnerUser = allProfiles.find(p => p.id === newDatingUserId);
+      if (partnerUser) {
+        const partnerBio = parseBio(partnerUser.bio);
+        if (partnerBio.dating_user_id !== currentUserProfile.id) {
+          // They broke up with us!
+          newDatingUserId = '';
+          newDatingUsername = '';
+          changed = true;
+        }
+      } else {
+        // Partner no longer exists in profiles database
+        newDatingUserId = '';
+        newDatingUsername = '';
+        changed = true;
+      }
+    }
+
+    // Save if anything changed
+    if (changed) {
+      const updatedBio = {
+        ...myBioObj,
+        friend_requests_sent: newFriendRequestsSent,
+        friends: newFriends,
+        relationship_request_sent: newRelRequestSent,
+        dating_user_id: newDatingUserId,
+        dating_username: newDatingUsername
+      };
+      
+      const updatedBioStr = JSON.stringify(updatedBio);
+      
+      // Update DB and local state
+      supabase
+        .from('profiles')
+        .update({ bio: updatedBioStr })
+        .eq('id', currentUserProfile.id)
+        .then(({ error }) => {
+          if (!error) {
+            onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+          }
+        });
+    }
+  }, [allProfiles, currentUserProfile, onProfileUpdate]);
   
   const menuRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -2521,6 +2720,21 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
             >
               <User className="h-5 w-5" />
             </button>
+
+            {/* Friend Requests Glow Button */}
+            <button 
+              onClick={() => setShowSocialRequestsModal(true)}
+              className="relative p-2 text-zinc-400 hover:text-emerald-500 hover:bg-[#1e1e22] rounded-lg transition-colors focus:outline-none"
+              title="Social Connections & Requests"
+            >
+              <UserPlus className="h-5.5 w-5.5 text-zinc-300" />
+              {totalIncomingRequestsCount > 0 && (
+                <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-pink-500 text-[9px] font-extrabold text-white ring-2 ring-zinc-950">
+                  {totalIncomingRequestsCount}
+                </span>
+              )}
+            </button>
+
             <button 
               onClick={() => setProfileMenuState(prev => prev === 'closed' ? 'main' : 'closed')}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity focus:outline-none ml-1 sm:ml-0"
@@ -3006,6 +3220,8 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
             setOnlineUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
             setMessages(prev => prev.map(m => m.user_id === updated.id ? { ...m, profiles: updated } : m));
           }}
+          allProfiles={allProfiles}
+          setSelectedProfileId={setSelectedProfileId}
         />
       )}
 
@@ -3029,17 +3245,44 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
         />
       )}
 
+      {showSocialRequestsModal && (
+        <SocialRequestsModal 
+          currentUserProfile={currentUserProfile}
+          allProfiles={allProfiles}
+          onProfileUpdate={onProfileUpdate}
+          onClose={() => setShowSocialRequestsModal(false)}
+          incomingFriendRequests={incomingFriendRequests}
+          incomingRelationshipRequests={incomingRelationshipRequests}
+        />
+      )}
+
     </div>
   );
 }
 
 // Inline modal to keep things compact
-function ProfileModal({ profileId, currentUserProfile, currentUserId, onClose, onProfileUpdate }: { profileId: string, currentUserProfile: Profile, currentUserId: string, onClose: () => void, onProfileUpdate: (p: Profile) => void }) {
+function ProfileModal({ 
+  profileId, 
+  currentUserProfile, 
+  currentUserId, 
+  onClose, 
+  onProfileUpdate,
+  allProfiles = [],
+  setSelectedProfileId
+}: { 
+  profileId: string, 
+  currentUserProfile: Profile, 
+  currentUserId: string, 
+  onClose: () => void, 
+  onProfileUpdate: (p: Profile) => void,
+  allProfiles?: Profile[],
+  setSelectedProfileId?: (id: string | null) => void
+}) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | 'border' | 'border_borders' | 'border_effects' | 'border_combos' | 'border_creator' | 'preferences' | 'usercards' | null>(null);
-  const [activeTab, setActiveTab] = useState<'info' | 'bio'>('bio');
+  const [activeTab, setActiveTab] = useState<'info' | 'bio' | 'friends'>('bio');
   const [isPlaying, setIsPlaying] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -3047,6 +3290,17 @@ function ProfileModal({ profileId, currentUserProfile, currentUserId, onClose, o
   const bioData: BioData = profile ? parseBio(profile.bio) : { text: '', mood: '', profile_music_type: '', profile_music_source: '', profile_card_bg: '', assigned_ranks: {} };
   const localUserBioData = parseBio(currentUserProfile.bio);
   const isLocalSoundDisabled = localUserBioData.sound_disabled ?? false;
+
+  const displayedUserFriends = useMemo(() => {
+    if (!profile || !allProfiles) return [];
+    const friendsIds = parseBio(profile.bio).friends || [];
+    return allProfiles.filter(u => {
+      const uBio = parseBio(u.bio);
+      const isMutual = friendsIds.includes(u.id) && (uBio.friends || []).includes(profile.id);
+      const isHidden = uBio.hide_me_from_friends;
+      return isMutual && !isHidden;
+    });
+  }, [profile, allProfiles]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -3296,6 +3550,24 @@ function ProfileModal({ profileId, currentUserProfile, currentUserId, onClose, o
                     {bioData.mood && (
                       <p className={`text-sm mt-1 mb-1 font-medium ${isProfileRainbowActive ? 'rainbow-text' : 'text-emerald-400'}`}>{bioData.mood}</p>
                     )}
+                    
+                    {bioData.dating_user_id && (
+                      <div className="inline-flex items-center gap-1.5 bg-pink-500/15 border border-pink-500/25 px-2.5 py-1 rounded-full text-pink-400 text-xs font-semibold select-none mt-1.5 shadow-sm">
+                        <Heart className="w-3.5 h-3.5 fill-pink-500 text-pink-500 animate-pulse" />
+                        <span>Dating: {bioData.dating_username}</span>
+                      </div>
+                    )}
+
+                    {!isSelf && profile!.id !== TEST_BOT.id && (
+                      <div className="mt-3">
+                        <FriendButton 
+                          profile={profile} 
+                          currentUserProfile={currentUserProfile} 
+                          onProfileUpdate={onProfileUpdate} 
+                          setProfile={setProfile} 
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -3345,6 +3617,9 @@ function ProfileModal({ profileId, currentUserProfile, currentUserId, onClose, o
                     <div className="flex gap-6 border-b border-zinc-800 px-6 shrink-0 h-10">
                       <button onClick={() => setActiveTab('bio')} className={`pb-1 flex items-center border-b-2 font-medium transition-colors text-sm ${activeTab === 'bio' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}>About Me</button>
                       <button onClick={() => setActiveTab('info')} className={`pb-1 flex items-center border-b-2 font-medium transition-colors text-sm ${activeTab === 'info' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}>Info</button>
+                      {!bioData.hide_friends_on_profile && (
+                        <button onClick={() => setActiveTab('friends')} className={`pb-1 flex items-center border-b-2 font-medium transition-colors text-sm ${activeTab === 'friends' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}>Friends ({displayedUserFriends.length})</button>
+                      )}
                     </div>
 
                     <div className="h-64 overflow-y-auto px-6 py-4 custom-scrollbar z-10 relative">
@@ -3360,7 +3635,7 @@ function ProfileModal({ profileId, currentUserProfile, currentUserId, onClose, o
                             <p className="text-zinc-500">No bio provided yet.</p>
                           )}
                         </div>
-                      ) : (
+                      ) : activeTab === 'info' ? (
                         <div className="flex flex-col gap-4">
                           <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
                             <span className="text-zinc-400 text-sm">Last online</span>
@@ -3375,9 +3650,49 @@ function ProfileModal({ profileId, currentUserProfile, currentUserId, onClose, o
                             <span className="text-zinc-200 text-sm">{(!isSelf && bioData.hide_age_gender) ? 'Hidden' : profile!.age}</span>
                           </div>
                           <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
+                            <span className="text-zinc-400 text-sm">Dating</span>
+                            {bioData.dating_user_id ? (
+                              <span className="text-pink-400 font-bold text-sm flex items-center gap-1.5 select-none">
+                                <Heart className="w-4 h-4 fill-pink-500 text-pink-500 inline" />
+                                {bioData.dating_username}
+                              </span>
+                            ) : (
+                              <span className="text-zinc-500 text-sm italic">Single</span>
+                            )}
+                          </div>
+                          <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
                             <span className="text-zinc-400 text-sm">Current Room</span>
                             <span className="text-emerald-500 font-medium text-sm">Main</span>
                           </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3 pb-4">
+                          {displayedUserFriends.length === 0 ? (
+                            <div className="col-span-2 text-center py-10 text-zinc-500 text-xs italic">
+                              No friends to display.
+                            </div>
+                          ) : (
+                            displayedUserFriends.map(f => (
+                              <button
+                                key={f.id}
+                                onClick={() => {
+                                  onClose();
+                                  if (setSelectedProfileId) {
+                                    setTimeout(() => {
+                                      setSelectedProfileId(f.id);
+                                    }, 50);
+                                  }
+                                }}
+                                className="flex items-center gap-2.5 p-2 bg-zinc-950/60 border border-zinc-900 rounded-xl hover:bg-zinc-900/60 transition-all text-left min-w-0 cursor-pointer"
+                              >
+                                <img src={f.avatar_url} className="h-9 w-9 rounded-full object-cover border border-zinc-850 shrink-0" alt="Friend avatar" />
+                                <div className="min-w-0">
+                                  <div className="text-xs font-bold text-white truncate">{f.username}</div>
+                                  <div className="text-[10px] text-zinc-500 font-mono truncate">{f.gender}, {f.age}</div>
+                                </div>
+                              </button>
+                            ))
+                          )}
                         </div>
                       )}
                     </div>
@@ -3469,7 +3784,9 @@ function ProfileModal({ profileId, currentUserProfile, currentUserId, onClose, o
             ...bioData, 
             hide_age_gender: !!val.hide_age_gender,
             hide_bio: !!val.hide_bio,
-            sound_disabled: !!val.sound_disabled
+            sound_disabled: !!val.sound_disabled,
+            hide_friends_on_profile: !!val.hide_friends_on_profile,
+            hide_me_from_friends: !!val.hide_me_from_friends
           });
           updateProfileData({ bio: newBio });
         }}>
@@ -5343,6 +5660,8 @@ function PreferencesEditForm({ bioData, data, setData }: { bioData: BioData, dat
       hide_age_gender: bioData.hide_age_gender ?? false,
       hide_bio: bioData.hide_bio ?? false,
       sound_disabled: bioData.sound_disabled ?? false,
+      hide_friends_on_profile: bioData.hide_friends_on_profile ?? false,
+      hide_me_from_friends: bioData.hide_me_from_friends ?? false,
     });
   }, []);
 
@@ -5376,6 +5695,38 @@ function PreferencesEditForm({ bioData, data, setData }: { bioData: BioData, dat
         >
           <span
             className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${data.hide_bio ? 'translate-x-5' : 'translate-x-0'}`}
+          />
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between p-3 bg-zinc-950/60 border border-zinc-800 rounded-xl gap-4">
+        <div className="flex-1">
+          <label className="text-sm font-semibold text-zinc-100 block">Hide Friends Tab</label>
+          <span className="text-xs text-zinc-400 block mt-0.5">Other users won't be able to see the friends list on your profile card.</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setData({ ...data, hide_friends_on_profile: !data.hide_friends_on_profile })}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${data.hide_friends_on_profile ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${data.hide_friends_on_profile ? 'translate-x-5' : 'translate-x-0'}`}
+          />
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between p-3 bg-zinc-950/60 border border-zinc-800 rounded-xl gap-4">
+        <div className="flex-1">
+          <label className="text-sm font-semibold text-zinc-100 block">Hide Me From Friend Lists</label>
+          <span className="text-xs text-zinc-400 block mt-0.5">Don't list your name in other users' friends tabs.</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setData({ ...data, hide_me_from_friends: !data.hide_me_from_friends })}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${data.hide_me_from_friends ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${data.hide_me_from_friends ? 'translate-x-5' : 'translate-x-0'}`}
           />
         </button>
       </div>
@@ -6733,6 +7084,532 @@ function PaintCanvasModal({
         </div>
 
       </div>
+    </div>
+  );
+}
+
+function SocialRequestsModal({
+  currentUserProfile,
+  allProfiles,
+  onProfileUpdate,
+  onClose,
+  incomingFriendRequests,
+  incomingRelationshipRequests
+}: {
+  currentUserProfile: Profile;
+  allProfiles: Profile[];
+  onProfileUpdate: (p: Profile) => void;
+  onClose: () => void;
+  incomingFriendRequests: Profile[];
+  incomingRelationshipRequests: Profile[];
+}) {
+  const [activeTab, setActiveTab] = useState<'friends' | 'relationships'>('friends');
+  const myBio = parseBio(currentUserProfile.bio);
+
+  const handleAcceptFriend = async (senderId: string) => {
+    const updatedBio = {
+      ...myBio,
+      friends: [...new Set([...(myBio.friends || []), senderId])]
+    };
+    const updatedBioStr = JSON.stringify(updatedBio);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: updatedBioStr })
+        .eq('id', currentUserProfile.id);
+
+      if (error) throw error;
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+      toast.success("Friend request accepted!");
+    } catch (e: any) {
+      toast.error("Failed to accept: " + e.message);
+    }
+  };
+
+  const handleDeclineFriend = async (senderId: string) => {
+    const updatedBio = {
+      ...myBio,
+      ignored_friend_requests: [...new Set([...((myBio as any).ignored_friend_requests || []), senderId])]
+    };
+    const updatedBioStr = JSON.stringify(updatedBio);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: updatedBioStr })
+        .eq('id', currentUserProfile.id);
+
+      if (error) throw error;
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+      toast.success("Request ignored");
+    } catch (e: any) {
+      toast.error("Failed to ignore: " + e.message);
+    }
+  };
+
+  const handleAcceptRelationship = async (partnerId: string, partnerUsername: string) => {
+    const updatedBio = {
+      ...myBio,
+      dating_user_id: partnerId,
+      dating_username: partnerUsername,
+      relationship_request_sent: ''
+    };
+    const updatedBioStr = JSON.stringify(updatedBio);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: updatedBioStr })
+        .eq('id', currentUserProfile.id);
+
+      if (error) throw error;
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+      toast.success(`You are now dating ${partnerUsername}! 💖`);
+    } catch (e: any) {
+      toast.error("Failed to accept: " + e.message);
+    }
+  };
+
+  const handleDeclineRelationship = async (partnerId: string) => {
+    const updatedBio = {
+      ...myBio,
+      ignored_relationship_requests: [...new Set([...((myBio as any).ignored_relationship_requests || []), partnerId])]
+    };
+    const updatedBioStr = JSON.stringify(updatedBio);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: updatedBioStr })
+        .eq('id', currentUserProfile.id);
+
+      if (error) throw error;
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+      toast.success("Relationship request ignored");
+    } catch (e: any) {
+      toast.error("Failed to ignore: " + e.message);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs font-sans">
+      <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-[#141416] p-6 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
+          <div className="flex items-center gap-2">
+            <UserPlus className="h-5 w-5 text-emerald-500" />
+            <span className="text-lg font-bold text-white tracking-wide">Social Inbox</span>
+          </div>
+          <button 
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Tab selector */}
+        <div className="flex bg-[#252529]/60 border border-zinc-800/80 p-1 rounded-lg gap-1.5 my-4">
+          <button
+            type="button"
+            onClick={() => setActiveTab('friends')}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activeTab === 'friends' 
+                ? 'bg-emerald-600 text-white shadow-md' 
+                : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            Friend Requests
+            {incomingFriendRequests.length > 0 && (
+              <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-extrabold animate-pulse">
+                {incomingFriendRequests.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('relationships')}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activeTab === 'relationships' 
+                ? 'bg-rose-600 text-white shadow-md' 
+                : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            Relationship Requests
+            {incomingRelationshipRequests.length > 0 && (
+              <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-extrabold animate-pulse">
+                {incomingRelationshipRequests.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {activeTab === 'friends' ? (
+          <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+            {incomingFriendRequests.length === 0 ? (
+              <div className="text-center py-8 text-zinc-500 text-xs">
+                No pending friend requests.
+              </div>
+            ) : (
+              incomingFriendRequests.map(sender => (
+                <div key={sender.id} className="flex items-center justify-between p-2.5 bg-zinc-950/60 border border-zinc-900 rounded-xl">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <img src={sender.avatar_url} className="h-9 w-9 rounded-full object-cover border border-zinc-800" alt="Avatar" />
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-white truncate">{sender.username}</div>
+                      <div className="text-[10px] text-zinc-500 font-mono truncate">{sender.gender}, {sender.age}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleAcceptFriend(sender.id)}
+                      className="p-1.5 bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-black rounded-lg transition-all cursor-pointer"
+                      title="Accept"
+                    >
+                      <Check className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeclineFriend(sender.id)}
+                      className="p-1.5 bg-zinc-900 text-zinc-400 hover:bg-zinc-850 hover:text-white rounded-lg transition-colors cursor-pointer"
+                      title="Ignore"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+            {incomingRelationshipRequests.length === 0 ? (
+              <div className="text-center py-8 text-zinc-500 text-xs font-sans">
+                No pending relationship requests.
+              </div>
+            ) : (
+              incomingRelationshipRequests.map(partner => (
+                <div key={partner.id} className="flex items-center justify-between p-2.5 bg-zinc-950/60 border border-zinc-900 rounded-xl">
+                  <div className="flex items-center gap-2.5 min-w-0 font-sans">
+                    <div className="relative">
+                      <img src={partner.avatar_url} className="h-9 w-9 rounded-full object-cover border border-zinc-800" alt="Avatar" />
+                      <span className="absolute -bottom-1 -right-1 bg-pink-500 text-white rounded-full p-0.5"><Heart className="h-3 w-3 fill-white" /></span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-white truncate">{partner.username}</div>
+                      <div className="text-[10px] text-pink-400 font-medium truncate">wants to date you!</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleAcceptRelationship(partner.id, partner.username)}
+                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <Heart className="h-3.5 w-3.5 fill-white text-white" /> Accept
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeclineRelationship(partner.id)}
+                      className="p-1.5 bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white rounded-lg transition-colors cursor-pointer"
+                      title="Ignore"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FriendButton({
+  profile,
+  currentUserProfile,
+  onProfileUpdate,
+  setProfile
+}: {
+  profile: Profile;
+  currentUserProfile: Profile;
+  onProfileUpdate: (p: Profile) => void;
+  setProfile: (p: Profile) => void;
+}) {
+  const myBio = parseBio(currentUserProfile.bio);
+  const otherBio = parseBio(profile.bio);
+
+  const areFriends = myBio.friends?.includes(profile.id) && otherBio.friends?.includes(currentUserProfile.id);
+  const sentFriendRequest = myBio.friend_requests_sent?.includes(profile.id);
+  const receivedFriendRequest = otherBio.friend_requests_sent?.includes(currentUserProfile.id);
+
+  const isDatingThisUser = myBio.dating_user_id === profile.id && otherBio.dating_user_id === currentUserProfile.id;
+  const isDatingOtherSpecialOne = myBio.dating_user_id && myBio.dating_user_id !== profile.id;
+  const sentRelationshipRequest = myBio.relationship_request_sent === profile.id;
+  const receivedRelationshipRequest = otherBio.relationship_request_sent === currentUserProfile.id;
+
+  const handleAddFriend = async () => {
+    const updatedBio = {
+      ...myBio,
+      friend_requests_sent: [...new Set([...(myBio.friend_requests_sent || []), profile.id])]
+    };
+    const updatedBioStr = JSON.stringify(updatedBio);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: updatedBioStr })
+        .eq('id', currentUserProfile.id);
+
+      if (error) throw error;
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+      toast.success("Friend request sent!");
+    } catch (e: any) {
+      toast.error("Failed to add: " + e.message);
+    }
+  };
+
+  const handleCancelFriendRequest = async () => {
+    const updatedBio = {
+      ...myBio,
+      friend_requests_sent: (myBio.friend_requests_sent || []).filter(id => id !== profile.id)
+    };
+    const updatedBioStr = JSON.stringify(updatedBio);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: updatedBioStr })
+        .eq('id', currentUserProfile.id);
+
+      if (error) throw error;
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+      toast.success("Friend request cancelled.");
+    } catch (e: any) {
+      toast.error("Failed to cancel: " + e.message);
+    }
+  };
+
+  const handleAcceptFriendRequest = async () => {
+    const updatedBio = {
+      ...myBio,
+      friends: [...new Set([...(myBio.friends || []), profile.id])]
+    };
+    const updatedBioStr = JSON.stringify(updatedBio);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: updatedBioStr })
+        .eq('id', currentUserProfile.id);
+
+      if (error) throw error;
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+      toast.success("Friend request accepted!");
+    } catch (e: any) {
+      toast.error("Failed: " + e.message);
+    }
+  };
+
+  const handleUnfriend = async () => {
+    const updatedBio = {
+      ...myBio,
+      friends: (myBio.friends || []).filter(id => id !== profile.id),
+      dating_user_id: myBio.dating_user_id === profile.id ? '' : myBio.dating_user_id,
+      dating_username: myBio.dating_user_id === profile.id ? '' : myBio.dating_username
+    };
+    const updatedBioStr = JSON.stringify(updatedBio);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: updatedBioStr })
+        .eq('id', currentUserProfile.id);
+
+      if (error) throw error;
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+      toast.success("Unfriended user.");
+    } catch (e: any) {
+      toast.error("Failed: " + e.message);
+    }
+  };
+
+  const handleSendRelationshipRequest = async () => {
+    if (isDatingOtherSpecialOne) {
+      toast.error("You are already dating someone! Break up first.");
+      return;
+    }
+    const updatedBio = {
+      ...myBio,
+      relationship_request_sent: profile.id
+    };
+    const updatedBioStr = JSON.stringify(updatedBio);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: updatedBioStr })
+        .eq('id', currentUserProfile.id);
+
+      if (error) throw error;
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+      toast.success("Relationship request sent! 💖");
+    } catch (e: any) {
+      toast.error("Failed: " + e.message);
+    }
+  };
+
+  const handleCancelRelationshipRequest = async () => {
+    const updatedBio = {
+      ...myBio,
+      relationship_request_sent: ''
+    };
+    const updatedBioStr = JSON.stringify(updatedBio);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: updatedBioStr })
+        .eq('id', currentUserProfile.id);
+
+      if (error) throw error;
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+      toast.success("Relationship request cancelled.");
+    } catch (e: any) {
+      toast.error("Failed: " + e.message);
+    }
+  };
+
+  const handleAcceptRelationshipRequest = async () => {
+    if (isDatingOtherSpecialOne) {
+      toast.error("You are already dating someone! Break up first.");
+      return;
+    }
+    const updatedBio = {
+      ...myBio,
+      dating_user_id: profile.id,
+      dating_username: profile.username,
+      relationship_request_sent: ''
+    };
+    const updatedBioStr = JSON.stringify(updatedBio);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: updatedBioStr })
+        .eq('id', currentUserProfile.id);
+
+      if (error) throw error;
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+      toast.success(`You are now dating ${profile.username}! 💖`);
+    } catch (e: any) {
+      toast.error("Failed: " + e.message);
+    }
+  };
+
+  const handleBreakup = async () => {
+    const confirmBreakup = window.confirm(`Are you sure you want to break up with ${profile.username}? 💔`);
+    if (!confirmBreakup) return;
+
+    const updatedBio = {
+      ...myBio,
+      dating_user_id: '',
+      dating_username: ''
+    };
+    const updatedBioStr = JSON.stringify(updatedBio);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: updatedBioStr })
+        .eq('id', currentUserProfile.id);
+
+      if (error) throw error;
+      onProfileUpdate({ ...currentUserProfile, bio: updatedBioStr });
+      toast.success(`You broke up with ${profile.username}. 💔`);
+    } catch (e: any) {
+      toast.error("Breakup failed: " + e.message);
+    }
+  };
+
+  return (
+    <div className="flex gap-2 items-center flex-wrap select-none font-sans">
+      {areFriends ? (
+        <button
+          type="button"
+          onClick={handleUnfriend}
+          className="px-3.5 py-1.5 text-xs font-semibold rounded-md border border-zinc-800 hover:border-red-500/20 bg-[#1e1e22]/80 text-zinc-300 hover:text-red-400 hover:bg-zinc-900 transition-all flex items-center gap-1.5 cursor-pointer"
+          title="Click to Unfriend"
+        >
+          <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
+          <span>Friends</span>
+        </button>
+      ) : sentFriendRequest ? (
+        <button
+          type="button"
+          onClick={handleCancelFriendRequest}
+          className="px-3.5 py-1.5 text-xs font-semibold rounded-md border border-[#2a2a30] hover:border-yellow-650/30 bg-[#2a2a30]/30 text-yellow-500 hover:text-yellow-400 transition-all flex items-center gap-1.5 cursor-pointer"
+          title="Click to Cancel Request"
+        >
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <span>Requested</span>
+        </button>
+      ) : receivedFriendRequest ? (
+        <button
+          type="button"
+          onClick={handleAcceptFriendRequest}
+          className="px-3.5 py-1.5 text-xs font-bold rounded-md bg-emerald-600 text-white hover:bg-emerald-500 transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+        >
+          <UserPlus className="w-3.5 h-3.5" />
+          <span>Accept Friend</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={handleAddFriend}
+          className="px-3.5 py-1.5 text-xs font-bold rounded-md bg-[#1e1e22] text-white hover:bg-zinc-800 border border-zinc-850 hover:border-zinc-700 transition-all flex items-center gap-1.5 cursor-pointer"
+        >
+          <UserPlus className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Add Friend</span>
+        </button>
+      )}
+
+      {areFriends && (
+        <>
+          {isDatingThisUser ? (
+            <button
+              type="button"
+              onClick={handleBreakup}
+              className="px-3.5 py-1.5 text-xs font-bold rounded-md bg-rose-950/40 border border-rose-900/40 text-rose-400 hover:bg-rose-900 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Click to Break Up"
+            >
+              <HeartOff className="w-3.5 h-3.5 text-rose-500" />
+              <span>Dating (Break up)</span>
+            </button>
+          ) : sentRelationshipRequest ? (
+            <button
+              type="button"
+              onClick={handleCancelRelationshipRequest}
+              className="px-3.5 py-1.5 text-xs font-semibold rounded-md border border-pink-900/30 bg-pink-950/20 text-pink-400 hover:bg-pink-900 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Click to Cancel Request"
+            >
+              <Heart className="w-3.5 h-3.5 fill-pink-500 text-pink-500 animate-pulse" />
+              <span>Requested Dating</span>
+            </button>
+          ) : receivedRelationshipRequest ? (
+            <button
+              type="button"
+              onClick={handleAcceptRelationshipRequest}
+              className="px-3.5 py-1.5 text-xs font-bold rounded-md bg-rose-600 text-white hover:bg-rose-500 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Heart className="w-3.5 h-3.5 fill-white text-white" />
+              <span>Accept Dating</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSendRelationshipRequest}
+              className="px-3.5 py-1.5 text-xs font-bold rounded-md bg-pink-600 hover:bg-pink-500 text-white transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+              title="Send Relationship Request"
+            >
+              <Heart className="w-3.5 h-3.5 fill-white text-white" />
+              <span>Send rls request</span>
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }
