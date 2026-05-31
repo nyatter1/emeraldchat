@@ -2265,7 +2265,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const isDev = ['test@gmail.com', 'dev@gmail.com'].includes(currentUserProfile.email || '');
 
   return (
-    <div className="flex h-[100dvh] bg-zinc-950 text-zinc-100 font-sans overflow-hidden w-full">
+    <div className="flex h-full bg-zinc-950 text-zinc-100 font-sans overflow-hidden w-full">
       
         {/* Left Drawer Menu */}
         {leftPanelMode !== 'none' && (
