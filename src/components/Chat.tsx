@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile, Message, News, ProfileLike } from '../types';
-import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, CheckCircle, Sparkles, ArrowLeft, Globe, User, MessageSquare, Layers, Wallet } from 'lucide-react';
+import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, CheckCircle, Sparkles, ArrowLeft, Globe, User, MessageSquare, Layers, Wallet, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import Markdown from 'react-markdown';
@@ -964,10 +964,13 @@ export interface BioData {
   coins?: number;
   last_daily_claim?: string;
   invisible?: boolean;
+  hide_age_gender?: boolean;
+  hide_bio?: boolean;
+  sound_disabled?: boolean;
 }
 
 export function parseBio(bioStr: string | null | undefined): BioData {
-  if (!bioStr) return { text: '', mood: '', profile_effect: 'none', gems: 5, coins: 1000, invisible: false };
+  if (!bioStr) return { text: '', mood: '', profile_effect: 'none', gems: 5, coins: 1000, invisible: false, hide_age_gender: false, hide_bio: false, sound_disabled: false };
   try {
     const data = JSON.parse(bioStr);
     return {
@@ -989,9 +992,12 @@ export function parseBio(bioStr: string | null | undefined): BioData {
       coins: typeof data.coins === 'number' ? data.coins : 1000,
       last_daily_claim: data.last_daily_claim,
       invisible: !!data.invisible,
+      hide_age_gender: !!data.hide_age_gender,
+      hide_bio: !!data.hide_bio,
+      sound_disabled: !!data.sound_disabled,
     };
   } catch (e) {}
-  return { text: bioStr, mood: '', profile_effect: 'none', gems: 5, coins: 1000, invisible: false };
+  return { text: bioStr, mood: '', profile_effect: 'none', gems: 5, coins: 1000, invisible: false, hide_age_gender: false, hide_bio: false, sound_disabled: false };
 }
 
 export function stringifyBio(data: BioData): string {
@@ -1447,6 +1453,10 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   }, []);
 
   const playSound = (audioRef: React.RefObject<HTMLAudioElement | null>) => {
+    try {
+      const bioData = parseBio(currentUserProfile.bio);
+      if (bioData.sound_disabled) return;
+    } catch (e) {}
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
       audioRef.current.play().catch(err => {
@@ -2818,6 +2828,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       {selectedProfileId && (
         <ProfileModal 
           profileId={selectedProfileId} 
+          currentUserProfile={currentUserProfile}
           currentUserId={currentUserProfile.id}
           onClose={() => setSelectedProfileId(null)} 
           onProfileUpdate={(updated) => {
@@ -2837,17 +2848,19 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 }
 
 // Inline modal to keep things compact
-function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { profileId: string, currentUserId: string, onClose: () => void, onProfileUpdate: (p: Profile) => void }) {
+function ProfileModal({ profileId, currentUserProfile, currentUserId, onClose, onProfileUpdate }: { profileId: string, currentUserProfile: Profile, currentUserId: string, onClose: () => void, onProfileUpdate: (p: Profile) => void }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
-  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | 'border' | 'border_borders' | 'border_effects' | 'border_combos' | 'border_creator' | null>(null);
+  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | 'border' | 'border_borders' | 'border_effects' | 'border_combos' | 'border_creator' | 'preferences' | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'bio'>('bio');
   const [isPlaying, setIsPlaying] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isSelf = profileId === currentUserId;
   const bioData: BioData = profile ? parseBio(profile.bio) : { text: '', mood: '', profile_music_type: '', profile_music_source: '', profile_card_bg: '', assigned_ranks: {} };
+  const localUserBioData = parseBio(currentUserProfile.bio);
+  const isLocalSoundDisabled = localUserBioData.sound_disabled ?? false;
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -2885,6 +2898,10 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
   const ytVideoId = musicType === 'youtube' && musicSource ? getYouTubeId(musicSource) : null;
 
   useEffect(() => {
+    if (isLocalSoundDisabled) {
+      setIsPlaying(false);
+      return;
+    }
     if (!loading && profile && musicType && musicSource) {
       if (musicType === 'mp3') {
         // Clean up previous instance first
@@ -2914,9 +2931,13 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
       }
       setIsPlaying(false);
     };
-  }, [loading, profileId, musicType, musicSource]);
+  }, [loading, profileId, musicType, musicSource, isLocalSoundDisabled]);
 
   const togglePlay = () => {
+    if (isLocalSoundDisabled) {
+      toast.error("Please enable is_sound_disabled option in your Preferences from editing profile to hear music!");
+      return;
+    }
     if (musicType === 'mp3') {
       if (!audioRef.current && musicSource) {
         const audio = new Audio(musicSource);
@@ -3123,7 +3144,7 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                       <div className={`w-1 h-5 bg-[#10b981] rounded-full ${isPlaying ? 'animate-bounce-bar' : 'opacity-40'}`} style={{ animationDelay: '0.35s', animationDuration: '0.85s' }}></div>
                     </div>
 
-                    {ytVideoId && isPlaying && (
+                    {ytVideoId && isPlaying && !isLocalSoundDisabled && (
                       <iframe
                         className="w-0 h-0 opacity-0 pointer-events-none absolute"
                         src={`https://www.youtube.com/embed/${ytVideoId}?autoplay=1&enablejsapi=1&loop=1&playlist=${ytVideoId}`}
@@ -3143,7 +3164,9 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                     <div className="h-64 overflow-y-auto px-6 py-4 custom-scrollbar z-10 relative">
                       {activeTab === 'bio' ? (
                         <div className="text-sm text-zinc-300">
-                          {bioData.text ? (
+                          {(!isSelf && bioData.hide_bio) ? (
+                            <p className="text-zinc-500 italic pb-2">This user's bio is hidden.</p>
+                          ) : bioData.text ? (
                             <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
                               {scrubContent(bioData.text)}
                             </Markdown>
@@ -3159,11 +3182,11 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                           </div>
                           <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
                             <span className="text-zinc-400 text-sm">Gender</span>
-                            <span className="text-zinc-200 text-sm">{profile!.gender}</span>
+                            <span className="text-zinc-200 text-sm">{(!isSelf && bioData.hide_age_gender) ? 'Hidden' : profile!.gender}</span>
                           </div>
                           <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
                             <span className="text-zinc-400 text-sm">Age</span>
-                            <span className="text-zinc-200 text-sm">{profile!.age}</span>
+                            <span className="text-zinc-200 text-sm">{(!isSelf && bioData.hide_age_gender) ? 'Hidden' : profile!.age}</span>
                           </div>
                           <div className="flex justify-between items-center pb-3 border-b border-zinc-800/50">
                             <span className="text-zinc-400 text-sm">Current Room</span>
@@ -3187,6 +3210,9 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
                       <button onClick={() => setActiveEditModal('border_combos')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Combos</button>
                       <button onClick={() => setActiveEditModal('border_creator')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Creator</button>
                     </div>
+                    <button onClick={() => setActiveEditModal('preferences')} className="w-full mt-3 py-2.5 bg-[#1e1e22] border border-emerald-500/25 hover:border-emerald-500/50 hover:bg-[#252529] text-emerald-400 hover:text-emerald-300 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-md">
+                      <Settings className="w-4 h-4 text-emerald-500 animate-[spin_8s_linear_infinite]" /> Preferences & Privacy
+                    </button>
                   </div>
                 )}
               </div>
@@ -3246,6 +3272,19 @@ function ProfileModal({ profileId, currentUserId, onClose, onProfileUpdate }: { 
           updateProfileData({ bio: newBio });
         }}>
           {(props) => <CardBgEditForm profile={profile!} {...props} />}
+        </EditModal>
+      )}
+      {activeEditModal === 'preferences' && (
+        <EditModal title="Preferences" onClose={() => setActiveEditModal(null)} onSave={(val) => {
+          const newBio = stringifyBio({ 
+            ...bioData, 
+            hide_age_gender: !!val.hide_age_gender,
+            hide_bio: !!val.hide_bio,
+            sound_disabled: !!val.sound_disabled
+          });
+          updateProfileData({ bio: newBio });
+        }}>
+          {(props) => <PreferencesEditForm bioData={bioData} {...props} />}
         </EditModal>
       )}
       {activeEditModal === 'border_borders' && (
@@ -5096,6 +5135,68 @@ function InfoEditForm({ profile, data, setData }: any) {
       </div>
     </div>
   )
+}
+
+function PreferencesEditForm({ bioData, data, setData }: { bioData: BioData, data: any, setData: any }) {
+  useEffect(() => {
+    setData({
+      hide_age_gender: bioData.hide_age_gender ?? false,
+      hide_bio: bioData.hide_bio ?? false,
+      sound_disabled: bioData.sound_disabled ?? false,
+    });
+  }, []);
+
+  return (
+    <div className="space-y-5 py-2 text-left">
+      <div className="flex items-center justify-between p-3 bg-zinc-950/60 border border-zinc-800 rounded-xl gap-4">
+        <div className="flex-1">
+          <label className="text-sm font-semibold text-zinc-100 block">Hide Age & Gender</label>
+          <span className="text-xs text-zinc-400 block mt-0.5">Other users won't be able to see your age and gender on your profile cards.</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setData({ ...data, hide_age_gender: !data.hide_age_gender })}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${data.hide_age_gender ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${data.hide_age_gender ? 'translate-x-5' : 'translate-x-0'}`}
+          />
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between p-3 bg-zinc-950/60 border border-zinc-800 rounded-xl gap-4">
+        <div className="flex-1">
+          <label className="text-sm font-semibold text-zinc-100 block">Hide Bio</label>
+          <span className="text-xs text-zinc-400 block mt-0.5">Other users won't be able to read your "About Me" biography.</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setData({ ...data, hide_bio: !data.hide_bio })}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${data.hide_bio ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${data.hide_bio ? 'translate-x-5' : 'translate-x-0'}`}
+          />
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between p-3 bg-zinc-950/60 border border-zinc-800 rounded-xl gap-4">
+        <div className="flex-1">
+          <label className="text-sm font-semibold text-zinc-100 block">Mute All Sounds</label>
+          <span className="text-xs text-zinc-400 block mt-0.5">Turn off all notification and incoming chat sound effects for you.</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setData({ ...data, sound_disabled: !data.sound_disabled })}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${data.sound_disabled ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${data.sound_disabled ? 'translate-x-5' : 'translate-x-0'}`}
+          />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function UsernameEditForm({ profile, data, setData }: any) {
