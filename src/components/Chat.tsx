@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile, Message, News, ProfileLike } from '../types';
-import { LogOut, Send, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, CheckCircle, Sparkles, ArrowLeft, Globe, User, MessageSquare, Layers, Wallet, Settings, Plus, Coins, Paintbrush, UserPlus, UserMinus, UserCheck, HeartOff } from 'lucide-react';
+import { LogOut, Send, Search, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, CheckCircle, Sparkles, ArrowLeft, Globe, User, MessageSquare, Layers, Wallet, Settings, Plus, Coins, Paintbrush, UserPlus, UserMinus, UserCheck, HeartOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
@@ -11,9 +11,7 @@ import remarkBreaks from 'remark-breaks';
 import { PROFILE_EFFECTS, PROFILE_COMBOS, EFFECTS_KEYFRAMES, ProfileEffectRenderer } from './ProfileEffects';
 import { USERCARD_STYLES } from '../usercardStyles';
 import { MESSAGE_CARDS } from '../messageCardsAndPFPStyles';
-import { SPOTIFY_THEMES, SPOTIFY_GLOWS, SPOTIFY_BORDERS, SPOTIFY_ANIMATIONS, SPOTIFY_VISUALIZERS, SPOTIFY_PRESETS, SpotifyPreset } from '../spotifyCustomStyles';
 
-const SPOTIFY_URL_REGEX = /https:\/\/open\.spotify\.com\/(track|album|playlist|episode)\/([a-zA-Z0-9]+)(\?.*)?/;
 const IMAGE_EXT_REGEX = /\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i;
 const VIDEO_EXT_REGEX = /\.(mp4|webm|ogg|mov)(\?.*)?$/i;
 const FORBIDDEN_TLDS = /\.(online|site|indevs\.in)(\/.*)?$/i;
@@ -748,8 +746,8 @@ function isSafeUrl(url: string | undefined): boolean {
   // Explicitly check forbidden TLDs first
   if (FORBIDDEN_TLDS.test(lowerUrl)) return false;
   
-  // Whitelist: Spotify, direct image, or video links
-  return SPOTIFY_URL_REGEX.test(url) || IMAGE_EXT_REGEX.test(url) || VIDEO_EXT_REGEX.test(url);
+  // Whitelist: direct image, or video links
+  return IMAGE_EXT_REGEX.test(url) || VIDEO_EXT_REGEX.test(url);
 }
 
 function scrubContent(text: string): string {
@@ -758,129 +756,12 @@ function scrubContent(text: string): string {
   return text.replace(/([a-zA-Z0-9-]+\.(online|site|indevs\.in))/gi, '[blocked]');
 }
 
-function SpotifyEmbed({ url, senderProfile }: { url: string, senderProfile?: any }) {
-  const match = url.match(SPOTIFY_URL_REGEX);
-  if (!match) return null;
-
-  const senderBio = parseBio(senderProfile?.bio);
-  const themeId = senderBio.spotify_theme || 'classic-emerald';
-  const glowId = senderBio.spotify_glow || 'emerald';
-  const borderId = senderBio.spotify_border || 'standard';
-  const animId = senderBio.spotify_animation || 'none';
-  const visId = senderBio.spotify_visualizer || 'none';
-
-  const themeObj = SPOTIFY_THEMES.find(t => t.id === themeId) || SPOTIFY_THEMES[0];
-  const glowObj = SPOTIFY_GLOWS.find(g => g.id === glowId) || SPOTIFY_GLOWS[0];
-  const borderObj = SPOTIFY_BORDERS.find(b => b.id === borderId) || SPOTIFY_BORDERS[0];
-  const animObj = SPOTIFY_ANIMATIONS.find(a => a.id === animId) || SPOTIFY_ANIMATIONS[0];
-
-  const isVinyl = themeId === 'vinyl-record';
-  const isCassette = themeId === 'retro-cassette';
-  const isChromaBorder = borderId === 'chroma';
-
-  return (
-    <div 
-      className={`my-3 w-full max-w-md rounded-2xl p-3.5 relative overflow-hidden transition-all duration-300 border bg-gradient-to-br ${themeObj.className} ${glowObj.className} ${animObj.className}`}
-      style={{
-        backgroundOrigin: isChromaBorder ? 'border-box' : undefined,
-        backgroundClip: isChromaBorder ? 'padding-box, border-box' : undefined,
-        borderColor: isChromaBorder ? 'transparent' : undefined,
-      }}
-    >
-      {/* Background gradients or effects */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${themeObj.bgColorClass} opacity-95 z-0 pointer-events-none rounded-2xl`} />
-
-      {/* Retro Tape Casette Decor */}
-      {isCassette && (
-        <div className="absolute inset-x-3 bottom-1 h-8 flex justify-between px-6 z-10 pointer-events-none text-zinc-650 opacity-45">
-          <div className="flex flex-col items-center select-none text-[7px] font-mono leading-none">
-            <span className="animate-[spin_4s_linear_infinite]">⭕</span>
-            <span className="mt-0.5">A-SIDE</span>
-          </div>
-          <div className="flex flex-col items-center select-none text-[7px] font-mono leading-none">
-            <span className="animate-[spin_4s_linear_infinite_reverse]">⭕</span>
-            <span className="mt-0.5">LO-FI</span>
-          </div>
-        </div>
-      )}
-
-      {/* Vinyl Disc Slide-Out Decor */}
-      {isVinyl && (
-        <div className="absolute right-[-45px] top-6 w-32 h-32 rounded-full bg-zinc-950 border-4 border-zinc-800 flex items-center justify-center opacity-75 shadow-lg select-none pointer-events-none z-10 animate-[spin_10s_linear_infinite] overflow-hidden">
-          {/* Vinyl Grooves */}
-          <div className="w-24 h-24 rounded-full border border-zinc-900 flex items-center justify-center">
-            <div className="w-16 h-16 rounded-full border border-zinc-900 flex items-center justify-center">
-              {/* Central Label */}
-              <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-[7px] font-black text-black">SPIN</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Sound Visualizer Overlay */}
-      {visId !== 'none' && (
-        <div className="absolute bottom-2 inset-x-4 h-6 flex items-end gap-1 pointer-events-none z-10 opacity-35">
-          {Array.from({ length: 18 }).map((_, i) => {
-            const h = Math.floor(Math.random() * 16) + 4;
-            const delay = (i * 0.08).toFixed(2);
-            return (
-              <span 
-                key={i} 
-                className="flex-1 bg-current rounded-t"
-                style={{
-                  height: `${h}px`,
-                  animation: `bounceBeat 0.8s infinite ease-in-out alternate -${delay}s`,
-                }}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {/* Header Badge */}
-      <div className="relative z-10 flex items-center justify-between mb-2">
-        <span className="text-[9px] uppercase tracking-widest font-black flex items-center gap-1 opacity-75 text-white/90">
-          <svg className="w-3.5 h-3.5 animate-[spin_4s_linear_infinite]" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm1 15.5h-2v-6h2v6zm0-8h-2V7h2v2.5z"/>
-          </svg>
-          {senderProfile?.username ? `${senderProfile.username}'s Spotify Customization` : 'SPOTIFY CUSTOMIZER'}
-        </span>
-        <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase font-black tracking-wider ${themeObj.textColorClass} bg-black/40 border border-current/25`}>
-          {themeObj.name}
-        </span>
-      </div>
-
-      {/* The Secure Player Iframe inside the customized slot */}
-      <div className="relative z-10 w-full rounded-xl overflow-hidden shadow-inner border border-black/30 bg-black/20">
-        <iframe 
-          style={{ borderRadius: '12px' }} 
-          src={`https://open.spotify.com/embed/${match[1]}/${match[2]}?utm_source=generator&theme=0`} 
-          width="100%" 
-          height="152" 
-          frameBorder="0" 
-          allowFullScreen={false} 
-          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-          loading="lazy"
-        />
-      </div>
-    </div>
-  );
-}
-
 const MarkdownComponents = {
   a: ({ node, href, children, ...props }: any) => {
     if (!href) return <span>{children}</span>;
     
     const lowerHref = href.toLowerCase();
     
-    if (SPOTIFY_URL_REGEX.test(href)) {
-      return (
-        <div className="flex flex-col gap-1 w-full max-w-sm mt-1">
-          <SpotifyEmbed url={href} />
-        </div>
-      );
-    }
-
     if (isSafeUrl(href)) {
       if (IMAGE_EXT_REGEX.test(lowerHref)) {
         return <img src={href} alt={children?.toString() || 'Image'} className="max-w-full rounded-lg my-2 border border-zinc-800" loading="lazy" />;
@@ -917,42 +798,7 @@ const MarkdownComponents = {
 };
 
 export function getMarkdownComponents(senderProfile?: any) {
-  return {
-    ...MarkdownComponents,
-    a: ({ node, href, children, ...props }: any) => {
-      if (!href) return <span>{children}</span>;
-      
-      const lowerHref = href.toLowerCase();
-      
-      if (SPOTIFY_URL_REGEX.test(href)) {
-        return (
-          <div className="flex flex-col gap-1 w-full max-w-sm mt-1">
-            <SpotifyEmbed url={href} senderProfile={senderProfile} />
-          </div>
-        );
-      }
-
-      if (isSafeUrl(href)) {
-        if (IMAGE_EXT_REGEX.test(lowerHref)) {
-          return <img src={href} alt={children?.toString() || 'Image'} className="max-w-full rounded-lg my-2 border border-zinc-800" loading="lazy" />;
-        }
-        if (VIDEO_EXT_REGEX.test(lowerHref)) {
-          return (
-            <video 
-              src={href} 
-              controls 
-              className="max-w-full rounded-lg my-2 border border-zinc-800 max-h-[360px] bg-black" 
-              playsInline 
-            />
-          );
-        }
-        return <a href={href} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline break-all" {...props}>{processChildrenWithStyles(children)}</a>;
-      }
-
-      // Block other domains
-      return <span className="text-zinc-500 line-through decoration-zinc-700 cursor-not-allowed" title="Link blocked for security">{processChildrenWithStyles(children)}</span>;
-    }
-  };
+  return MarkdownComponents;
 }
 
 export const GOOGLE_FONTS_PRESETS = [
@@ -4754,8 +4600,8 @@ function PrivateMessagesModal({
                            className={`relative ${isCustomCard ? messageCard.bubbleClass : (isMe ? 'bg-emerald-600 text-white px-4 py-2' : 'bg-zinc-800 text-zinc-200 px-4 py-2 border border-zinc-700')} text-[15px] font-medium leading-relaxed ${!isCustomCard && 'rounded-[20px]'}`} 
                            style={isCustomCard ? messageCard.bubbleStyle : {}}
                         >
-                          <div className="break-words">
-                            <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} className="markdown-body">
+                          <div className="break-words markdown-body">
+                            <Markdown remarkPlugins={[remarkGfm, remarkBreaks]}>
                               {m.content}
                             </Markdown>
                           </div>
