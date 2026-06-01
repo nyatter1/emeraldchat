@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile, Message, News, ProfileLike } from '../types';
-import { LogOut, Send, Search, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, CheckCircle, Sparkles, ArrowLeft, Globe, User, MessageSquare, Layers, Wallet, Settings, Plus, Coins, Paintbrush, UserPlus, UserMinus, UserCheck, HeartOff, Eye, Lock, Gem } from 'lucide-react';
+import { LogOut, Send, Search, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, CheckCircle, Sparkles, ArrowLeft, Globe, User, MessageSquare, Layers, Wallet, Settings, Plus, Coins, Paintbrush, UserPlus, UserMinus, UserCheck, HeartOff, Eye, Lock, Gem, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import { AdminPanel } from './AdminPanel';
 import { PROFILE_EFFECTS, PROFILE_COMBOS, EFFECTS_KEYFRAMES, ProfileEffectRenderer } from './ProfileEffects';
 import { USERCARD_STYLES } from '../usercardStyles';
 import { MESSAGE_CARDS } from '../messageCardsAndPFPStyles';
@@ -1517,6 +1518,8 @@ function DeveloperPanel({ onClose, allProfiles }: { onClose: () => void, allProf
 export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { currentUserProfile: Profile, onSignOut: () => void, onProfileUpdate: (p: Profile) => void }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isIPhone, setIsIPhone] = useState(false);
+  const [openMainDropdownId, setOpenMainDropdownId] = useState<string | null>(null);
+  const [openPmDropdownId, setOpenPmDropdownId] = useState<string | null>(null);
   
   useEffect(() => {
     const ua = navigator.userAgent;
@@ -1769,6 +1772,20 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       } else {
         toast.error("Failed to send message: " + error.message);
       }
+    } else {
+      const { data: interactionMessages } = await supabase
+        .from('private_messages')
+        .select('id, is_saved')
+        .or(`and(sender_id.eq.${currentUserProfile.id},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${currentUserProfile.id})`)
+        .order('created_at', { ascending: true });
+        
+      if (interactionMessages && interactionMessages.length > 50) {
+        const messagesToDelete = interactionMessages.filter(m => !m.is_saved).map(m => m.id);
+        if (messagesToDelete.length > 0) {
+          await supabase.from('private_messages').delete().in('id', messagesToDelete);
+          toast.success("PM limit reached! Unsaved messages cleared.");
+        }
+      }
     }
   };
 
@@ -1923,6 +1940,15 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, (payload) => {
          setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
+         setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'private_messages' }, (payload) => {
+         setPrivateMessages(prev => prev.filter(m => m.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'private_messages' }, (payload) => {
+         setPrivateMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news' }, async (payload) => {
         playSound(audioNewNews);
@@ -2492,6 +2518,28 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           await supabase.from('messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         }
       }
+
+      // Execute bots
+      if (!finalContent.startsWith('__SYSTEM__:') && !finalContent.startsWith('__CMD_UI__:')) {
+        const { data: botsData } = await supabase.from('bots').select('*');
+        if (botsData && botsData.length > 0) {
+          setTimeout(async () => {
+            const contextMsg = { content: finalContent, user_id: currentUserProfile.id, username: currentUserProfile.username };
+            for (const bot of botsData) {
+              try {
+                 const botFunc = new Function('message', 'supabase', 'botProfileId', `
+                    return (async () => {
+                      ${bot.script}
+                    })();
+                 `);
+                 await botFunc(contextMsg, supabase, bot.profile_id);
+              } catch(e) {
+                 console.error('Bot execution error:', bot.name, e);
+              }
+            }
+          }, 500);
+        }
+      }
     }
   };
 
@@ -3052,8 +3100,13 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                           <span className="font-bold text-[15px] hover:underline cursor-pointer" onClick={() => setSelectedProfileId(renderMsg.user_id)} style={{ color: renderMsg.user_id === currentUserProfile.id ? '#10b981' : 'white' }}>{renderMsg.profiles?.username || 'Unknown'}</span>
                           <span className="text-xs text-zinc-500">{format(new Date(renderMsg.created_at), 'dd/MM HH:mm')}</span>
                         </div>
+                        {renderMsg.is_saved && <Bookmark className="w-3.5 h-3.5 text-zinc-500/50" />}
                       </div>
-                      <div className={isCustomCard ? `mt-1 p-2.5 rounded-xl border max-w-[85%] relative shadow-md break-words ${messageCard.bubbleClass}` : "text-zinc-200 text-[15px] leading-relaxed break-words relative pr-12"} style={isCustomCard ? messageCard.bubbleStyle : undefined}>
+                      <div className="flex items-center group/msg">
+                        <div 
+                          className={isCustomCard ? `mt-1 p-2.5 rounded-xl border max-w-[85%] shadow-md break-words ${messageCard.bubbleClass}` : "text-zinc-200 text-[15px] leading-relaxed break-words pr-4"} 
+                          style={isCustomCard ? messageCard.bubbleStyle : undefined}
+                        >
                         {renderMsg.content?.startsWith('__SYSTEM__:') ? (
                           <div className="bg-[#111] border border-zinc-800 rounded-md p-3 my-2 text-sm text-zinc-300">
                              <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={getMarkdownComponents(renderMsg.profiles)}>
@@ -3155,6 +3208,31 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                           <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={getMarkdownComponents(renderMsg.profiles)}>
                             {scrubContent(renderMsg.content)}
                           </Markdown>
+                        )}
+                        </div>
+                        {(renderMsg.user_id === currentUserProfile.id || ['Developer', 'Founder', 'Superadmin', 'Admin', 'Mod'].includes(currentUserProfile.rank || '')) && (
+                          <div className="relative ml-2 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => setOpenMainDropdownId(openMainDropdownId === renderMsg.id ? null : renderMsg.id)} 
+                              className="p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                            >
+                              <Menu className="w-4 h-4 text-zinc-500" />
+                            </button>
+                            {openMainDropdownId === renderMsg.id && (
+                              <div className="absolute top-full left-0 mt-1 z-50 flex flex-col min-w-[100px] shadow-xl">
+                                <button 
+                                  onClick={async () => {
+                                    await supabase.from('messages').delete().eq('id', renderMsg.id);
+                                    setOpenMainDropdownId(null);
+                                    toast.success('Message deleted!');
+                                  }}
+                                  className="text-[12px] font-bold text-red-500 hover:text-red-400 text-left py-1.5 px-3 bg-[#111] border border-zinc-900 rounded-[8px]"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -3507,6 +3585,7 @@ function ProfileModal({
   const [editGroup, setEditGroup] = useState<'core' | 'cosmetics' | 'media'>('core');
   const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | 'border' | 'border_borders' | 'border_effects' | 'border_combos' | 'border_creator' | 'preferences' | 'usercards' | 'message_cards' | 'pfp_borders' | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'bio' | 'friends'>('bio');
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -3969,6 +4048,11 @@ function ProfileModal({
                           <button onClick={() => setActiveEditModal('preferences')} className="col-span-2 py-2.5 bg-[#1e1e22] border border-emerald-500/25 hover:border-emerald-500/50 hover:bg-[#252529] text-emerald-400 hover:text-emerald-300 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-sm">
                             <Settings className="w-4 h-4 text-emerald-500 animate-[spin_8s_linear_infinite]" /> Preferences & Privacy
                           </button>
+                          {['Developer', 'Founder', 'Superadmin', 'Admin', 'Mod'].includes(currentUserProfile.rank || '') && (
+                            <button onClick={() => setShowAdminPanel(true)} className="col-span-2 py-2.5 bg-red-950/30 border border-red-500/25 hover:border-red-500/50 hover:bg-red-900/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-sm">
+                              <ShieldCheck className="w-4 h-4 text-red-500" /> Admin Panel
+                            </button>
+                          )}
                         </>
                       )}
 
@@ -4132,6 +4216,12 @@ function ProfileModal({
             });
             updateProfileData({ bio: newBio });
           }} 
+        />
+      )}
+      {showAdminPanel && (
+        <AdminPanel 
+           currentUserProfile={currentUserProfile} 
+           onClose={() => setShowAdminPanel(false)} 
         />
       )}
     </div>
@@ -4895,15 +4985,80 @@ function PrivateMessagesModal({
                         {msgProfile && <RenderPfpWithCustomBorder profile={msgProfile} size={36} />}
                       </div>
                       <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]`}>
-                        <div 
-                           className={`relative ${isCustomCard ? messageCard.bubbleClass : (isMe ? 'bg-emerald-600 text-white px-4 py-2' : 'bg-zinc-800 text-zinc-200 px-4 py-2 border border-zinc-700')} text-[15px] font-medium leading-relaxed ${!isCustomCard && 'rounded-[20px]'}`} 
-                           style={isCustomCard ? messageCard.bubbleStyle : {}}
-                        >
+                        <div className="group/pm flex items-center gap-2">
+                            {isMe && (
+                              <div className="relative opacity-0 group-hover/pm:opacity-100 transition-opacity">
+                                <button 
+                                  onClick={() => setOpenPmDropdownId(openPmDropdownId === m.id ? null : m.id)} 
+                                  className="p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                                >
+                                  <MoreVertical className="w-4 h-4 text-zinc-500" />
+                                </button>
+                                {openPmDropdownId === m.id && (
+                                  <div className="absolute top-full right-0 mt-1 z-50 flex flex-col gap-1 min-w-[120px] shadow-xl bg-[#111] border border-zinc-900 rounded-[8px] p-1">
+                                    <button 
+                                      onClick={async () => {
+                                        await supabase.from('private_messages').update({ is_saved: !m.is_saved }).eq('id', m.id);
+                                        setOpenPmDropdownId(null);
+                                        toast.success(m.is_saved ? 'Unsaved' : 'Saved');
+                                      }}
+                                      className="text-[12px] font-bold text-zinc-300 hover:text-white text-left py-1.5 px-2 rounded-md hover:bg-zinc-800"
+                                    >
+                                      {m.is_saved ? 'Unsave' : 'Save'}
+                                    </button>
+                                    <button 
+                                      onClick={async () => {
+                                        await supabase.from('private_messages').delete().eq('id', m.id);
+                                        setOpenPmDropdownId(null);
+                                        toast.success('Message deleted!');
+                                      }}
+                                      className="text-[12px] font-bold text-red-500 hover:text-red-400 text-left py-1.5 px-2 rounded-md hover:bg-red-500/10"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          <div 
+                             className={`relative ${isCustomCard ? messageCard.bubbleClass : (isMe ? 'bg-emerald-600 text-white px-4 py-2' : 'bg-zinc-800 text-zinc-200 px-4 py-2 border border-zinc-700')} text-[15px] font-medium leading-relaxed ${!isCustomCard && 'rounded-[20px]'}`} 
+                             style={isCustomCard ? messageCard.bubbleStyle : {}}
+                          >
+                          {m.is_saved && (
+                            <div className="absolute -top-1.5 -right-1.5 bg-black/50 rounded-full p-1 border border-black/20">
+                              <Bookmark className="w-3 h-3 text-emerald-400" />
+                            </div>
+                          )}
                           <div className="break-words markdown-body">
                             <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={getMarkdownComponents(msgProfile)}>
                               {scrubContent(m.content)}
                             </Markdown>
                           </div>
+                        </div>
+                        {!isMe && (
+                              <div className="relative ml-2 opacity-0 group-hover/pm:opacity-100 transition-opacity">
+                                <button 
+                                  onClick={() => setOpenPmDropdownId(openPmDropdownId === m.id ? null : m.id)} 
+                                  className="p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                                >
+                                  <MoreVertical className="w-4 h-4 text-zinc-500" />
+                                </button>
+                                {openPmDropdownId === m.id && (
+                                  <div className="absolute top-full left-0 mt-1 z-50 flex flex-col gap-1 min-w-[120px] shadow-xl bg-[#111] border border-zinc-900 rounded-[8px] p-1">
+                                    <button 
+                                      onClick={async () => {
+                                        await supabase.from('private_messages').update({ is_saved: !m.is_saved }).eq('id', m.id);
+                                        setOpenPmDropdownId(null);
+                                        toast.success(m.is_saved ? 'Unsaved' : 'Saved');
+                                      }}
+                                      className="text-[12px] font-bold text-zinc-300 hover:text-white text-left py-1.5 px-2 rounded-md hover:bg-zinc-800"
+                                    >
+                                      {m.is_saved ? 'Unsave' : 'Save'}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                         </div>
                         <div className={`text-[10px] mt-1 opacity-50 font-medium tracking-wide ${isMe ? 'pr-2' : 'pl-2'} flex items-center justify-end gap-1`}>
                           {format(new Date(m.created_at), 'HH:mm')}
