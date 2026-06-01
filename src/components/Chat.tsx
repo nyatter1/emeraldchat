@@ -976,11 +976,6 @@ export interface BioData {
   dating_username?: string;
   hide_friends_on_profile?: boolean;
   hide_me_from_friends?: boolean;
-  spotify_theme?: string;
-  spotify_glow?: string;
-  spotify_border?: string;
-  spotify_animation?: string;
-  spotify_visualizer?: string;
 }
 
 export function parseBio(bioStr: string | null | undefined): BioData {
@@ -1003,12 +998,7 @@ export function parseBio(bioStr: string | null | undefined): BioData {
     dating_user_id: '',
     dating_username: '',
     hide_friends_on_profile: false,
-    hide_me_from_friends: false,
-    spotify_theme: 'classic-emerald',
-    spotify_glow: 'emerald',
-    spotify_border: 'standard',
-    spotify_animation: 'none',
-    spotify_visualizer: 'none'
+    hide_me_from_friends: false
   };
   try {
     const data = JSON.parse(bioStr);
@@ -1043,12 +1033,7 @@ export function parseBio(bioStr: string | null | undefined): BioData {
       dating_user_id: data.dating_user_id || '',
       dating_username: data.dating_username || '',
       hide_friends_on_profile: !!data.hide_friends_on_profile,
-      hide_me_from_friends: !!data.hide_me_from_friends,
-      spotify_theme: data.spotify_theme || 'classic-emerald',
-      spotify_glow: data.spotify_glow || 'emerald',
-      spotify_border: data.spotify_border || 'standard',
-      spotify_animation: data.spotify_animation || 'none',
-      spotify_visualizer: data.spotify_visualizer || 'none',
+      hide_me_from_friends: !!data.hide_me_from_friends
     };
   } catch (e) {}
   return { 
@@ -1070,12 +1055,7 @@ export function parseBio(bioStr: string | null | undefined): BioData {
     dating_user_id: '',
     dating_username: '',
     hide_friends_on_profile: false,
-    hide_me_from_friends: false,
-    spotify_theme: 'classic-emerald',
-    spotify_glow: 'emerald',
-    spotify_border: 'standard',
-    spotify_animation: 'none',
-    spotify_visualizer: 'none',
+    hide_me_from_friends: false
   };
 }
 
@@ -3415,7 +3395,7 @@ function ProfileModal({
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [editGroup, setEditGroup] = useState<'core' | 'cosmetics' | 'media'>('core');
-  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | 'border' | 'border_borders' | 'border_effects' | 'border_combos' | 'border_creator' | 'preferences' | 'usercards' | 'message_cards' | 'pfp_borders' | 'spotify_customizer' | null>(null);
+  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | 'border' | 'border_borders' | 'border_effects' | 'border_combos' | 'border_creator' | 'preferences' | 'usercards' | 'message_cards' | 'pfp_borders' | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'bio' | 'friends'>('bio');
   const [isPlaying, setIsPlaying] = useState(false);
   
@@ -3898,7 +3878,6 @@ function ProfileModal({
                         <>
                           <button onClick={() => setActiveEditModal('card_bg')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><ImageIcon className="w-4 h-4 text-emerald-500" /> Background</button>
                           <button onClick={() => setActiveEditModal('music')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Music className="w-4 h-4 text-emerald-500" /> Theme Song</button>
-                          <button onClick={() => setActiveEditModal('spotify_customizer')} className="col-span-2 py-2.5 bg-[#1e1e22] border border-emerald-500/25 hover:border-emerald-500/55 hover:bg-[#252529] text-emerald-400 font-black rounded-lg text-sm transition-all flex items-center justify-center gap-1.5 shadow-md relative overflow-hidden group"><Music className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform animate-pulse" /> <span>Spotify Styles</span><span className="absolute -top-1 right-0 bg-emerald-500 text-zinc-950 text-[6.5px] font-black uppercase px-1 rounded-bl">CUSTOM LAB</span></button>
                         </>
                       )}
                     </div>
@@ -4033,20 +4012,6 @@ function ProfileModal({
       )}
       {activeEditModal === 'message_cards' && (
         <MessageCardsModal 
-          profile={profile!} 
-          bioData={bioData} 
-          onClose={() => setActiveEditModal(null)} 
-          onSave={(val: any) => {
-            const newBio = stringifyBio({ 
-              ...bioData, 
-              ...val
-            });
-            updateProfileData({ bio: newBio });
-          }} 
-        />
-      )}
-      {activeEditModal === 'spotify_customizer' && (
-        <SpotifyStylesModal 
           profile={profile!} 
           bioData={bioData} 
           onClose={() => setActiveEditModal(null)} 
@@ -6894,13 +6859,6 @@ function BioEditForm({ profile, data, setData }: any) {
     }
   };
 
-  const addSpotify = () => {
-    const url = prompt("Enter Spotify Track/Album/Playlist URL:");
-    if (url) {
-      insertText(`[Spotify](${url})`, '');
-    }
-  }
-
   const addImageLink = () => {
     const url = prompt("Enter Image URL (ends with .png, .jpg, etc.):");
     if (url) {
@@ -7087,19 +7045,16 @@ function BioEditForm({ profile, data, setData }: any) {
            </button>
            <div className="w-px bg-zinc-800 mx-0.5 h-4 my-auto"></div>
            <button title="Link" type="button" onClick={() => { 
-             const url = prompt("Enter URL (Only Spotify or direct image links allowed):"); 
+             const url = prompt("Enter URL:"); 
              if(url) {
                if (isSafeUrl(url)) {
                  insertText(`[link text](${url})`); 
                } else {
-                 alert("Blocked: Only Spotify links and direct image links are permitted.");
+                 alert("Blocked: Domain not allowed.");
                }
              }
            }} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded text-zinc-300">
              <LinkIcon className="w-4 h-4" />
-           </button>
-           <button title="Spotify" type="button" onClick={addSpotify} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded text-emerald-500">
-             <Music className="w-4 h-4" />
            </button>
            <div className="w-px bg-zinc-800 mx-0.5 h-4 my-auto"></div>
            <button title="Image URL" type="button" onClick={addImageLink} className="w-7 h-7 flex items-center justify-center hover:bg-zinc-800 rounded text-zinc-300">
