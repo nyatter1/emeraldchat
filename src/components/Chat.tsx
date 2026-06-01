@@ -2772,8 +2772,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                )}
              </button>
              <div className="flex items-center gap-2 ml-2 select-none">
-               <img src="/logo.png" className="h-6 w-6 object-contain" alt="Emerald Chat Logo" />
-               <span className="text-emerald-500 font-extrabold text-lg tracking-normal">Emerald Chat</span>
+               <img src="/logo.png" className="h-7 w-7 object-contain" alt="Logo" />
              </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-4 relative" ref={menuRef}>
