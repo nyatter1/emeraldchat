@@ -3472,6 +3472,8 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           }}
           allProfiles={allProfiles}
           setSelectedProfileId={setSelectedProfileId}
+          setShowPmInbox={setShowPmInbox}
+          setPmTargetId={setPmTargetId}
         />
       )}
 
@@ -3518,7 +3520,9 @@ function ProfileModal({
   onClose, 
   onProfileUpdate,
   allProfiles = [],
-  setSelectedProfileId
+  setSelectedProfileId,
+  setShowPmInbox,
+  setPmTargetId
 }: { 
   profileId: string, 
   currentUserProfile: Profile, 
@@ -3526,7 +3530,9 @@ function ProfileModal({
   onClose: () => void, 
   onProfileUpdate: (p: Profile) => void,
   allProfiles?: Profile[],
-  setSelectedProfileId?: (id: string | null) => void
+  setSelectedProfileId?: (id: string | null) => void,
+  setShowPmInbox: (show: boolean) => void,
+  setPmTargetId: (id: string | null) => void
 }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
