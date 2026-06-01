@@ -10,7 +10,8 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { PROFILE_EFFECTS, PROFILE_COMBOS, EFFECTS_KEYFRAMES, ProfileEffectRenderer } from './ProfileEffects';
 import { USERCARD_STYLES } from '../usercardStyles';
-import { MESSAGE_CARDS, PFP_BORDERS } from '../messageCardsAndPFPStyles';
+import { MESSAGE_CARDS } from '../messageCardsAndPFPStyles';
+import { SPOTIFY_THEMES, SPOTIFY_GLOWS, SPOTIFY_BORDERS, SPOTIFY_ANIMATIONS, SPOTIFY_VISUALIZERS, SPOTIFY_PRESETS, SpotifyPreset } from '../spotifyCustomStyles';
 
 const SPOTIFY_URL_REGEX = /https:\/\/open\.spotify\.com\/(track|album|playlist|episode)\/([a-zA-Z0-9]+)(\?.*)?/;
 const IMAGE_EXT_REGEX = /\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i;
@@ -757,12 +758,111 @@ function scrubContent(text: string): string {
   return text.replace(/([a-zA-Z0-9-]+\.(online|site|indevs\.in))/gi, '[blocked]');
 }
 
-function SpotifyEmbed({ url }: { url: string }) {
+function SpotifyEmbed({ url, senderProfile }: { url: string, senderProfile?: any }) {
   const match = url.match(SPOTIFY_URL_REGEX);
   if (!match) return null;
+
+  const senderBio = parseBio(senderProfile?.bio);
+  const themeId = senderBio.spotify_theme || 'classic-emerald';
+  const glowId = senderBio.spotify_glow || 'emerald';
+  const borderId = senderBio.spotify_border || 'standard';
+  const animId = senderBio.spotify_animation || 'none';
+  const visId = senderBio.spotify_visualizer || 'none';
+
+  const themeObj = SPOTIFY_THEMES.find(t => t.id === themeId) || SPOTIFY_THEMES[0];
+  const glowObj = SPOTIFY_GLOWS.find(g => g.id === glowId) || SPOTIFY_GLOWS[0];
+  const borderObj = SPOTIFY_BORDERS.find(b => b.id === borderId) || SPOTIFY_BORDERS[0];
+  const animObj = SPOTIFY_ANIMATIONS.find(a => a.id === animId) || SPOTIFY_ANIMATIONS[0];
+
+  const isVinyl = themeId === 'vinyl-record';
+  const isCassette = themeId === 'retro-cassette';
+  const isChromaBorder = borderId === 'chroma';
+
   return (
-    <div className="my-3 w-full">
-      <iframe style={{ borderRadius: '12px' }} src={`https://open.spotify.com/embed/${match[1]}/${match[2]}?utm_source=generator&theme=0`} width="100%" height="152" frameBorder="0" allowFullScreen={false} allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+    <div 
+      className={`my-3 w-full max-w-md rounded-2xl p-3.5 relative overflow-hidden transition-all duration-300 border bg-gradient-to-br ${themeObj.className} ${glowObj.className} ${animObj.className}`}
+      style={{
+        backgroundOrigin: isChromaBorder ? 'border-box' : undefined,
+        backgroundClip: isChromaBorder ? 'padding-box, border-box' : undefined,
+        borderColor: isChromaBorder ? 'transparent' : undefined,
+      }}
+    >
+      {/* Background gradients or effects */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${themeObj.bgColorClass} opacity-95 z-0 pointer-events-none rounded-2xl`} />
+
+      {/* Retro Tape Casette Decor */}
+      {isCassette && (
+        <div className="absolute inset-x-3 bottom-1 h-8 flex justify-between px-6 z-10 pointer-events-none text-zinc-650 opacity-45">
+          <div className="flex flex-col items-center select-none text-[7px] font-mono leading-none">
+            <span className="animate-[spin_4s_linear_infinite]">⭕</span>
+            <span className="mt-0.5">A-SIDE</span>
+          </div>
+          <div className="flex flex-col items-center select-none text-[7px] font-mono leading-none">
+            <span className="animate-[spin_4s_linear_infinite_reverse]">⭕</span>
+            <span className="mt-0.5">LO-FI</span>
+          </div>
+        </div>
+      )}
+
+      {/* Vinyl Disc Slide-Out Decor */}
+      {isVinyl && (
+        <div className="absolute right-[-45px] top-6 w-32 h-32 rounded-full bg-zinc-950 border-4 border-zinc-800 flex items-center justify-center opacity-75 shadow-lg select-none pointer-events-none z-10 animate-[spin_10s_linear_infinite] overflow-hidden">
+          {/* Vinyl Grooves */}
+          <div className="w-24 h-24 rounded-full border border-zinc-900 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full border border-zinc-900 flex items-center justify-center">
+              {/* Central Label */}
+              <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-[7px] font-black text-black">SPIN</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sound Visualizer Overlay */}
+      {visId !== 'none' && (
+        <div className="absolute bottom-2 inset-x-4 h-6 flex items-end gap-1 pointer-events-none z-10 opacity-35">
+          {Array.from({ length: 18 }).map((_, i) => {
+            const h = Math.floor(Math.random() * 16) + 4;
+            const delay = (i * 0.08).toFixed(2);
+            return (
+              <span 
+                key={i} 
+                className="flex-1 bg-current rounded-t"
+                style={{
+                  height: `${h}px`,
+                  animation: `bounceBeat 0.8s infinite ease-in-out alternate -${delay}s`,
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Header Badge */}
+      <div className="relative z-10 flex items-center justify-between mb-2">
+        <span className="text-[9px] uppercase tracking-widest font-black flex items-center gap-1 opacity-75 text-white/90">
+          <svg className="w-3.5 h-3.5 animate-[spin_4s_linear_infinite]" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm1 15.5h-2v-6h2v6zm0-8h-2V7h2v2.5z"/>
+          </svg>
+          {senderProfile?.username ? `${senderProfile.username}'s Spotify Customization` : 'SPOTIFY CUSTOMIZER'}
+        </span>
+        <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase font-black tracking-wider ${themeObj.textColorClass} bg-black/40 border border-current/25`}>
+          {themeObj.name}
+        </span>
+      </div>
+
+      {/* The Secure Player Iframe inside the customized slot */}
+      <div className="relative z-10 w-full rounded-xl overflow-hidden shadow-inner border border-black/30 bg-black/20">
+        <iframe 
+          style={{ borderRadius: '12px' }} 
+          src={`https://open.spotify.com/embed/${match[1]}/${match[2]}?utm_source=generator&theme=0`} 
+          width="100%" 
+          height="152" 
+          frameBorder="0" 
+          allowFullScreen={false} 
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+          loading="lazy"
+        />
+      </div>
     </div>
   );
 }
@@ -815,6 +915,45 @@ const MarkdownComponents = {
   hr: () => <hr className="border-zinc-800 my-4" />,
   code: ({ inline, children }: any) => inline ? <code className="bg-zinc-800/50 text-emerald-400 px-1 py-0.5 rounded text-sm font-mono">{children}</code> : <code className="block bg-zinc-900 border border-zinc-800 text-zinc-300 p-3 rounded-lg text-sm font-mono my-2 overflow-x-auto whitespace-pre-wrap">{children}</code>
 };
+
+export function getMarkdownComponents(senderProfile?: any) {
+  return {
+    ...MarkdownComponents,
+    a: ({ node, href, children, ...props }: any) => {
+      if (!href) return <span>{children}</span>;
+      
+      const lowerHref = href.toLowerCase();
+      
+      if (SPOTIFY_URL_REGEX.test(href)) {
+        return (
+          <div className="flex flex-col gap-1 w-full max-w-sm mt-1">
+            <SpotifyEmbed url={href} senderProfile={senderProfile} />
+          </div>
+        );
+      }
+
+      if (isSafeUrl(href)) {
+        if (IMAGE_EXT_REGEX.test(lowerHref)) {
+          return <img src={href} alt={children?.toString() || 'Image'} className="max-w-full rounded-lg my-2 border border-zinc-800" loading="lazy" />;
+        }
+        if (VIDEO_EXT_REGEX.test(lowerHref)) {
+          return (
+            <video 
+              src={href} 
+              controls 
+              className="max-w-full rounded-lg my-2 border border-zinc-800 max-h-[360px] bg-black" 
+              playsInline 
+            />
+          );
+        }
+        return <a href={href} target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline break-all" {...props}>{processChildrenWithStyles(children)}</a>;
+      }
+
+      // Block other domains
+      return <span className="text-zinc-500 line-through decoration-zinc-700 cursor-not-allowed" title="Link blocked for security">{processChildrenWithStyles(children)}</span>;
+    }
+  };
+}
 
 export const GOOGLE_FONTS_PRESETS = [
   'Creepster',
@@ -991,6 +1130,11 @@ export interface BioData {
   dating_username?: string;
   hide_friends_on_profile?: boolean;
   hide_me_from_friends?: boolean;
+  spotify_theme?: string;
+  spotify_glow?: string;
+  spotify_border?: string;
+  spotify_animation?: string;
+  spotify_visualizer?: string;
 }
 
 export function parseBio(bioStr: string | null | undefined): BioData {
@@ -1013,7 +1157,12 @@ export function parseBio(bioStr: string | null | undefined): BioData {
     dating_user_id: '',
     dating_username: '',
     hide_friends_on_profile: false,
-    hide_me_from_friends: false
+    hide_me_from_friends: false,
+    spotify_theme: 'classic-emerald',
+    spotify_glow: 'emerald',
+    spotify_border: 'standard',
+    spotify_animation: 'none',
+    spotify_visualizer: 'none'
   };
   try {
     const data = JSON.parse(bioStr);
@@ -1049,6 +1198,11 @@ export function parseBio(bioStr: string | null | undefined): BioData {
       dating_username: data.dating_username || '',
       hide_friends_on_profile: !!data.hide_friends_on_profile,
       hide_me_from_friends: !!data.hide_me_from_friends,
+      spotify_theme: data.spotify_theme || 'classic-emerald',
+      spotify_glow: data.spotify_glow || 'emerald',
+      spotify_border: data.spotify_border || 'standard',
+      spotify_animation: data.spotify_animation || 'none',
+      spotify_visualizer: data.spotify_visualizer || 'none',
     };
   } catch (e) {}
   return { 
@@ -1070,7 +1224,12 @@ export function parseBio(bioStr: string | null | undefined): BioData {
     dating_user_id: '',
     dating_username: '',
     hide_friends_on_profile: false,
-    hide_me_from_friends: false
+    hide_me_from_friends: false,
+    spotify_theme: 'classic-emerald',
+    spotify_glow: 'emerald',
+    spotify_border: 'standard',
+    spotify_animation: 'none',
+    spotify_visualizer: 'none',
   };
 }
 
@@ -1087,38 +1246,16 @@ export function RenderPfpWithCustomBorder({
   className?: string,
   roundedClass?: string
 }) {
-  const bioData = parseBio(profile?.bio);
-  const pfpBorderId = bioData.pfp_border || 'none';
-  const pfpBorder = PFP_BORDERS.find(b => b.id === pfpBorderId) || PFP_BORDERS[0];
-  const borderStyles = pfpBorder.borderStyle || {};
-
   const avatarUrl = profile?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=default';
 
-  if (pfpBorderId === 'none') {
-    return (
-      <img 
-        src={avatarUrl} 
-        alt="Avatar" 
-        className={`object-cover border border-zinc-800 shrink-0 ${roundedClass} ${className}`}
-        style={{ width: `${size}px`, height: `${size}px` }}
-        onClick={onClick}
-      />
-    );
-  }
-
-  const wrapperSize = size + 6;
   return (
-    <div 
-      className={`relative shrink-0 flex items-center justify-center p-[2px] transition-all hover:scale-105 duration-100 ${pfpBorder.borderClass || ''} ${roundedClass} ${className}`}
-      style={{ ...borderStyles, width: `${wrapperSize}px`, height: `${wrapperSize}px` }}
+    <img 
+      src={avatarUrl} 
+      alt="Avatar" 
+      className={`object-cover border border-zinc-800 shrink-0 shadow-sm transition-all hover:scale-105 duration-100 ${roundedClass} ${className}`}
+      style={{ width: `${size}px`, height: `${size}px`, cursor: onClick ? 'pointer' : 'default' }}
       onClick={onClick}
-    >
-      <img 
-        src={avatarUrl} 
-        alt="Avatar" 
-        className={`w-full h-full object-cover ${roundedClass}`}
-      />
-    </div>
+    />
   );
 }
 
@@ -1175,7 +1312,7 @@ function NewsItem({ news, currentUserProfile, handleLikeNews, handleReactNews, h
          </div>
        </div>
        <div className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap break-words">
-          <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+          <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={getMarkdownComponents(news.profiles)}>
             {scrubContent(news.content)}
           </Markdown>
        </div>
@@ -1563,6 +1700,9 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [leftPanelMode, setLeftPanelMode] = useState<'none' | 'menu' | 'news' | 'rules'>('none');
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [profileMenuState, setProfileMenuState] = useState<'closed' | 'main' | 'wallet'>('closed');
+  const [pmTargetId, setPmTargetId] = useState<string | null>(null);
+  const [showPmInbox, setShowPmInbox] = useState(false);
+  const [privateMessages, setPrivateMessages] = useState<any[]>([]);
   const [newsFeed, setNewsFeed] = useState<News[]>([]);
   const [newNewsContent, setNewNewsContent] = useState('');
   const [hasNewNews, setHasNewNews] = useState(false);
@@ -1749,6 +1889,18 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const handleSendPrivateMessage = async (receiverId: string, content: string) => {
+    if (!content.trim()) return;
+    const { error } = await supabase.from('private_messages').insert({
+      sender_id: currentUserProfile.id,
+      receiver_id: receiverId,
+      content: content.trim()
+    });
+    if (error) {
+      toast.error("Failed to send message: " + error.message);
+    }
+  };
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (profileMenuState !== 'closed' && menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -1775,6 +1927,19 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     };
 
     fetchAllProfiles();
+
+    // Initial fetch of private messages
+    const fetchPMs = async () => {
+      const { data, error } = await supabase
+        .from('private_messages')
+        .select('*')
+        .or(`sender_id.eq.${currentUserProfile.id},receiver_id.eq.${currentUserProfile.id}`)
+        .order('created_at', { ascending: true });
+      if (!error && data) {
+        setPrivateMessages(data);
+      }
+    };
+    fetchPMs();
 
     // Initial fetch of messages
     const fetchMessages = async () => {
@@ -1870,6 +2035,19 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
            if (prev.some(m => m.id === payload.new.id)) return prev;
            return [...prev, { ...payload.new, profiles: profileData } as any];
          });
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'private_messages' }, (payload) => {
+        const newMessage = payload.new;
+        if (newMessage.sender_id === currentUserProfile.id || newMessage.receiver_id === currentUserProfile.id) {
+          setPrivateMessages(prev => {
+            if (prev.some(m => m.id === newMessage.id)) return prev;
+            return [...prev, newMessage];
+          });
+          if (newMessage.receiver_id === currentUserProfile.id) {
+            playSound(audioNewMsg);
+            toast(`New PM from someone!`, { icon: '💬' });
+          }
         }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, (payload) => {
@@ -2771,8 +2949,10 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                  <div className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-600 rounded-full border border-zinc-950" />
                )}
              </button>
-             <div className="flex items-center gap-2 ml-2 select-none">
-               <img src="/logo.png" className="h-7 w-7 object-contain" alt="Logo" />
+             <div className="flex items-center select-none ml-2">
+               <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-emerald-400 via-emerald-500 to-green-500 bg-clip-text text-transparent drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+                 Emerald Chat
+               </span>
              </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-4 relative" ref={menuRef}>
@@ -2849,6 +3029,16 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                       >
                         <User className="w-5 h-5 text-zinc-500" />
                         Edit profile
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setShowPmInbox(true);
+                          setProfileMenuState('closed');
+                        }}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-emerald-400 hover:bg-[#222222] transition-colors"
+                      >
+                        <MessageSquare className="w-5 h-5 text-emerald-500" />
+                        Private Messages
                       </button>
                     </div>
                     <div className="border-t border-[#222222] py-2">
@@ -2946,7 +3136,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                       <div className={isCustomCard ? `mt-1 p-2.5 rounded-xl border max-w-[85%] relative shadow-md break-words ${messageCard.bubbleClass}` : "text-zinc-200 text-[15px] leading-relaxed break-words relative pr-12"} style={isCustomCard ? messageCard.bubbleStyle : undefined}>
                         {renderMsg.content?.startsWith('__SYSTEM__:') ? (
                           <div className="bg-[#111] border border-zinc-800 rounded-md p-3 my-2 text-sm text-zinc-300">
-                             <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+                             <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={getMarkdownComponents(renderMsg.profiles)}>
                                {renderMsg.content.slice(11)}
                              </Markdown>
                           </div>
@@ -3039,10 +3229,10 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                                  );
                                }
                             } catch (err) {}
-                            return <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>{scrubContent(renderMsg.content)}</Markdown>;
+                            return <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={getMarkdownComponents(renderMsg.profiles)}>{scrubContent(renderMsg.content)}</Markdown>;
                           })()
                         ) : (
-                          <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+                          <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={getMarkdownComponents(renderMsg.profiles)}>
                             {scrubContent(renderMsg.content)}
                           </Markdown>
                         )}
@@ -3341,7 +3531,8 @@ function ProfileModal({
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
-  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | 'border' | 'border_borders' | 'border_effects' | 'border_combos' | 'border_creator' | 'preferences' | 'usercards' | 'message_cards' | 'pfp_borders' | null>(null);
+  const [editGroup, setEditGroup] = useState<'core' | 'cosmetics' | 'media'>('core');
+  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | 'border' | 'border_borders' | 'border_effects' | 'border_combos' | 'border_creator' | 'preferences' | 'usercards' | 'message_cards' | 'pfp_borders' | 'spotify_customizer' | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'bio' | 'friends'>('bio');
   const [isPlaying, setIsPlaying] = useState(false);
   
@@ -3619,13 +3810,24 @@ function ProfileModal({
                     )}
 
                     {!isSelf && profile!.id !== TEST_BOT.id && (
-                      <div className="mt-3">
+                      <div className="mt-3 flex gap-2">
                         <FriendButton 
                           profile={profile} 
                           currentUserProfile={currentUserProfile} 
                           onProfileUpdate={onProfileUpdate} 
                           setProfile={setProfile} 
                         />
+                        <button 
+                          onClick={() => {
+                            onClose();
+                            setPmTargetId(profile!.id);
+                            setShowPmInbox(true);
+                          }}
+                          className="px-3.5 py-1.5 text-xs font-bold rounded-md bg-emerald-600 text-white hover:bg-emerald-500 transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>Message</span>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -3688,7 +3890,7 @@ function ProfileModal({
                           {(!isSelf && bioData.hide_bio) ? (
                             <p className="text-zinc-500 italic pb-2">This user's bio is hidden.</p>
                           ) : bioData.text ? (
-                            <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+                            <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={getMarkdownComponents(profile)}>
                               {scrubContent(bioData.text)}
                             </Markdown>
                           ) : (
@@ -3759,25 +3961,64 @@ function ProfileModal({
                   </div>
                 ) : (
                   <div className="px-6 pb-6 pt-2 z-10 relative">
-                    <div className="grid grid-cols-2 gap-3">
-                      <button onClick={() => setActiveEditModal('username')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><User className="w-4 h-4 text-emerald-500" /> Edit Username</button>
-                      <button onClick={() => setActiveEditModal('mood')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Laugh className="w-4 h-4 text-emerald-500" /> Edit Mood</button>
-                      <button onClick={() => setActiveEditModal('info')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Heart className="w-4 h-4 text-emerald-500" /> Edit Age & Gender</button>
-                      <button onClick={() => setActiveEditModal('bio')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Quote className="w-4 h-4 text-emerald-500" /> Edit Bio</button>
-                      <button onClick={() => setActiveEditModal('music')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Music className="w-4 h-4 text-emerald-500" /> Edit Music</button>
-                      <button onClick={() => setActiveEditModal('card_bg')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><ImageIcon className="w-4 h-4 text-emerald-500" /> Edit Background</button>
-                      <button onClick={() => setActiveEditModal('border_borders')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><ShieldCheck className="w-4 h-4 text-emerald-500" /> Borders</button>
-                      <button onClick={() => setActiveEditModal('border_effects')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Sparkles className="w-4 h-4 text-emerald-500" /> Effects</button>
-                      <button onClick={() => setActiveEditModal('border_combos')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Paintbrush className="w-4 h-4 text-emerald-500" /> Combos</button>
-                      <button onClick={() => setActiveEditModal('pfp_borders')} className="py-2.5 bg-[#1e1e22] border border-violet-500/20 hover:border-violet-500/55 hover:bg-[#252529] text-violet-400 font-semibold rounded-lg text-sm transition-all flex items-center justify-center gap-1.5"><User className="w-4 h-4 text-violet-400" /> PFP Borders</button>
-                      <button onClick={() => setActiveEditModal('message_cards')} className="py-2.5 bg-[#1e1e22] border border-cyan-500/20 hover:border-cyan-500/55 hover:bg-[#252529] text-cyan-400 font-semibold rounded-lg text-sm transition-all col-span-2 flex items-center justify-center gap-1.5"><MessageSquare className="w-4 h-4 text-cyan-400" /> Message Cards</button>
-                      <button onClick={() => setActiveEditModal('usercards')} className="py-2.5 bg-[#1e1e22] border border-emerald-500/20 hover:border-emerald-500/50 hover:bg-[#252529] text-emerald-400 hover:text-emerald-300 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5 shadow-md col-span-2">
-                        <Layers className="w-4.5 h-4.5 text-emerald-500" /> Usercards
+                    {/* EDIT GROUPS NAVIGATION */}
+                    <div className="flex bg-[#121214]/80 border border-zinc-900 rounded-xl p-1 gap-1 mb-4 select-none shrink-0">
+                      <button 
+                        type="button"
+                        onClick={() => setEditGroup('core')} 
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${editGroup === 'core' ? 'bg-zinc-800 text-emerald-400 font-extrabold shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                      >
+                        Core
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setEditGroup('cosmetics')} 
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${editGroup === 'cosmetics' ? 'bg-zinc-800 text-emerald-400 font-extrabold shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                      >
+                        Cosmetics
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setEditGroup('media')} 
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${editGroup === 'media' ? 'bg-zinc-800 text-emerald-400 font-extrabold shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                      >
+                        Media
                       </button>
                     </div>
-                    <button onClick={() => setActiveEditModal('preferences')} className="w-full mt-3 py-2.5 bg-[#1e1e22] border border-emerald-500/25 hover:border-emerald-500/50 hover:bg-[#252529] text-emerald-400 hover:text-emerald-300 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-md">
-                      <Settings className="w-4 h-4 text-emerald-500 animate-[spin_8s_linear_infinite]" /> Preferences & Privacy
-                    </button>
+
+                    <div className="grid grid-cols-2 gap-3 min-h-[160px] content-start">
+                      {editGroup === 'core' && (
+                        <>
+                          <button onClick={() => setActiveEditModal('username')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><User className="w-4 h-4 text-emerald-500" /> Edit Username</button>
+                          <button onClick={() => setActiveEditModal('mood')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Laugh className="w-4 h-4 text-emerald-500" /> Edit Mood</button>
+                          <button onClick={() => setActiveEditModal('info')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Heart className="w-4 h-4 text-emerald-500" /> Edit Age & Gender</button>
+                          <button onClick={() => setActiveEditModal('bio')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Quote className="w-4 h-4 text-emerald-500" /> Edit Bio</button>
+                          <button onClick={() => setActiveEditModal('preferences')} className="col-span-2 py-2.5 bg-[#1e1e22] border border-emerald-500/25 hover:border-emerald-500/50 hover:bg-[#252529] text-emerald-400 hover:text-emerald-300 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-sm">
+                            <Settings className="w-4 h-4 text-emerald-500 animate-[spin_8s_linear_infinite]" /> Preferences & Privacy
+                          </button>
+                        </>
+                      )}
+
+                      {editGroup === 'cosmetics' && (
+                        <>
+                          <button onClick={() => setActiveEditModal('border_borders')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><ShieldCheck className="w-4 h-4 text-emerald-500" /> Borders</button>
+                          <button onClick={() => setActiveEditModal('border_effects')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Sparkles className="w-4 h-4 text-emerald-500" /> Effects</button>
+                          <button onClick={() => setActiveEditModal('border_combos')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Paintbrush className="w-4 h-4 text-emerald-500" /> Combos</button>
+                          <button onClick={() => setActiveEditModal('message_cards')} className="py-2.5 bg-[#1e1e22] border border-cyan-500/20 hover:border-cyan-500/55 hover:bg-[#252529] text-cyan-400 font-semibold rounded-lg text-sm transition-all col-span-2 flex items-center justify-center gap-1.5"><MessageSquare className="w-4 h-4 text-cyan-400" /> Message Cards</button>
+                          <button onClick={() => setActiveEditModal('usercards')} className="py-2.5 bg-[#1e1e22] border border-emerald-500/20 hover:border-emerald-500/50 hover:bg-[#252529] text-emerald-400 hover:text-emerald-300 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5 shadow-md col-span-2">
+                            <Layers className="w-4.5 h-4.5 text-emerald-500" /> Usercards
+                          </button>
+                        </>
+                      )}
+
+                      {editGroup === 'media' && (
+                        <>
+                          <button onClick={() => setActiveEditModal('card_bg')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><ImageIcon className="w-4 h-4 text-emerald-500" /> Background</button>
+                          <button onClick={() => setActiveEditModal('music')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Music className="w-4 h-4 text-emerald-500" /> Theme Song</button>
+                          <button onClick={() => setActiveEditModal('spotify_customizer')} className="col-span-2 py-2.5 bg-[#1e1e22] border border-emerald-500/25 hover:border-emerald-500/55 hover:bg-[#252529] text-emerald-400 font-black rounded-lg text-sm transition-all flex items-center justify-center gap-1.5 shadow-md relative overflow-hidden group"><Music className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform animate-pulse" /> <span>Spotify Styles</span><span className="absolute -top-1 right-0 bg-emerald-500 text-zinc-950 text-[6.5px] font-black uppercase px-1 rounded-bl">CUSTOM LAB</span></button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -3921,8 +4162,8 @@ function ProfileModal({
           }} 
         />
       )}
-      {activeEditModal === 'pfp_borders' && (
-        <PfpBordersModal 
+      {activeEditModal === 'spotify_customizer' && (
+        <SpotifyStylesModal 
           profile={profile!} 
           bioData={bioData} 
           onClose={() => setActiveEditModal(null)} 
@@ -3933,6 +4174,19 @@ function ProfileModal({
             });
             updateProfileData({ bio: newBio });
           }} 
+        />
+      )}
+      {showPmInbox && (
+        <PrivateMessagesModal 
+          currentUserProfile={currentUserProfile}
+          allProfiles={allProfiles}
+          privateMessages={privateMessages}
+          onClose={() => {
+            setShowPmInbox(false);
+            setPmTargetId(null);
+          }}
+          onSendMessage={handleSendPrivateMessage}
+          initialTargetId={pmTargetId}
         />
       )}
     </div>
@@ -4331,138 +4585,537 @@ function MessageCardsModal({ profile, bioData, onClose, onSave }: any) {
   );
 }
 
-function PfpBordersModal({ profile, bioData, onClose, onSave }: any) {
-  const [screen, setScreen] = useState<'preview' | 'grid'>('preview');
-  const [previewBorderId, setPreviewBorderId] = useState(() => bioData?.pfp_border || 'none');
-  const [index, setIndex] = useState(() => {
-    const currentId = bioData?.pfp_border || 'none';
-    const foundIdx = PFP_BORDERS.findIndex(b => b.id === currentId);
-    return foundIdx >= 0 ? foundIdx : 0;
-  });
+function PrivateMessagesModal({ 
+  currentUserProfile, 
+  allProfiles, 
+  privateMessages, 
+  onClose,
+  onSendMessage,
+  initialTargetId = null
+}: any) {
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(initialTargetId);
+  const [newMessage, setNewMessage] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const unlockedBorders = bioData?.unlocked_pfp_borders || [];
+  const contacts = useMemo(() => {
+    const userIds = new Set<string>();
+    privateMessages.forEach((m: any) => {
+      if (m.sender_id === currentUserProfile.id) userIds.add(m.receiver_id);
+      if (m.receiver_id === currentUserProfile.id) userIds.add(m.sender_id);
+    });
+    return allProfiles.filter(p => userIds.has(p.id));
+  }, [privateMessages, allProfiles, currentUserProfile.id]);
+
+  const currentChat = useMemo(() => {
+    if (!selectedUserId) return [];
+    return privateMessages.filter((m: any) => 
+      (m.sender_id === currentUserProfile.id && m.receiver_id === selectedUserId) ||
+      (m.receiver_id === currentUserProfile.id && m.sender_id === selectedUserId)
+    );
+  }, [privateMessages, selectedUserId, currentUserProfile.id]);
 
   useEffect(() => {
-    const idx = PFP_BORDERS.findIndex(b => b.id === previewBorderId);
-    if (idx >= 0) setIndex(idx);
-  }, [previewBorderId]);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [currentChat]);
+
+  const selectedUser = allProfiles.find(p => p.id === selectedUserId);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in font-sans">
+      <div className="w-full max-w-2xl h-[600px] bg-[#0c0c0c] border border-zinc-800 rounded-[2rem] shadow-2xl flex overflow-hidden">
+        {/* Sidebar */}
+        <div className="w-64 border-r border-zinc-800 flex flex-col bg-[#0a0a0a]">
+          <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+            <h2 className="text-sm font-black uppercase tracking-tight text-white">Messages</h2>
+            <button onClick={onClose} className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors md:hidden">
+              <X className="w-4 h-4 text-zinc-400" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+            {contacts.length === 0 ? (
+              <div className="text-center py-10 text-zinc-600 text-[11px] font-medium px-4">
+                No active conversations
+              </div>
+            ) : (
+              contacts.map(user => (
+                <button 
+                  key={user.id}
+                  onClick={() => setSelectedUserId(user.id)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all ${selectedUserId === user.id ? 'bg-emerald-500/10 border border-emerald-500/20' : 'hover:bg-zinc-900 border border-transparent'}`}
+                >
+                  <img src={user.avatar_url} className="w-10 h-10 rounded-full object-cover border border-zinc-800" alt="Avatar" />
+                  <div className="text-left overflow-hidden">
+                    <div className={`text-xs font-bold truncate ${selectedUserId === user.id ? 'text-emerald-400' : 'text-zinc-200'}`}>{user.username}</div>
+                    <div className="text-[10px] text-zinc-500 truncate">Click to chat</div>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col bg-[#0c0c0c]">
+          {selectedUserId ? (
+            <>
+              <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <img src={selectedUser?.avatar_url} className="w-8 h-8 rounded-full border border-zinc-800" alt="Avatar" />
+                  <h3 className="text-sm font-bold text-white">{selectedUser?.username}</h3>
+                </div>
+                <button onClick={onClose} className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors">
+                  <X className="w-5 h-5 text-zinc-400" />
+                </button>
+              </div>
+              <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-4">
+                {currentChat.map((m: any) => {
+                  const isMe = m.sender_id === currentUserProfile.id;
+                  return (
+                    <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${isMe ? 'bg-emerald-600 text-white' : 'bg-zinc-900 text-zinc-200 border border-zinc-800'}`}>
+                        {m.content}
+                        <div className={`text-[10px] mt-1 opacity-50 ${isMe ? 'text-right' : 'text-left'}`}>
+                          {format(new Date(m.created_at), 'HH:mm')}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (newMessage.trim()) {
+                    onSendMessage(selectedUserId, newMessage);
+                    setNewMessage('');
+                  }
+                }}
+                className="p-5 border-t border-zinc-800 flex gap-2"
+              >
+                <input 
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type a message..."
+                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+                />
+                <button type="submit" className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white transition-all active:scale-95">
+                  <Send className="w-5 h-5" />
+                </button>
+              </form>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-10">
+              <div className="w-16 h-16 bg-zinc-900 rounded-3xl flex items-center justify-center mb-4 border border-zinc-800 text-emerald-500/50">
+                <MessageSquare className="w-8 h-8" />
+              </div>
+              <h3 className="text-white font-bold mb-1">Private Messaging</h3>
+              <p className="text-zinc-500 text-xs max-w-[200px]">Select a contact from the left to start chatting privately.</p>
+              <button 
+                onClick={onClose} 
+                className="mt-6 px-5 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-bold text-zinc-300 hover:bg-zinc-800 md:hidden"
+              >
+                Close
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SpotifyStylesModal({ profile, bioData, onClose, onSave }: any) {
+  const [screen, setScreen] = useState<'preview' | 'grid'>('preview');
+  const [mixerTab, setMixerTab] = useState<'presets' | 'custom'>('presets');
+
+  // Customization state
+  const [theme, setTheme] = useState(() => bioData?.spotify_theme || 'classic-emerald');
+  const [glow, setGlow] = useState(() => bioData?.spotify_glow || 'emerald');
+  const [border, setBorder] = useState(() => bioData?.spotify_border || 'standard');
+  const [animation, setAnimation] = useState(() => bioData?.spotify_animation || 'none');
+  const [visualizer, setVisualizer] = useState(() => bioData?.spotify_visualizer || 'none');
+
+  // Search or filter presets
+  const [presetSearch, setPresetSearch] = useState('');
+  const [presetRarity, setPresetRarity] = useState<string>('All');
+
+  const filteredPresets = SPOTIFY_PRESETS.filter(p => {
+    const matchSearch = p.name.toLowerCase().includes(presetSearch.toLowerCase());
+    const matchRarity = presetRarity === 'All' || p.rarity === presetRarity;
+    return matchSearch && matchRarity;
+  });
+
+  const handleSelectPreset = (p: any) => {
+    setTheme(p.theme);
+    setGlow(p.glow);
+    setBorder(p.border);
+    setAnimation(p.animation);
+    setVisualizer(p.visualizer);
+    toast.success(`Preset "${p.name}" selected!`);
+  };
 
   const handlePrev = () => {
-    const nextIdx = (index - 1 + PFP_BORDERS.length) % PFP_BORDERS.length;
-    setIndex(nextIdx);
-    setPreviewBorderId(PFP_BORDERS[nextIdx].id);
+    let prevIdx = SPOTIFY_PRESETS.findIndex(
+      p => p.theme === theme && p.glow === glow && p.border === border && p.animation === animation && p.visualizer === visualizer
+    );
+    if (prevIdx === -1) prevIdx = 0;
+    const nextIdx = (prevIdx - 1 + SPOTIFY_PRESETS.length) % SPOTIFY_PRESETS.length;
+    const p = SPOTIFY_PRESETS[nextIdx];
+    setTheme(p.theme);
+    setGlow(p.glow);
+    setBorder(p.border);
+    setAnimation(p.animation);
+    setVisualizer(p.visualizer);
   };
 
   const handleNext = () => {
-    const nextIdx = (index + 1) % PFP_BORDERS.length;
-    setIndex(nextIdx);
-    setPreviewBorderId(PFP_BORDERS[nextIdx].id);
+    let prevIdx = SPOTIFY_PRESETS.findIndex(
+      p => p.theme === theme && p.glow === glow && p.border === border && p.animation === animation && p.visualizer === visualizer
+    );
+    if (prevIdx === -1) prevIdx = 0;
+    const nextIdx = (prevIdx + 1) % SPOTIFY_PRESETS.length;
+    const p = SPOTIFY_PRESETS[nextIdx];
+    setTheme(p.theme);
+    setGlow(p.glow);
+    setBorder(p.border);
+    setAnimation(p.animation);
+    setVisualizer(p.visualizer);
   };
-
-  const currentBorder = PFP_BORDERS[index] || PFP_BORDERS[0];
-  const isUnlocked = currentBorder.cost === 0 || unlockedBorders.includes(currentBorder.id);
 
   const handleSave = () => {
-    if (!isUnlocked) {
-      const userCoins = bioData?.coins ?? 0;
-      if (userCoins < currentBorder.cost) {
-        toast.error(`You need ${currentBorder.cost} Coins to purchase this. You currently have ${userCoins} Coins.`);
-        return;
-      }
-      // Purchase item!
-      const updatedCoins = userCoins - currentBorder.cost;
-      const updatedUnlocked = [...unlockedBorders, currentBorder.id];
-      onSave({ 
-        pfp_border: currentBorder.id,
-        coins: updatedCoins,
-        unlocked_pfp_borders: updatedUnlocked
-      });
-      toast.success(`Successfully unlocked and equipped standard ${currentBorder.name} pfp border!`);
-    } else {
-      onSave({ pfp_border: previewBorderId });
-      toast.success('PFP Border applied successfully!');
-    }
-    onClose();
+    onSave({
+      spotify_theme: theme,
+      spotify_glow: glow,
+      spotify_border: border,
+      spotify_animation: animation,
+      spotify_visualizer: visualizer
+    });
+    toast.success("Spotify Styles equipped!");
   };
 
-  const borderStyles = currentBorder.borderStyle || {};
-  const previewNode = (
-    <div className="bg-[#111] border border-zinc-800/80 rounded-2xl p-4 w-full flex flex-col items-center pointer-events-none select-none">
-      <span className="text-[10px] font-black text-zinc-500 uppercase mb-4 tracking-widest text-center">PFP BORDER PREVIEW ({currentBorder.rarity})</span>
-      
-      <div className="my-3 flex flex-col items-center gap-2">
-        <div 
-          className={`relative shrink-0 flex items-center justify-center p-[2px] transition-all rounded-lg ${currentBorder.borderClass || ''}`}
-          style={{ ...borderStyles, width: '106px', height: '106px' }}
-        >
-          <img 
-            src={profile?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=default'} 
-            alt="Avatar" 
-            className="w-full h-full rounded-md object-cover"
-          />
-        </div>
-        <span className="font-bold text-[15px] mt-2 text-white">{currentBorder.name}</span>
-      </div>
+  // Resolve styles for mock preview
+  const activeTheme = SPOTIFY_THEMES.find(t => t.id === theme) || SPOTIFY_THEMES[0];
+  const activeGlow = SPOTIFY_GLOWS.find(g => g.id === glow) || SPOTIFY_GLOWS[0];
+  const activeBorder = SPOTIFY_BORDERS.find(b => b.id === border) || SPOTIFY_BORDERS[0];
+  const activeAnim = SPOTIFY_ANIMATIONS.find(a => a.id === animation) || SPOTIFY_ANIMATIONS[0];
 
-      <div className="w-full mt-2 flex items-center justify-between pt-3 border-t border-zinc-900">
-        <span className="text-xs text-zinc-400 font-bold">Rarity: <span className={
-          currentBorder.rarity === 'Mythic' ? 'text-purple-400 font-black animate-pulse' :
-          currentBorder.rarity === 'Legendary' ? 'text-amber-400 font-extrabold' :
-          currentBorder.rarity === 'Epic' ? 'text-pink-400 font-bold' :
-          currentBorder.rarity === 'Rare' ? 'text-cyan-400' : 'text-zinc-450'
-        }>{currentBorder.rarity}</span></span>
-        
-        <div className="flex items-center gap-1">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0"><circle cx="12" cy="12" r="10" fill="#FFB800" /><circle cx="12" cy="12" r="8" fill="#FFC700" /><path d="M12 6L13.8 9.6L17.5 10L14.7 12.6L15.5 16.5L12 14.5L8.5 16.5L9.3 12.6L6.5 10L10.2 9.6L12 6Z" fill="#FFD600" /></svg>
-          <span className="text-xs font-black text-yellow-500">{currentBorder.cost === 0 ? 'FREE' : `${currentBorder.cost} Coins`}</span>
+  const isVinyl = theme === 'vinyl-record';
+  const isCassette = theme === 'retro-cassette';
+  const isChromaBorder = border === 'chroma';
+
+  const previewNode = (
+    <div className="flex flex-col items-center justify-center p-2">
+      <div 
+        className={`w-full rounded-2xl p-4 relative overflow-hidden border bg-gradient-to-br transition-all duration-300 ${activeTheme.className} ${activeGlow.className} ${activeAnim.className}`}
+        style={{
+          backgroundOrigin: isChromaBorder ? 'border-box' : undefined,
+          backgroundClip: isChromaBorder ? 'padding-box, border-box' : undefined,
+          borderColor: isChromaBorder ? 'transparent' : undefined,
+        }}
+      >
+        {/* Background gradient overlay */}
+        <div className={`absolute inset-0 bg-gradient-to-br ${activeTheme.bgColorClass} opacity-95 z-0 pointer-events-none rounded-2xl`} />
+
+        {/* Tape reels */}
+        {isCassette && (
+          <div className="absolute inset-x-3 bottom-1 h-8 flex justify-between px-6 z-10 pointer-events-none text-zinc-650 opacity-45">
+            <div className="flex flex-col items-center text-[7px] font-mono leading-none">
+              <span className="animate-[spin_4s_linear_infinite]">⭕</span>
+              <span className="mt-0.5">TAPE-A</span>
+            </div>
+            <div className="flex flex-col items-center text-[7px] font-mono leading-none">
+              <span className="animate-[spin_4s_linear_infinite_reverse]">⭕</span>
+              <span className="mt-0.5">TAPE-B</span>
+            </div>
+          </div>
+        )}
+
+        {/* Vinyl slide out */}
+        {isVinyl && (
+          <div className="absolute right-[-45px] top-6 w-32 h-32 rounded-full bg-zinc-950 border-4 border-zinc-800 flex items-center justify-center opacity-75 shadow-lg animate-[spin_10s_linear_infinite] overflow-hidden">
+            <div className="w-24 h-24 rounded-full border border-zinc-900 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full border border-zinc-900 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-[7px] font-black text-black">SPIN</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Simulated active visualizer */}
+        {visualizer !== 'none' && (
+          <div className="absolute bottom-2 inset-x-4 h-6 flex items-end gap-1 pointer-events-none z-10 opacity-35">
+            {Array.from({ length: 18 }).map((_, i) => {
+              const h = Math.floor(Math.random() * 16) + 4;
+              const delay = (i * 0.08).toFixed(2);
+              return (
+                <span 
+                  key={i} 
+                  className="flex-1 bg-current rounded-t"
+                  style={{
+                    height: `${h}px`,
+                    animation: `bounceBeat 0.8s infinite ease-in-out alternate -${delay}s`,
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        {/* Real Header Badge */}
+        <div className="relative z-10 flex items-center justify-between mb-3 text-white">
+          <span className="text-[9px] uppercase tracking-widest font-black flex items-center gap-1 opacity-75">
+            <svg className="w-3.5 h-3.5 animate-[spin_4s_linear_infinite]" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm1 15.5h-2v-6h2v6zm0-8h-2V7h2v2.5z"/>
+            </svg>
+            Spotify Preview
+          </span>
+          <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase font-black tracking-wider ${activeTheme.textColorClass} bg-black/40 border border-current/25`}>
+            {activeTheme.name}
+          </span>
+        </div>
+
+        {/* Mock Song details */}
+        <div className="relative z-10 w-full rounded-xl overflow-hidden shadow-inner border border-black/30 bg-black/60 p-4 h-[152px] flex flex-col justify-between">
+          <div className="flex gap-3">
+            <div className="w-16 h-16 rounded bg-zinc-850 border border-zinc-750 flex items-center justify-center text-[11px] font-black tracking-tighter text-emerald-500 overflow-hidden shrink-0 shadow-lg">
+              <div className="w-full h-full relative flex items-center justify-center">
+                <Music className="w-6 h-6 text-emerald-400 rotate-12 animate-bounce" />
+              </div>
+            </div>
+            <div className="flex flex-col min-w-0 justify-center">
+              <span className="text-xs font-black text-white truncate text-left">Emerald Theme Symphony</span>
+              <span className="text-[10px] text-emerald-400 font-bold truncate text-left">Star Beats & Electro Vibe</span>
+              <span className="text-[8px] text-zinc-500 font-mono mt-1 text-left">EMERALD PLATINUM SOUND</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/40">
+            <div className="flex items-center gap-3">
+              <span className="text-zinc-450 hover:text-white transition-colors cursor-pointer text-[10px]">◀</span>
+              <button type="button" className="w-7 h-7 rounded-full bg-emerald-500 text-zinc-950 font-bold text-xs flex items-center justify-center shadow-md animate-pulse">▶</button>
+              <span className="text-zinc-450 hover:text-white transition-colors cursor-pointer text-[10px]">▶</span>
+            </div>
+            <div className="flex items-center gap-1 font-mono text-[9px] text-zinc-500">
+              <span>0:34</span>
+              <span>/</span>
+              <span>3:42</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 
   const gridNode = (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[380px] overflow-y-auto pr-2 custom-scrollbar pb-6 text-zinc-300">
-      {PFP_BORDERS.map((border, bIdx) => {
-        const isSelected = previewBorderId === border.id;
-        const owns = border.cost === 0 || unlockedBorders.includes(border.id);
-        return (
-          <button
-            key={border.id}
-            type="button"
-            onClick={() => {
-              setPreviewBorderId(border.id);
-              setIndex(bIdx);
-              setScreen('preview');
-            }}
-            className={`p-2.5 rounded-xl border flex flex-col items-center justify-between text-center transition-all min-h-[96px] relative ${
-              isSelected 
-                ? 'bg-violet-500/10 border-violet-500 shadow-lg scale-105 z-10' 
-                : 'bg-[#151515] hover:bg-zinc-800 border-zinc-850 hover:border-zinc-700'
-            }`}
-          >
-            <div className="text-[9px] font-black uppercase text-zinc-500 truncate w-full mb-1">{border.rarity}</div>
-            <div className="font-bold text-xs text-white line-clamp-2 leading-tight flex-1 flex items-center justify-center">{border.name}</div>
-            <div className="mt-2 text-[9px] font-mono flex items-center justify-center gap-1">
-              {owns ? (
-                <span className="text-violet-400 font-extrabold uppercase text-[8px] tracking-wider">OWNED</span>
-              ) : (
-                <>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0"><circle cx="12" cy="12" r="10" fill="#FFB800" /><circle cx="12" cy="12" r="8" fill="#FFC700" /><path d="M12 6L13.8 9.6L17.5 10L14.7 12.6L15.5 16.5L12 14.5L8.5 16.5L9.3 12.6L6.5 10L10.2 9.6L12 6Z" fill="#FFD600" /></svg>
-                  <span className="text-yellow-500 font-black">{border.cost}</span>
-                </>
-              )}
+    <div className="space-y-4">
+      {/* Grid Tab Navigation */}
+      <div className="flex bg-[#121214] border border-zinc-905 rounded-xl p-1 gap-1 select-none">
+        <button 
+          type="button" 
+          onClick={() => setMixerTab('presets')} 
+          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 ${mixerTab === 'presets' ? 'bg-zinc-805 text-emerald-400 font-extrabold shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+        >
+          Preset Designs
+        </button>
+        <button 
+          type="button" 
+          onClick={() => setMixerTab('custom')} 
+          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 ${mixerTab === 'custom' ? 'bg-zinc-805 text-emerald-400 font-extrabold shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+        >
+          Manual Mixer
+        </button>
+      </div>
+
+      {mixerTab === 'presets' ? (
+        <div className="space-y-3 pt-1">
+          {/* Filters for presets */}
+          <div className="flex flex-col sm:flex-row gap-2 bg-[#121214] border border-zinc-900 p-2 rounded-xl">
+            <input 
+              type="text" 
+              placeholder="Search presets..."
+              value={presetSearch}
+              onChange={(e) => setPresetSearch(e.target.value)}
+              className="w-full bg-[#161619] border border-zinc-800 text-xs rounded-lg px-2.5 py-1.5 text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40"
+            />
+            <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-none shrink-0">
+              {['All', 'Common', 'Rare', 'Epic', 'Legendary', 'Mythic'].map((rarity) => (
+                <button
+                  key={rarity}
+                  type="button"
+                  onClick={() => setPresetRarity(rarity)}
+                  className={`text-[8px] font-black uppercase tracking-wide px-2 py-1 rounded transition-all ${
+                    presetRarity === rarity 
+                      ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' 
+                      : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  {rarity}
+                </button>
+              ))}
             </div>
-            {isSelected && <span className="absolute top-1.5 right-1.5 font-black text-violet-400 text-xs">✓</span>}
-          </button>
-        );
-      })}
+          </div>
+
+          {/* Grid list of presets */}
+          <div className="grid grid-cols-2 gap-2 pb-4">
+            {filteredPresets.map((p) => {
+              const isSelected = theme === p.theme && glow === p.glow && border === p.border && animation === p.animation && visualizer === p.visualizer;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handleSelectPreset(p)}
+                  className={`p-2.5 rounded-xl border flex flex-col justify-between text-left transition-all relative group h-20 ${
+                    isSelected 
+                      ? 'bg-emerald-500/10 border-emerald-500 shadow-sm scale-[1.01] z-10' 
+                      : 'bg-[#0f0f11] hover:bg-zinc-850 border-zinc-900'
+                  }`}
+                >
+                  <span className={`text-[7px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded self-start ${
+                    p.rarity === 'Mythic' ? 'bg-purple-950 border border-purple-500/20 text-purple-400' :
+                    p.rarity === 'Legendary' ? 'bg-amber-950 border border-amber-500/20 text-amber-400' :
+                    p.rarity === 'Epic' ? 'bg-pink-950 border border-pink-500/20 text-pink-400' :
+                    p.rarity === 'Rare' ? 'bg-cyan-950 border border-cyan-500/20 text-cyan-400' :
+                    'bg-zinc-900 border border-zinc-800 text-zinc-500'
+                  }`}>
+                    {p.rarity}
+                  </span>
+                  <div className="font-extrabold text-[11px] text-zinc-200 mt-1 line-clamp-1 truncate uppercase tracking-tight">{p.name}</div>
+                  <span className="text-[8px] text-zinc-650 font-mono flex items-center gap-1 mt-0.5 uppercase">
+                    {p.theme.replace('-', ' ')} • {p.visualizer !== 'none' ? 'EQ ACTIVE' : 'EQ OFF'}
+                  </span>
+                  {isSelected && (
+                    <span className="absolute top-2 right-2 bg-emerald-500 text-zinc-950 rounded-full w-4 h-4 flex items-center justify-center font-black text-[9px]">✓</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4 pb-4">
+          {/* Card Theme */}
+          <div className="space-y-1 text-left">
+            <span className="text-[9.5px] uppercase font-black text-zinc-500 tracking-wider">Card Theme</span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {SPOTIFY_THEMES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTheme(t.id)}
+                  className={`px-2.5 py-1.5 rounded-lg border text-left flex items-center justify-between text-[11px] ${
+                    theme === t.id 
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold' 
+                      : 'bg-[#101012] border-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-850'
+                  }`}
+                >
+                  <span>{t.name}</span>
+                  {theme === t.id && <span className="text-emerald-400 font-black">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Outer Neon Glow */}
+          <div className="space-y-1 text-left pt-2 border-t border-zinc-900">
+            <span className="text-[9.5px] uppercase font-black text-zinc-500 tracking-wider">Outer Neon Glow</span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {SPOTIFY_GLOWS.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => setGlow(g.id)}
+                  className={`px-2.5 py-1.5 rounded-lg border text-left flex items-center justify-between text-[11px] ${
+                    glow === g.id 
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold' 
+                      : 'bg-[#101012] border-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-850'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: g.colorHex === 'rainbow' ? '#ec4899' : g.colorHex }} />
+                    <span>{g.name}</span>
+                  </div>
+                  {glow === g.id && <span className="text-emerald-400 font-black">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Border Style */}
+          <div className="space-y-1 text-left pt-2 border-t border-zinc-900">
+            <span className="text-[9.5px] uppercase font-black text-zinc-500 tracking-wider">Border Style</span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {SPOTIFY_BORDERS.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => setBorder(b.id)}
+                  className={`px-2.5 py-1.5 rounded-lg border text-left flex items-center justify-between text-[11px] ${
+                    border === b.id 
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold' 
+                      : 'bg-[#101012] border-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-850'
+                  }`}
+                >
+                  <span>{b.name}</span>
+                  {border === b.id && <span className="text-emerald-400 font-black">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Card Animation */}
+          <div className="space-y-1 text-left pt-2 border-t border-zinc-900">
+            <span className="text-[9.5px] uppercase font-black text-zinc-500 tracking-wider">Card Animation</span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {SPOTIFY_ANIMATIONS.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setAnimation(a.id)}
+                  className={`px-2.5 py-1.5 rounded-lg border text-left flex items-center justify-between text-[11px] ${
+                    animation === a.id 
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold' 
+                      : 'bg-[#101012] border-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-850'
+                  }`}
+                >
+                  <span>{a.name}</span>
+                  {animation === a.id && <span className="text-emerald-400 font-black">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Music Equalizer */}
+          <div className="space-y-1 text-left pt-2 border-t border-zinc-900">
+            <span className="text-[9.5px] uppercase font-black text-zinc-500 tracking-wider">Music Equalizer</span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {SPOTIFY_VISUALIZERS.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => setVisualizer(v.id)}
+                  className={`px-2.5 py-1.5 rounded-lg border text-left flex items-center justify-between text-[11px] ${
+                    visualizer === v.id 
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold' 
+                      : 'bg-[#101012] border-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-850'
+                  }`}
+                >
+                  <span>{v.name}</span>
+                  {visualizer === v.id && <span className="text-emerald-400 font-black">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
   return (
     <CosmeticShopLayout
-      title="PFP Borders"
-      tag={isUnlocked ? "OWNED / EQUIP" : `${currentBorder.cost} COINS`}
+      title="Spotify Styles"
+      tag="50+ CUSTOMIZATIONS"
       onClose={onClose}
       onSave={handleSave}
       onPrev={handlePrev}
@@ -5026,7 +5679,7 @@ function ProfileBorderForm({ profile, onClose, onSave, bioData, initialTab }: an
                         {previewActiveTab === 'bio' ? (
                           <div className="text-[11px] text-zinc-350 leading-relaxed">
                             {bioData.text ? (
-                              <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
+                              <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={getMarkdownComponents(profile)}>
                                 {scrubContent(bioData.text)}
                               </Markdown>
                             ) : (
