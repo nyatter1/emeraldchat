@@ -4894,8 +4894,8 @@ function PrivateMessagesModal({
                            style={isCustomCard ? messageCard.bubbleStyle : {}}
                         >
                           <div className="break-words markdown-body">
-                            <Markdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                              {m.content}
+                            <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={getMarkdownComponents(msgProfile)}>
+                              {scrubContent(m.content)}
                             </Markdown>
                           </div>
                         </div>
