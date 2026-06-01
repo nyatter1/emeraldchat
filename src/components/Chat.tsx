@@ -1556,7 +1556,6 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [onlineUsers, setOnlineUsers] = useState<Profile[]>([TEST_BOT]);
   const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
   const [showDeveloperPanel, setShowDeveloperPanel] = useState(false);
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [leftPanelMode, setLeftPanelMode] = useState<'none' | 'menu' | 'news' | 'rules'>('none');
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [profileMenuState, setProfileMenuState] = useState<'closed' | 'main' | 'wallet'>('closed');
@@ -4975,8 +4974,9 @@ function PrivateMessagesModal({
               <AnimatePresence>
                 {showPaintCanvasModal && (
                   <PaintCanvasModal
+                    currentUserProfile={currentUserProfile}
                     onClose={() => setShowPaintCanvasModal(false)}
-                    onSend={async (url: string) => {
+                    onSendDrawing={async (url: string) => {
                       if (!selectedUserId) return;
                       await onSendMessage(selectedUserId, url);
                       setShowPaintCanvasModal(false);
