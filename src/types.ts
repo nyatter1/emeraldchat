@@ -24,7 +24,18 @@ export interface Message {
   created_at: string;
   content: string;
   user_id: string;
+  is_saved?: boolean;
   profiles?: Profile;
+}
+
+export interface PrivateMessage {
+  id: string;
+  created_at: string;
+  content: string;
+  sender_id: string;
+  receiver_id: string;
+  is_saved?: boolean;
+  read_at?: string;
 }
 
 export interface NewsLike {
