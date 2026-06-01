@@ -12,17 +12,6 @@ export interface MessageCardStyle {
   isAnimated?: boolean;
 }
 
-export interface PfpBorderStyle {
-  id: string;
-  name: string;
-  rarity: 'Common' | 'Rare' | 'Epic' | 'Legendary' | 'Mythic';
-  cost: number;
-  borderClass: string;
-  borderStyle?: React.CSSProperties;
-  glowColor?: string;
-  isAnimated?: boolean;
-}
-
 export const MESSAGE_CARDS: MessageCardStyle[] = [
   { id: 'none', name: 'Default Plain', rarity: 'Common', cost: 0, bubbleClass: 'bg-transparent text-zinc-100' },
   // Common (10 items)
@@ -87,68 +76,3 @@ export const MESSAGE_CARDS: MessageCardStyle[] = [
   { id: 'mc_void_consumer', name: 'Eldritch Vortex', rarity: 'Mythic', cost: 0, bubbleClass: 'bg-[#030008] border-2 border-indigo-600 rounded-xl px-4 py-2.5 text-indigo-200 shadow-[0_0_30px_rgba(79,70,229,0.8)]' },
   { id: 'mc_god_mode', name: 'Hyperdimension God', rarity: 'Mythic', cost: 0, bubbleClass: 'bg-[#060a14] border-2 border-cyan-450 rounded-xl px-4 py-2.5 text-white shadow-[0_0_30px_rgba(6,182,212,0.8),inset_0_0_15px_rgba(6,182,212,0.4)]' }
 ].map(c => ({ ...c, cost: 0 })) as MessageCardStyle[];
-
-export const PFP_BORDERS: PfpBorderStyle[] = [
-  { id: 'none', name: 'Default Standard', rarity: 'Common', cost: 0, borderClass: 'border border-zinc-800' },
-  // Common (10 items)
-  { id: 'pfp_crimson_thin', name: 'Slayer Red', rarity: 'Common', cost: 0, borderClass: 'border-2 border-red-600/70' },
-  { id: 'pfp_cyan_thin', name: 'Glacier Cyan', rarity: 'Common', cost: 0, borderClass: 'border-2 border-cyan-600/70' },
-  { id: 'pfp_emerald_thin', name: 'Forest Green', rarity: 'Common', cost: 0, borderClass: 'border-2 border-emerald-600/70' },
-  { id: 'pfp_amber_thin', name: 'Warm Amber', rarity: 'Common', cost: 0, borderClass: 'border-2 border-amber-500/70' },
-  { id: 'pfp_blue_thin', name: 'Marine Cobalt', rarity: 'Common', cost: 0, borderClass: 'border-2 border-blue-600/70' },
-  { id: 'pfp_purple_thin', name: 'Orchid Dream', rarity: 'Common', cost: 0, borderClass: 'border-2 border-purple-600/70' },
-  { id: 'pfp_pink_thin', name: 'Cherry Glow', rarity: 'Common', cost: 0, borderClass: 'border-2 border-pink-500/70' },
-  { id: 'pfp_zinc_double', name: 'Double Slate', rarity: 'Common', cost: 0, borderClass: 'border-4 border-double border-zinc-700' },
-  { id: 'pfp_brass', name: 'Polished Brass', rarity: 'Common', cost: 0, borderClass: 'border-2 border-yellow-700/80' },
-  { id: 'pfp_silver', name: 'Solid Silver', rarity: 'Common', cost: 0, borderClass: 'border-2 border-zinc-400' },
-
-  // Rare (15 items)
-  { id: 'pfp_cyber_glow', name: 'Cyber Neon Ring', rarity: 'Rare', cost: 0, borderClass: 'border-2 border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]' },
-  { id: 'pfp_pink_neon', name: 'Laser Pink Core', rarity: 'Rare', cost: 0, borderClass: 'border-2 border-fuchsia-400 shadow-[0_0_8px_rgba(232,121,249,0.5)]' },
-  { id: 'pfp_green_neon', name: 'Vibrant Acid', rarity: 'Rare', cost: 0, borderClass: 'border-2 border-lime-400 shadow-[0_0_8px_rgba(163,230,53,0.5)]' },
-  { id: 'pfp_gold_rim', name: 'Rich Gild', rarity: 'Rare', cost: 0, borderClass: 'border-2 border-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.4)]' },
-  { id: 'pfp_red_pulse', name: 'Vampire Glare', rarity: 'Rare', cost: 0, borderClass: 'border-2 border-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]' },
-  { id: 'pfp_amethyst', name: 'Amethyst Halo', rarity: 'Rare', cost: 0, borderClass: 'border-2 border-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.4)]' },
-  { id: 'pfp_sky_rim', name: 'Zephyr Rim', rarity: 'Rare', cost: 0, borderClass: 'border-2 border-sky-450' },
-  { id: 'pfp_orange_glow', name: 'Magma Ring', rarity: 'Rare', cost: 0, borderClass: 'border-2 border-orange-500 shadow-[0_0_6px_rgba(249,115,22,0.4)]' },
-  { id: 'pfp_white_classic', name: 'Porcelain White', rarity: 'Rare', cost: 0, borderClass: 'border-[3px] border-white' },
-  { id: 'pfp_pitch_black', name: 'Stygian Void', rarity: 'Rare', cost: 0, borderClass: 'border-[3px] border-black/80 shadow-[0_0_8px_rgba(0,0,0,0.8)]' },
-  { id: 'pfp_electric', name: 'Static Charge', rarity: 'Rare', cost: 0, borderClass: 'border-2 border-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.5)]' },
-  { id: 'pfp_forest_ring', name: 'Druid Jade', rarity: 'Rare', cost: 0, borderClass: 'border-[2.5px] border-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.3)]' },
-  { id: 'pfp_rust', name: 'Oxidized Iron', rarity: 'Rare', cost: 0, borderClass: 'border-2 border-amber-800' },
-  { id: 'pfp_navy_bevel', name: 'Bathyal Deep', rarity: 'Rare', cost: 0, borderClass: 'border-2 border-blue-900/90' },
-  { id: 'pfp_toxic_dust', name: 'Plague Rot', rarity: 'Rare', cost: 0, borderClass: 'border-2 border-yellow-600/60' },
-
-  // Epic (15 items)
-  { id: 'pfp_cyber_shimmer', name: 'Chrono Pulse Rim', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.6)] animate-pulse' },
-  { id: 'pfp_fiery_sun', name: 'Solar Flare', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse' },
-  { id: 'pfp_indigo_blast', name: 'Quantum Ring', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-indigo-500/80 shadow-[0_0_12px_rgba(99,102,241,0.6)] animate-pulse' },
-  { id: 'pfp_gold_royal', name: 'Emperor Gold', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-yellow-400 shadow-[0_0_12px_rgba(234,179,8,0.6)] animate-pulse' },
-  { id: 'pfp_cyan_shield', name: 'Shield Core', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-cyan-400', borderStyle: { borderStyle: 'dotted' } },
-  { id: 'pfp_lava_shield', name: 'Magma Shell', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-orange-500', borderStyle: { borderStyle: 'dashed' } },
-  { id: 'pfp_crimson_glow', name: 'Gothic Rose', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-rose-600 shadow-[0_0_15px_rgba(225,29,72,0.6)]' },
-  { id: 'pfp_violet_vixen', name: 'Astral Eye', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.6)]' },
-  { id: 'pfp_neon_citrus', name: 'Citrus Ring', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)]' },
-  { id: 'pfp_deep_abyss', name: 'Vortex Rim', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-stone-800 shadow-[inset_0_0_8px_rgba(0,0,0,0.9)]' },
-  { id: 'pfp_fuchsia_orbit', name: 'Orbit Pink', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-pink-400 shadow-[0_0_12px_rgba(244,114,182,0.5)]' },
-  { id: 'pfp_sky_dashed', name: 'Sky Dashed', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-dashed border-sky-400 shadow-[0_0_6px_rgba(125,211,252,0.4)]' },
-  { id: 'pfp_bronze_ring', name: 'Beveled Bronze', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-amber-700/80 shadow-[inset_0_0_4px_rgba(0,0,0,0.6)]' },
-  { id: 'pfp_steel_cage', name: 'Riveted Rim', rarity: 'Epic', cost: 0, borderClass: 'border-4 border-dashed border-zinc-650' },
-  { id: 'pfp_lime_dashed', name: 'Acidity Dashed', rarity: 'Epic', cost: 0, borderClass: 'border-2 border-dashed border-lime-400' },
-
-  // Legendary (8 items)
-  { id: 'pfp_rainbow_ring', name: 'Chroma Ring', rarity: 'Legendary', cost: 0, borderClass: 'border-2 border-transparent', borderStyle: { borderImage: 'linear-gradient(270deg, #ff007f, #7f00ff, #00ffff, #00ff7f, #ff007f) 1', animation: 'chromaSweep 5s linear infinite' } },
-  { id: 'pfp_cosmic_pulse', name: 'Nebula Streamer', rarity: 'Legendary', cost: 0, borderClass: 'border-2 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.7)] animate-pulse' },
-  { id: 'pfp_matrix_grid', name: 'Console Ring', rarity: 'Legendary', cost: 0, borderClass: 'border-2 border-green-400 shadow-[0_0_15px_rgba(74,222,128,0.7)]', borderStyle: { borderStyle: 'double' } },
-  { id: 'pfp_eclipse_sun', name: 'Corona Ring', rarity: 'Legendary', cost: 0, borderClass: 'border-2 border-amber-500 shadow-[0_0_18px_rgba(245,158,11,0.7)] animate-pulse' },
-  { id: 'pfp_cyber_alert', name: 'Alert Core', rarity: 'Legendary', cost: 0, borderClass: 'border-2 border-red-500 shadow-[0_0_18px_rgba(239,68,68,0.7)] animate-pulse' },
-  { id: 'pfp_volt_rim', name: 'Electric Ring', rarity: 'Legendary', cost: 0, borderClass: 'border-2 border-cyan-400 shadow-[0_0_18px_rgba(34,211,238,0.7)] animate-pulse' },
-  { id: 'pfp_glitch_border', name: 'System Glitch', rarity: 'Legendary', cost: 0, borderClass: 'border-2 border-pink-500/80 shadow-[0_0_12px_rgba(244,114,182,0.6)]' },
-  { id: 'pfp_golden_shimmer', name: 'Royal Gild Shimmer', rarity: 'Legendary', cost: 0, borderClass: 'border-[2.5px] border-yellow-300 shadow-[0_0_15px_rgba(253,224,71,0.7)] animate-pulse' },
-
-  // Mythic (4 items)
-  { id: 'pfp_celestial_galaxy', name: 'Cosmic Singularity', rarity: 'Mythic', cost: 0, borderClass: 'border-[3px] border-purple-400 shadow-[0_0_22px_rgba(168,85,247,0.9),inset_0_0_8px_rgba(168,85,247,0.5)]' },
-  { id: 'pfp_royal_crown', name: 'Aureate Ring', rarity: 'Mythic', cost: 0, borderClass: 'border-[3px] border-yellow-400 shadow-[0_0_22px_rgba(234,179,8,0.9),inset_0_0_8px_rgba(234,179,8,0.5)] animate-pulse' },
-  { id: 'pfp_void_ring', name: 'Void Warp Ring', rarity: 'Mythic', cost: 0, borderClass: 'border-[3.5px] border-indigo-600 shadow-[0_0_25px_rgba(79,70,229,0.95)]' },
-  { id: 'pfp_god_ring', name: 'Overload Spark', rarity: 'Mythic', cost: 0, borderClass: 'border-[3.5px] border-cyan-400 shadow-[0_0_28px_rgba(6,182,212,0.95)] animate-pulse' }
-].map(c => ({ ...c, cost: 0 })) as PfpBorderStyle[];
