@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile, Message, News, ProfileLike } from '../types';
-import { LogOut, Send, Search, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, CheckCircle, Sparkles, ArrowLeft, Globe, User, MessageSquare, Layers, Wallet, Settings, Plus, Coins, Paintbrush, UserPlus, UserMinus, UserCheck, HeartOff } from 'lucide-react';
+import { LogOut, Send, Search, MoreVertical, X, Upload, Loader2, Link as LinkIcon, Image as ImageIcon, Music, List, ListOrdered, Quote, Minus, ShieldCheck, Menu, ThumbsUp, Heart, Laugh, ChevronLeft, ChevronRight, Grid, ArrowRight, Check, CheckCircle, Sparkles, ArrowLeft, Globe, User, MessageSquare, Layers, Wallet, Settings, Plus, Coins, Paintbrush, UserPlus, UserMinus, UserCheck, HeartOff, Eye, Lock, Gem } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
@@ -3424,6 +3424,15 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           currentUserProfile={currentUserProfile}
           onProfileUpdate={onProfileUpdate}
           onClose={() => setShowConvertCoinsModal(false)}
+        />
+      )}
+
+      {showProfileViewsModal && (
+        <ProfileViewsModal
+          currentUserProfile={currentUserProfile}
+          allProfiles={allProfiles}
+          onProfileUpdate={onProfileUpdate}
+          onClose={() => setShowProfileViewsModal(false)}
         />
       )}
 
