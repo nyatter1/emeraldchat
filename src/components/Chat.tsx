@@ -1709,27 +1709,31 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [rankOverrides, setRankOverrides] = useState<Record<string, string>>({});
 
   // Computed incoming friend requests
-  const incomingFriendRequests = allProfiles.filter(other => {
-    if (other.id === currentUserProfile.id) return false;
-    const otherBio = parseBio(other.bio);
-    const myBio = parseBio(currentUserProfile.bio);
-    const sentToMe = otherBio.friend_requests_sent?.includes(currentUserProfile.id);
-    const alreadyFriends = myBio.friends?.includes(other.id);
-    const isIgnored = (myBio as any).ignored_friend_requests?.includes(other.id);
-    return sentToMe && !alreadyFriends && !isIgnored;
-  });
+  const myBio = useMemo(() => parseBio(currentUserProfile.bio), [currentUserProfile.bio]);
+
+  const incomingFriendRequests = useMemo(() => {
+    return allProfiles.filter(other => {
+      if (other.id === currentUserProfile.id) return false;
+      const otherBio = parseBio(other.bio);
+      const sentToMe = otherBio.friend_requests_sent?.includes(currentUserProfile.id);
+      const alreadyFriends = myBio.friends?.includes(other.id);
+      const isIgnored = (myBio as any).ignored_friend_requests?.includes(other.id);
+      return sentToMe && !alreadyFriends && !isIgnored;
+    });
+  }, [allProfiles, currentUserProfile.id, myBio]);
 
   // Computed incoming relationship requests
-  const incomingRelationshipRequests = allProfiles.filter(other => {
-    if (other.id === currentUserProfile.id) return false;
-    const otherBio = parseBio(other.bio);
-    const myBio = parseBio(currentUserProfile.bio);
-    const sentToMe = otherBio.relationship_request_sent === currentUserProfile.id;
-    const alreadyDating = myBio.dating_user_id === other.id;
-    const areFriends = myBio.friends?.includes(other.id) && otherBio.friends?.includes(currentUserProfile.id);
-    const isIgnored = (myBio as any).ignored_relationship_requests?.includes(other.id);
-    return sentToMe && !alreadyDating && areFriends && !isIgnored;
-  });
+  const incomingRelationshipRequests = useMemo(() => {
+    return allProfiles.filter(other => {
+      if (other.id === currentUserProfile.id) return false;
+      const otherBio = parseBio(other.bio);
+      const sentToMe = otherBio.relationship_request_sent === currentUserProfile.id;
+      const alreadyDating = myBio.dating_user_id === other.id;
+      const areFriends = myBio.friends?.includes(other.id) && otherBio.friends?.includes(currentUserProfile.id);
+      const isIgnored = (myBio as any).ignored_relationship_requests?.includes(other.id);
+      return sentToMe && !alreadyDating && areFriends && !isIgnored;
+    });
+  }, [allProfiles, currentUserProfile.id, myBio]);
 
   const totalIncomingRequestsCount = incomingFriendRequests.length + incomingRelationshipRequests.length;
 
@@ -1897,7 +1901,11 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
       content: content.trim()
     });
     if (error) {
-      toast.error("Failed to send message: " + error.message);
+      if (error.message.includes('find the table')) {
+        toast.error("Please apply supabase.sql in your Supabase Dashboard to create the PMs table!");
+      } else {
+        toast.error("Failed to send message: " + error.message);
+      }
     }
   };
 
@@ -2963,6 +2971,15 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
               <User className="h-5 w-5" />
             </button>
 
+            {/* Private Messages Button */}
+            <button 
+              onClick={() => setShowPmInbox(true)}
+              className="relative p-2 text-zinc-400 hover:text-emerald-500 hover:bg-[#1e1e22] rounded-lg transition-colors focus:outline-none"
+              title="Private Messages"
+            >
+              <MessageSquare className="h-5.5 w-5.5 text-zinc-300" />
+            </button>
+
             {/* Friend Requests Glow Button */}
             <button 
               onClick={() => setShowSocialRequestsModal(true)}
@@ -3505,6 +3522,20 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           onClose={() => setShowSocialRequestsModal(false)}
           incomingFriendRequests={incomingFriendRequests}
           incomingRelationshipRequests={incomingRelationshipRequests}
+        />
+      )}
+
+      {showPmInbox && (
+        <PrivateMessagesModal 
+          currentUserProfile={currentUserProfile}
+          allProfiles={allProfiles}
+          privateMessages={privateMessages}
+          onClose={() => {
+            setShowPmInbox(false);
+            setPmTargetId(null);
+          }}
+          onSendMessage={handleSendPrivateMessage}
+          initialTargetId={pmTargetId}
         />
       )}
 
@@ -4182,19 +4213,6 @@ function ProfileModal({
           }} 
         />
       )}
-      {showPmInbox && (
-        <PrivateMessagesModal 
-          currentUserProfile={currentUserProfile}
-          allProfiles={allProfiles}
-          privateMessages={privateMessages}
-          onClose={() => {
-            setShowPmInbox(false);
-            setPmTargetId(null);
-          }}
-          onSendMessage={handleSendPrivateMessage}
-          initialTargetId={pmTargetId}
-        />
-      )}
     </div>
   );
 }
@@ -4601,6 +4619,7 @@ function PrivateMessagesModal({
 }: any) {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(initialTargetId);
   const [newMessage, setNewMessage] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const contacts = useMemo(() => {
@@ -4611,6 +4630,12 @@ function PrivateMessagesModal({
     });
     return allProfiles.filter(p => userIds.has(p.id));
   }, [privateMessages, allProfiles, currentUserProfile.id]);
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const query = searchQuery.toLowerCase();
+    return allProfiles.filter(p => p.id !== currentUserProfile.id && p.username?.toLowerCase().includes(query)).slice(0, 5);
+  }, [searchQuery, allProfiles, currentUserProfile.id]);
 
   const currentChat = useMemo(() => {
     if (!selectedUserId) return [];
@@ -4630,59 +4655,112 @@ function PrivateMessagesModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in font-sans">
-      <div className="w-full max-w-2xl h-[600px] bg-[#0c0c0c] border border-zinc-800 rounded-[2rem] shadow-2xl flex overflow-hidden">
+      <div className="w-full max-w-4xl h-[700px] max-h-[90vh] bg-[#0c0c0c] border border-zinc-800 rounded-[2rem] shadow-2xl flex overflow-hidden">
         {/* Sidebar */}
-        <div className="w-64 border-r border-zinc-800 flex flex-col bg-[#0a0a0a]">
-          <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
-            <h2 className="text-sm font-black uppercase tracking-tight text-white">Messages</h2>
-            <button onClick={onClose} className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors md:hidden">
-              <X className="w-4 h-4 text-zinc-400" />
-            </button>
+        <div className="w-72 border-r border-zinc-800 flex flex-col bg-[#0a0a0a]">
+          <div className="p-5 border-b border-zinc-800 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-black uppercase tracking-tight text-white">Messages</h2>
+              <button onClick={onClose} className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors md:hidden">
+                <X className="w-4 h-4 text-zinc-400" />
+              </button>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <input 
+                type="text" 
+                placeholder="Find users..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 transition-colors"
+              />
+            </div>
           </div>
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-            {contacts.length === 0 ? (
+          
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1 relative">
+            {searchQuery.trim() ? (
+              <div className="absolute top-0 left-0 right-0 p-2 z-10 bg-[#0a0a0a]">
+                <h3 className="text-[10px] font-bold text-zinc-500 uppercase px-2 mb-2">Search Results</h3>
+                {searchResults.length === 0 && <div className="text-xs text-zinc-500 px-2">No users found</div>}
+                {searchResults.map(user => (
+                  <button 
+                    key={user.id}
+                    onClick={() => {
+                      setSelectedUserId(user.id);
+                      setSearchQuery('');
+                    }}
+                    className="w-full flex items-center gap-3 p-3 rounded-2xl transition-all hover:bg-zinc-900 border border-transparent"
+                  >
+                    <RenderPfpWithCustomBorder profile={user} size={32} />
+                    <div className="text-left overflow-hidden">
+                      <div className="text-xs font-bold truncate text-zinc-200">{user.username}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {!searchQuery && contacts.length === 0 ? (
               <div className="text-center py-10 text-zinc-600 text-[11px] font-medium px-4">
                 No active conversations
               </div>
-            ) : (
+            ) : !searchQuery ? (
               contacts.map(user => (
                 <button 
                   key={user.id}
                   onClick={() => setSelectedUserId(user.id)}
                   className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all ${selectedUserId === user.id ? 'bg-emerald-500/10 border border-emerald-500/20' : 'hover:bg-zinc-900 border border-transparent'}`}
                 >
-                  <img src={user.avatar_url} className="w-10 h-10 rounded-full object-cover border border-zinc-800" alt="Avatar" />
+                  <RenderPfpWithCustomBorder profile={user} size={36} />
                   <div className="text-left overflow-hidden">
                     <div className={`text-xs font-bold truncate ${selectedUserId === user.id ? 'text-emerald-400' : 'text-zinc-200'}`}>{user.username}</div>
                     <div className="text-[10px] text-zinc-500 truncate">Click to chat</div>
                   </div>
                 </button>
               ))
-            )}
+            ) : null}
           </div>
         </div>
 
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col bg-[#0c0c0c]">
+        <div className="flex-1 flex flex-col bg-[#0c0c0c] min-w-0">
           {selectedUserId ? (
             <>
-              <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+              <div className="p-5 border-b border-zinc-800 flex items-center justify-between shadow-sm z-10">
                 <div className="flex items-center gap-3">
-                  <img src={selectedUser?.avatar_url} className="w-8 h-8 rounded-full border border-zinc-800" alt="Avatar" />
-                  <h3 className="text-sm font-bold text-white">{selectedUser?.username}</h3>
+                  {selectedUser && <RenderPfpWithCustomBorder profile={selectedUser} size={36} />}
+                  <h3 className="text-base font-extrabold text-white">{selectedUser?.username}</h3>
                 </div>
-                <button onClick={onClose} className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors">
+                <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors active:scale-95">
                   <X className="w-5 h-5 text-zinc-400" />
                 </button>
               </div>
-              <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-4">
+              <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5">
                 {currentChat.map((m: any) => {
                   const isMe = m.sender_id === currentUserProfile.id;
+                  const msgProfile = isMe ? currentUserProfile : selectedUser;
+                  const bioObj = msgProfile ? parseBio(msgProfile.bio) : {} as any;
+                  const messageCardId = bioObj.message_card || 'none';
+                  const messageCard = MESSAGE_CARDS.find(c => c.id === messageCardId) || MESSAGE_CARDS[0];
+                  const isCustomCard = messageCard.id !== 'none';
+
                   return (
-                    <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${isMe ? 'bg-emerald-600 text-white' : 'bg-zinc-900 text-zinc-200 border border-zinc-800'}`}>
-                        {m.content}
-                        <div className={`text-[10px] mt-1 opacity-50 ${isMe ? 'text-right' : 'text-left'}`}>
+                    <div key={m.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                      <div className="shrink-0 mt-1">
+                        {msgProfile && <RenderPfpWithCustomBorder profile={msgProfile} size={36} />}
+                      </div>
+                      <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]`}>
+                        <div 
+                           className={`relative ${isCustomCard ? messageCard.bubbleClass : (isMe ? 'bg-emerald-600 text-white px-4 py-2' : 'bg-zinc-800 text-zinc-200 px-4 py-2 border border-zinc-700')} text-[15px] font-medium leading-relaxed ${!isCustomCard && 'rounded-[20px]'}`} 
+                           style={isCustomCard ? messageCard.bubbleStyle : {}}
+                        >
+                          <div className="break-words">
+                            <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} className="markdown-body">
+                              {m.content}
+                            </Markdown>
+                          </div>
+                        </div>
+                        <div className={`text-[10px] mt-1 opacity-50 font-medium tracking-wide ${isMe ? 'pr-2' : 'pl-2'}`}>
                           {format(new Date(m.created_at), 'HH:mm')}
                         </div>
                       </div>
@@ -4698,32 +4776,29 @@ function PrivateMessagesModal({
                     setNewMessage('');
                   }
                 }}
-                className="p-5 border-t border-zinc-800 flex gap-2"
+                className="p-4 border-t border-zinc-800 flex gap-3 bg-[#0a0a0a]"
               >
                 <input 
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+                  placeholder={`Message @${selectedUser?.username || 'user'}...`}
+                  className="flex-1 bg-zinc-900 border border-zinc-700 rounded-full px-5 py-3 text-[15px] text-white focus:outline-none focus:border-emerald-500/50 transition-colors shadow-inner"
                 />
-                <button type="submit" className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white transition-all active:scale-95">
-                  <Send className="w-5 h-5" />
+                <button type="submit" disabled={!newMessage.trim()} className="p-3 bg-emerald-600 disabled:opacity-50 disabled:bg-zinc-800 hover:bg-emerald-500 rounded-full text-white transition-all active:scale-95 shadow-md">
+                  <Send className="w-5 h-5 ml-1 my-0.5 mr-0.5" />
                 </button>
               </form>
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-10">
-              <div className="w-16 h-16 bg-zinc-900 rounded-3xl flex items-center justify-center mb-4 border border-zinc-800 text-emerald-500/50">
-                <MessageSquare className="w-8 h-8" />
-              </div>
-              <h3 className="text-white font-bold mb-1">Private Messaging</h3>
-              <p className="text-zinc-500 text-xs max-w-[200px]">Select a contact from the left to start chatting privately.</p>
-              <button 
-                onClick={onClose} 
-                className="mt-6 px-5 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-bold text-zinc-300 hover:bg-zinc-800 md:hidden"
-              >
-                Close
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-10 relative">
+              <button onClick={onClose} className="absolute top-5 right-5 p-2 hover:bg-zinc-800 rounded-lg transition-colors active:scale-95">
+                <X className="w-5 h-5 text-zinc-400" />
               </button>
+              <div className="w-20 h-20 bg-zinc-900 rounded-[2rem] flex items-center justify-center mb-6 border border-zinc-800 text-emerald-500 shadow-2xl">
+                <MessageSquare className="w-10 h-10" />
+              </div>
+              <h3 className="text-white text-xl font-black mb-2 tracking-tight">Private Messaging</h3>
+              <p className="text-zinc-400 text-sm max-w-xs leading-relaxed">Search for users on the left or select a contact to start chatting privately.</p>
             </div>
           )}
         </div>
