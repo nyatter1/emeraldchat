@@ -1541,7 +1541,11 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
        supabase.from('profile_views').insert({
          viewer_id: currentUserProfile.id,
          viewed_id: selectedProfileId
-       }).then(() => {});
+       }).then(({ error }) => {
+         if (error) {
+           console.error("Profile view insert error:", error);
+         }
+       });
     }
   }, [selectedProfileId, currentUserProfile.id]);
 
@@ -4540,16 +4544,18 @@ function ProfileViewsModal({ currentUserProfile, allProfiles, onProfileUpdate, o
     const fetchData = async () => {
       setLoading(true);
       if (isUnlocked && activeTab === 'insights') {
-        const { data } = await supabase.from('profile_views')
+        const { data, error } = await supabase.from('profile_views')
           .select('*')
           .eq('viewed_id', currentUserProfile.id)
           .order('created_at', { ascending: false });
+        if (error) console.error("Error fetching profile views:", error);
         if (data) setViews(data);
       } else if (activeTab === 'leaderboard') {
-        const { data } = await supabase.from('profile_views_leaderboard')
+        const { data, error } = await supabase.from('profile_views_leaderboard')
           .select('*')
           .order('total_views', { ascending: false })
           .limit(50);
+        if (error) console.error("Error fetching leaderboard:", error);
         if (data) setLeaderboard(data);
       }
       setLoading(false);
@@ -4569,7 +4575,7 @@ function ProfileViewsModal({ currentUserProfile, allProfiles, onProfileUpdate, o
     const { error } = await supabase.from('profiles').update({ bio: JSON.stringify(newBio) }).eq('id', currentUserProfile.id);
     setIsPurchasing(false);
     if (!error) {
-      onProfileUpdate();
+      onProfileUpdate({ ...currentUserProfile, bio: JSON.stringify(newBio) });
       toast.success('Profile Insights unlocked for 24 hours!');
     }
   };
@@ -4690,7 +4696,7 @@ function ProfileViewsModal({ currentUserProfile, allProfiles, onProfileUpdate, o
                            </div>
                          </div>
                          <div className="text-emerald-500 font-black text-lg">
-                           {entry.total_views} <span className="text-[10px] text-zinc-500 uppercase tracking-widestml-1">Views</span>
+                           {entry.total_views} <span className="text-[10px] text-zinc-500 uppercase tracking-widest ml-1">Views</span>
                          </div>
                        </div>
                      );
