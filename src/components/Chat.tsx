@@ -1091,7 +1091,7 @@ export function RenderPfpWithCustomBorder({
     <img 
       src={avatarUrl} 
       alt="Avatar" 
-      className={`object-cover border border-zinc-800 shrink-0 shadow-sm transition-all hover:scale-105 duration-100 ${roundedClass} ${className}`}
+      className={`object-cover shrink-0 shadow-sm transition-all hover:scale-105 duration-100 ${roundedClass} ${className}`}
       style={{ width: `${size}px`, height: `${size}px`, cursor: onClick ? 'pointer' : 'default' }}
       onClick={onClick}
     />
@@ -3725,7 +3725,7 @@ function ProfileModal({
                 <div className="px-6 pb-4 relative shrink-0">
                   <div className="flex justify-between items-end">
                     <div 
-                      className="relative group mt-3 mb-3 border-4 border-[#141416] rounded-full h-24 w-24 bg-zinc-800 shrink-0"
+                      className="relative group mt-3 mb-3 rounded-full h-24 w-24 shrink-0"
                     >
                        <RenderPfpWithCustomBorder profile={profile} size={96} roundedClass="rounded-full" />
                        {editMode && (
@@ -5509,7 +5509,7 @@ function ProfileBorderForm({ profile, onClose, onSave, bioData, initialTab }: an
                   <div className="relative z-10 flex flex-col h-full overflow-y-auto pb-4 custom-scrollbar">
                     <div className="px-5 pb-3 relative shrink-0">
                       <div className="flex justify-between items-end">
-                        <div className="relative border-4 border-[#141416] rounded-full h-18 w-18 bg-zinc-800 shrink-0 overflow-hidden -mt-9">
+                        <div className="relative rounded-full h-18 w-18 shrink-0 overflow-hidden -mt-9">
                           <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover rounded-full" />
                         </div>
                       </div>
@@ -6129,7 +6129,7 @@ function ProfileBorderFormOld({ profile, onClose, onSave, bioData }: any) {
 
                   <div className="relative z-10 flex flex-col items-center">
                     {/* Standard circle-cropped avatar representation */}
-                    <div className="mt-[-28px] border-4 border-[#141416] rounded-full h-14 w-14 bg-zinc-800 relative z-20 shrink-0 overflow-hidden">
+                    <div className="mt-[-28px] rounded-full h-14 w-14 relative z-20 shrink-0 overflow-hidden">
                       <img src={profile.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
                     </div>
 
@@ -6331,7 +6331,7 @@ function ProfileBorderFormOld({ profile, onClose, onSave, bioData }: any) {
                 </div>
                 <div className="px-3 pb-3 pt-0.5 relative">
                   <div className="relative z-10 flex flex-col items-center">
-                    <div className="mt-[-20px] border-3 border-[#141416] rounded-full h-11 w-11 bg-zinc-850 shrink-0 overflow-hidden">
+                    <div className="mt-[-20px] rounded-full h-11 w-11 shrink-0 overflow-hidden">
                       <img src={profile.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
                     </div>
                     <div className="text-center w-full mt-1.5">
