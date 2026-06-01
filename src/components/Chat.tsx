@@ -10,13 +10,14 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { PROFILE_EFFECTS, PROFILE_COMBOS, EFFECTS_KEYFRAMES, ProfileEffectRenderer } from './ProfileEffects';
 import { USERCARD_STYLES } from '../usercardStyles';
+import { MESSAGE_CARDS, PFP_BORDERS } from '../messageCardsAndPFPStyles';
 
 const SPOTIFY_URL_REGEX = /https:\/\/open\.spotify\.com\/(track|album|playlist|episode)\/([a-zA-Z0-9]+)(\?.*)?/;
 const IMAGE_EXT_REGEX = /\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i;
 const VIDEO_EXT_REGEX = /\.(mp4|webm|ogg|mov)(\?.*)?$/i;
 const FORBIDDEN_TLDS = /\.(online|site|indevs\.in)(\/.*)?$/i;
 
-export const DEV_EMAILS = ['test@gmail.com', 'dev@gmail.com', 'haydensixseven@gmail.com'];
+export const DEV_EMAILS = ['test@gmail.com', 'dev@gmail.com', 'haydensixseven@gmail.com','onetallteen@duck.com' ];
 export const FOUNDER_EMAILS: string[] = ['minlee214@gmail.com']; // Add emails here
 export const MOP_EMAILS: string[] = []; // Add emails here
 export const SUPERADMIN_EMAILS: string[] = [];
@@ -966,6 +967,8 @@ export interface BioData {
   profile_card_bg?: string;
   profile_border?: string;
   profile_effect?: string;
+  message_card?: string;
+  pfp_border?: string;
   assigned_ranks?: Record<string, string>;
   custom_fonts?: Record<string, string>;
   banned_users?: string[];
@@ -995,6 +998,8 @@ export function parseBio(bioStr: string | null | undefined): BioData {
     text: '', 
     mood: '', 
     profile_effect: 'none', 
+    message_card: 'none',
+    pfp_border: 'none',
     gems: 5, 
     coins: 1000, 
     invisible: false, 
@@ -1020,6 +1025,8 @@ export function parseBio(bioStr: string | null | undefined): BioData {
       profile_card_bg: data.profile_card_bg || '',
       profile_border: data.profile_border || 'none',
       profile_effect: data.profile_effect || 'none',
+      message_card: data.message_card || 'none',
+      pfp_border: data.pfp_border || 'none',
       assigned_ranks: data.assigned_ranks || {},
       custom_fonts: data.custom_fonts || {},
       banned_users: data.banned_users || [],
@@ -1048,6 +1055,8 @@ export function parseBio(bioStr: string | null | undefined): BioData {
     text: bioStr, 
     mood: '', 
     profile_effect: 'none', 
+    message_card: 'none',
+    pfp_border: 'none',
     gems: 5, 
     coins: 1000, 
     invisible: false, 
@@ -1063,6 +1072,54 @@ export function parseBio(bioStr: string | null | undefined): BioData {
     hide_friends_on_profile: false,
     hide_me_from_friends: false
   };
+}
+
+export function RenderPfpWithCustomBorder({ 
+  profile, 
+  size = 42, 
+  onClick, 
+  className = "",
+  roundedClass = "rounded-md"
+}: { 
+  profile: any, 
+  size?: number, 
+  onClick?: () => void, 
+  className?: string,
+  roundedClass?: string
+}) {
+  const bioData = parseBio(profile?.bio);
+  const pfpBorderId = bioData.pfp_border || 'none';
+  const pfpBorder = PFP_BORDERS.find(b => b.id === pfpBorderId) || PFP_BORDERS[0];
+  const borderStyles = pfpBorder.borderStyle || {};
+
+  const avatarUrl = profile?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=default';
+
+  if (pfpBorderId === 'none') {
+    return (
+      <img 
+        src={avatarUrl} 
+        alt="Avatar" 
+        className={`object-cover border border-zinc-800 shrink-0 ${roundedClass} ${className}`}
+        style={{ width: `${size}px`, height: `${size}px` }}
+        onClick={onClick}
+      />
+    );
+  }
+
+  const wrapperSize = size + 6;
+  return (
+    <div 
+      className={`relative shrink-0 flex items-center justify-center p-[2px] transition-all hover:scale-105 duration-100 ${pfpBorder.borderClass || ''} ${roundedClass} ${className}`}
+      style={{ ...borderStyles, width: `${wrapperSize}px`, height: `${wrapperSize}px` }}
+      onClick={onClick}
+    >
+      <img 
+        src={avatarUrl} 
+        alt="Avatar" 
+        className={`w-full h-full object-cover ${roundedClass}`}
+      />
+    </div>
+  );
 }
 
 export function stringifyBio(data: BioData): string {
@@ -2714,7 +2771,10 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                  <div className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-600 rounded-full border border-zinc-950" />
                )}
              </button>
-             <img src="/logo.png" alt="Logo" className="h-[22px] object-contain ml-2" />
+             <div className="flex items-center gap-2 ml-2 select-none">
+               <img src="/logo.png" className="h-6 w-6 object-contain" alt="Emerald Chat Logo" />
+               <span className="text-emerald-500 font-extrabold text-lg tracking-normal">Emerald Chat</span>
+             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-4 relative" ref={menuRef}>
             <button
@@ -2853,6 +2913,10 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           <div className="space-y-2">
             {visibleMessages.map((msg, index) => {
               const renderMsg = transformMessage(msg);
+              const msgBio = parseBio(renderMsg.profiles?.bio);
+              const messageCardId = msgBio.message_card || 'none';
+              const messageCard = MESSAGE_CARDS.find(c => c.id === messageCardId) || MESSAGE_CARDS[0];
+              const isCustomCard = messageCard.id !== 'none';
               return (
                 <div 
                   key={renderMsg.id || index} 
@@ -2864,19 +2928,12 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                 >
                   <UserProfileFontsLoader bio={renderMsg.profiles?.bio} />
                   <div className="flex items-start gap-3">
-                    {(() => {
-                      const msgBio = parseBio(renderMsg.profiles?.bio);
-                      const msgBorderId = msgBio.profile_border || 'none';
-                      const msgBorder = PROFILE_BORDERS.find(b => b.id === msgBorderId) || PROFILE_BORDERS[0];
-                      return (
-                        <img 
-                          src={renderMsg.profiles?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=default'} 
-                          alt="Avatar" 
-                          className="h-[42px] w-[42px] rounded-md object-cover shrink-0 mt-0.5 cursor-pointer border border-zinc-800"
-                          onClick={() => setSelectedProfileId(renderMsg.user_id)}
-                        />
-                      );
-                    })()}
+                    <RenderPfpWithCustomBorder 
+                      profile={renderMsg.profiles} 
+                      size={42} 
+                      onClick={() => setSelectedProfileId(renderMsg.user_id)} 
+                      className="mt-0.5"
+                    />
                     <div className="flex flex-col w-full">
                       <div className="flex items-baseline justify-between mb-0.5">
                         <div className="flex items-center gap-2 leading-none">
@@ -2887,7 +2944,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                           <span className="text-xs text-zinc-500">{format(new Date(renderMsg.created_at), 'dd/MM HH:mm')}</span>
                         </div>
                       </div>
-                      <div className="text-zinc-200 text-[15px] leading-relaxed break-words relative pr-12">
+                      <div className={isCustomCard ? `mt-1 p-2.5 rounded-xl border max-w-[85%] relative shadow-md break-words ${messageCard.bubbleClass}` : "text-zinc-200 text-[15px] leading-relaxed break-words relative pr-12"} style={isCustomCard ? messageCard.bubbleStyle : undefined}>
                         {renderMsg.content?.startsWith('__SYSTEM__:') ? (
                           <div className="bg-[#111] border border-zinc-800 rounded-md p-3 my-2 text-sm text-zinc-300">
                              <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={MarkdownComponents}>
@@ -3118,10 +3175,10 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                   style={isDefaultCard ? undefined : cardStyleObj.style}
                 >
                   <div className="relative shrink-0">
-                    <img 
-                      src={user.avatar_url} 
-                      alt="Avatar" 
-                      className="h-[34px] w-[34px] rounded-full object-cover border border-zinc-800" 
+                    <RenderPfpWithCustomBorder 
+                      profile={user} 
+                      size={34} 
+                      roundedClass="rounded-full" 
                     />
                     <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#1e1e22] bg-emerald-500"></div>
                   </div>
@@ -3184,10 +3241,11 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                         style={isDefaultCard ? undefined : { ...cardStyleObj.style, filter: 'grayscale(25%) saturate(85%) opacity(85%)' }}
                       >
                         <div className="relative shrink-0">
-                          <img 
-                            src={user.avatar_url} 
-                            alt="Avatar" 
-                            className="h-[34px] w-[34px] rounded-full object-cover border border-zinc-900/80 filter grayscale" 
+                          <RenderPfpWithCustomBorder 
+                            profile={user} 
+                            size={34} 
+                            roundedClass="rounded-full" 
+                            className="filter grayscale"
                           />
                           <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#141416] bg-zinc-600"></div>
                         </div>
@@ -3284,7 +3342,7 @@ function ProfileModal({
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
-  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | 'border' | 'border_borders' | 'border_effects' | 'border_combos' | 'border_creator' | 'preferences' | 'usercards' | null>(null);
+  const [activeEditModal, setActiveEditModal] = useState<'info' | 'username' | 'bio' | 'mood' | 'music' | 'card_bg' | 'border' | 'border_borders' | 'border_effects' | 'border_combos' | 'border_creator' | 'preferences' | 'usercards' | 'message_cards' | 'pfp_borders' | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'bio' | 'friends'>('bio');
   const [isPlaying, setIsPlaying] = useState(false);
   
@@ -3508,9 +3566,9 @@ function ProfileModal({
                 <div className="px-6 pb-4 relative shrink-0">
                   <div className="flex justify-between items-end">
                     <div 
-                      className="relative group mt-3 mb-3 border-4 border-[#141416] rounded-full h-24 w-24 bg-zinc-800 shrink-0 overflow-hidden"
+                      className="relative group mt-3 mb-3 border-4 border-[#141416] rounded-full h-24 w-24 bg-zinc-800 shrink-0"
                     >
-                       <img src={profile!.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
+                       <RenderPfpWithCustomBorder profile={profile} size={96} roundedClass="rounded-full" />
                        {editMode && (
                         <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity rounded-full">
                           <Upload className="h-6 w-6 text-white" />
@@ -3703,16 +3761,17 @@ function ProfileModal({
                 ) : (
                   <div className="px-6 pb-6 pt-2 z-10 relative">
                     <div className="grid grid-cols-2 gap-3">
-                      <button onClick={() => setActiveEditModal('username')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Username</button>
-                      <button onClick={() => setActiveEditModal('mood')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Mood</button>
-                      <button onClick={() => setActiveEditModal('info')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Age & Gender</button>
-                      <button onClick={() => setActiveEditModal('bio')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Edit Bio</button>
+                      <button onClick={() => setActiveEditModal('username')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><User className="w-4 h-4 text-emerald-500" /> Edit Username</button>
+                      <button onClick={() => setActiveEditModal('mood')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Laugh className="w-4 h-4 text-emerald-500" /> Edit Mood</button>
+                      <button onClick={() => setActiveEditModal('info')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Heart className="w-4 h-4 text-emerald-500" /> Edit Age & Gender</button>
+                      <button onClick={() => setActiveEditModal('bio')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Quote className="w-4 h-4 text-emerald-500" /> Edit Bio</button>
                       <button onClick={() => setActiveEditModal('music')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Music className="w-4 h-4 text-emerald-500" /> Edit Music</button>
                       <button onClick={() => setActiveEditModal('card_bg')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><ImageIcon className="w-4 h-4 text-emerald-500" /> Edit Background</button>
-                      <button onClick={() => setActiveEditModal('border_borders')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Borders</button>
-                      <button onClick={() => setActiveEditModal('border_effects')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Effects</button>
-                      <button onClick={() => setActiveEditModal('border_combos')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Combos</button>
-                      <button onClick={() => setActiveEditModal('border_creator')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors">Creator</button>
+                      <button onClick={() => setActiveEditModal('border_borders')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><ShieldCheck className="w-4 h-4 text-emerald-500" /> Borders</button>
+                      <button onClick={() => setActiveEditModal('border_effects')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Sparkles className="w-4 h-4 text-emerald-500" /> Effects</button>
+                      <button onClick={() => setActiveEditModal('border_combos')} className="py-2.5 bg-[#1e1e22] border border-zinc-800 hover:bg-[#252529] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"><Paintbrush className="w-4 h-4 text-emerald-500" /> Combos</button>
+                      <button onClick={() => setActiveEditModal('pfp_borders')} className="py-2.5 bg-[#1e1e22] border border-violet-500/20 hover:border-violet-500/55 hover:bg-[#252529] text-violet-400 font-semibold rounded-lg text-sm transition-all flex items-center justify-center gap-1.5"><User className="w-4 h-4 text-violet-400" /> PFP Borders</button>
+                      <button onClick={() => setActiveEditModal('message_cards')} className="py-2.5 bg-[#1e1e22] border border-cyan-500/20 hover:border-cyan-500/55 hover:bg-[#252529] text-cyan-400 font-semibold rounded-lg text-sm transition-all col-span-2 flex items-center justify-center gap-1.5"><MessageSquare className="w-4 h-4 text-cyan-400" /> Message Cards</button>
                       <button onClick={() => setActiveEditModal('usercards')} className="py-2.5 bg-[#1e1e22] border border-emerald-500/20 hover:border-emerald-500/50 hover:bg-[#252529] text-emerald-400 hover:text-emerald-300 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5 shadow-md col-span-2">
                         <Layers className="w-4.5 h-4.5 text-emerald-500" /> Usercards
                       </button>
@@ -3849,8 +3908,22 @@ function ProfileModal({
           }} 
         />
       )}
-      {activeEditModal === 'border_creator' && (
-        <ProfileCreatorModal 
+      {activeEditModal === 'message_cards' && (
+        <MessageCardsModal 
+          profile={profile!} 
+          bioData={bioData} 
+          onClose={() => setActiveEditModal(null)} 
+          onSave={(val: any) => {
+            const newBio = stringifyBio({ 
+              ...bioData, 
+              ...val
+            });
+            updateProfileData({ bio: newBio });
+          }} 
+        />
+      )}
+      {activeEditModal === 'pfp_borders' && (
+        <PfpBordersModal 
           profile={profile!} 
           bioData={bioData} 
           onClose={() => setActiveEditModal(null)} 
@@ -4103,6 +4176,294 @@ function ProfileBordersModal({ profile, bioData, onClose, onSave }: any) {
     <CosmeticShopLayout
       title="Profile Borders"
       tag="FREE"
+      onClose={onClose}
+      onSave={handleSave}
+      onPrev={handlePrev}
+      onNext={handleNext}
+      onViewGrid={() => setScreen(screen === 'preview' ? 'grid' : 'preview')}
+      screen={screen}
+      previewNode={previewNode}
+      gridNode={gridNode}
+    />
+  );
+}
+
+function MessageCardsModal({ profile, bioData, onClose, onSave }: any) {
+  const [screen, setScreen] = useState<'preview' | 'grid'>('preview');
+  const [previewCardId, setPreviewCardId] = useState(() => bioData?.message_card || 'none');
+  const [index, setIndex] = useState(() => {
+    const currentId = bioData?.message_card || 'none';
+    const foundIdx = MESSAGE_CARDS.findIndex(c => c.id === currentId);
+    return foundIdx >= 0 ? foundIdx : 0;
+  });
+
+  const unlockedCards = bioData?.unlocked_message_cards || [];
+
+  useEffect(() => {
+    const idx = MESSAGE_CARDS.findIndex(c => c.id === previewCardId);
+    if (idx >= 0) setIndex(idx);
+  }, [previewCardId]);
+
+  const handlePrev = () => {
+    const nextIdx = (index - 1 + MESSAGE_CARDS.length) % MESSAGE_CARDS.length;
+    setIndex(nextIdx);
+    setPreviewCardId(MESSAGE_CARDS[nextIdx].id);
+  };
+
+  const handleNext = () => {
+    const nextIdx = (index + 1) % MESSAGE_CARDS.length;
+    setIndex(nextIdx);
+    setPreviewCardId(MESSAGE_CARDS[nextIdx].id);
+  };
+
+  const currentCard = MESSAGE_CARDS[index] || MESSAGE_CARDS[0];
+  const isCustom = currentCard.id !== 'none';
+  const isUnlocked = currentCard.cost === 0 || unlockedCards.includes(currentCard.id);
+
+  const handleSave = () => {
+    if (!isUnlocked) {
+      const userCoins = bioData?.coins ?? 0;
+      if (userCoins < currentCard.cost) {
+        toast.error(`You need ${currentCard.cost} Coins to purchase this. You currently have ${userCoins} Coins.`);
+        return;
+      }
+      // Purchase item!
+      const updatedCoins = userCoins - currentCard.cost;
+      const updatedUnlocked = [...unlockedCards, currentCard.id];
+      onSave({ 
+        message_card: currentCard.id,
+        coins: updatedCoins,
+        unlocked_message_cards: updatedUnlocked
+      });
+      toast.success(`Successfully unlocked and equipped standard ${currentCard.name} message card!`);
+    } else {
+      onSave({ message_card: previewCardId });
+      toast.success('Message Card style equipped successfully!');
+    }
+    onClose();
+  };
+
+  const previewNode = (
+    <div className="bg-[#111] border border-zinc-800/80 rounded-2xl p-4 w-full flex flex-col pointer-events-none select-none">
+      <span className="text-[10px] font-black text-zinc-500 uppercase mb-3 tracking-widest text-center">CARD PREVIEW ({currentCard.rarity})</span>
+      
+      <div className="flex items-start gap-3">
+        <RenderPfpWithCustomBorder profile={profile} size={36} />
+        <div className="flex flex-col flex-1">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="font-bold text-[13px] text-zinc-150">{profile?.username || 'You'}</span>
+            <span className="text-[10px] text-zinc-500">12:34</span>
+          </div>
+          
+          <div className={isCustom ? `mt-1 p-2.5 rounded-xl border relative shadow-md break-words ${currentCard.bubbleClass}` : "text-zinc-200 text-[14px] leading-relaxed break-words relative"} style={isCustom ? currentCard.bubbleStyle : undefined}>
+            This is a preview of the <strong className="font-extrabold underline text-white">{currentCard.name}</strong> message card.
+          </div>
+        </div>
+      </div>
+      
+      <div className="mt-4 flex items-center justify-between pt-3 border-t border-zinc-900">
+        <span className="text-xs text-zinc-400 font-bold">Rarity: <span className={
+          currentCard.rarity === 'Mythic' ? 'text-purple-400 font-black animate-pulse' :
+          currentCard.rarity === 'Legendary' ? 'text-amber-400 font-extrabold' :
+          currentCard.rarity === 'Epic' ? 'text-pink-400 font-bold' :
+          currentCard.rarity === 'Rare' ? 'text-cyan-400' : 'text-zinc-450'
+        }>{currentCard.rarity}</span></span>
+        
+        <div className="flex items-center gap-1">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0"><circle cx="12" cy="12" r="10" fill="#FFB800" /><circle cx="12" cy="12" r="8" fill="#FFC700" /><path d="M12 6L13.8 9.6L17.5 10L14.7 12.6L15.5 16.5L12 14.5L8.5 16.5L9.3 12.6L6.5 10L10.2 9.6L12 6Z" fill="#FFD600" /></svg>
+          <span className="text-xs font-black text-yellow-500">{currentCard.cost === 0 ? 'FREE' : `${currentCard.cost} Coins`}</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  const gridNode = (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[380px] overflow-y-auto pr-2 custom-scrollbar pb-6 text-zinc-300">
+      {MESSAGE_CARDS.map((card, cIdx) => {
+        const isSelected = previewCardId === card.id;
+        const owns = card.cost === 0 || unlockedCards.includes(card.id);
+        return (
+          <button
+            key={card.id}
+            type="button"
+            onClick={() => {
+              setPreviewCardId(card.id);
+              setIndex(cIdx);
+              setScreen('preview');
+            }}
+            className={`p-2.5 rounded-xl border flex flex-col items-center justify-between text-center transition-all min-h-[96px] relative ${
+              isSelected 
+                ? 'bg-cyan-500/10 border-cyan-500 shadow-lg scale-105 z-10' 
+                : 'bg-[#151515] hover:bg-zinc-800 border-zinc-850 hover:border-zinc-700'
+            }`}
+          >
+            <div className="text-[9px] font-black uppercase text-zinc-500 truncate w-full mb-1">{card.rarity}</div>
+            <div className="font-bold text-xs text-white line-clamp-2 leading-tight flex-1 flex items-center justify-center">{card.name}</div>
+            <div className="mt-2 text-[9px] font-mono flex items-center justify-center gap-1">
+              {owns ? (
+                <span className="text-cyan-400 font-extrabold uppercase text-[8px] tracking-wider">OWNED</span>
+              ) : (
+                <>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0"><circle cx="12" cy="12" r="10" fill="#FFB800" /><circle cx="12" cy="12" r="8" fill="#FFC700" /><path d="M12 6L13.8 9.6L17.5 10L14.7 12.6L15.5 16.5L12 14.5L8.5 16.5L9.3 12.6L6.5 10L10.2 9.6L12 6Z" fill="#FFD600" /></svg>
+                  <span className="text-yellow-500 font-black">{card.cost}</span>
+                </>
+              )}
+            </div>
+            {isSelected && <span className="absolute top-1.5 right-1.5 font-black text-cyan-400 text-xs">✓</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <CosmeticShopLayout
+      title="Message Cards"
+      tag={isUnlocked ? "OWNED / EQUIP" : `${currentCard.cost} COINS`}
+      onClose={onClose}
+      onSave={handleSave}
+      onPrev={handlePrev}
+      onNext={handleNext}
+      onViewGrid={() => setScreen(screen === 'preview' ? 'grid' : 'preview')}
+      screen={screen}
+      previewNode={previewNode}
+      gridNode={gridNode}
+    />
+  );
+}
+
+function PfpBordersModal({ profile, bioData, onClose, onSave }: any) {
+  const [screen, setScreen] = useState<'preview' | 'grid'>('preview');
+  const [previewBorderId, setPreviewBorderId] = useState(() => bioData?.pfp_border || 'none');
+  const [index, setIndex] = useState(() => {
+    const currentId = bioData?.pfp_border || 'none';
+    const foundIdx = PFP_BORDERS.findIndex(b => b.id === currentId);
+    return foundIdx >= 0 ? foundIdx : 0;
+  });
+
+  const unlockedBorders = bioData?.unlocked_pfp_borders || [];
+
+  useEffect(() => {
+    const idx = PFP_BORDERS.findIndex(b => b.id === previewBorderId);
+    if (idx >= 0) setIndex(idx);
+  }, [previewBorderId]);
+
+  const handlePrev = () => {
+    const nextIdx = (index - 1 + PFP_BORDERS.length) % PFP_BORDERS.length;
+    setIndex(nextIdx);
+    setPreviewBorderId(PFP_BORDERS[nextIdx].id);
+  };
+
+  const handleNext = () => {
+    const nextIdx = (index + 1) % PFP_BORDERS.length;
+    setIndex(nextIdx);
+    setPreviewBorderId(PFP_BORDERS[nextIdx].id);
+  };
+
+  const currentBorder = PFP_BORDERS[index] || PFP_BORDERS[0];
+  const isUnlocked = currentBorder.cost === 0 || unlockedBorders.includes(currentBorder.id);
+
+  const handleSave = () => {
+    if (!isUnlocked) {
+      const userCoins = bioData?.coins ?? 0;
+      if (userCoins < currentBorder.cost) {
+        toast.error(`You need ${currentBorder.cost} Coins to purchase this. You currently have ${userCoins} Coins.`);
+        return;
+      }
+      // Purchase item!
+      const updatedCoins = userCoins - currentBorder.cost;
+      const updatedUnlocked = [...unlockedBorders, currentBorder.id];
+      onSave({ 
+        pfp_border: currentBorder.id,
+        coins: updatedCoins,
+        unlocked_pfp_borders: updatedUnlocked
+      });
+      toast.success(`Successfully unlocked and equipped standard ${currentBorder.name} pfp border!`);
+    } else {
+      onSave({ pfp_border: previewBorderId });
+      toast.success('PFP Border applied successfully!');
+    }
+    onClose();
+  };
+
+  const borderStyles = currentBorder.borderStyle || {};
+  const previewNode = (
+    <div className="bg-[#111] border border-zinc-800/80 rounded-2xl p-4 w-full flex flex-col items-center pointer-events-none select-none">
+      <span className="text-[10px] font-black text-zinc-500 uppercase mb-4 tracking-widest text-center">PFP BORDER PREVIEW ({currentBorder.rarity})</span>
+      
+      <div className="my-3 flex flex-col items-center gap-2">
+        <div 
+          className={`relative shrink-0 flex items-center justify-center p-[2px] transition-all rounded-lg ${currentBorder.borderClass || ''}`}
+          style={{ ...borderStyles, width: '106px', height: '106px' }}
+        >
+          <img 
+            src={profile?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=default'} 
+            alt="Avatar" 
+            className="w-full h-full rounded-md object-cover"
+          />
+        </div>
+        <span className="font-bold text-[15px] mt-2 text-white">{currentBorder.name}</span>
+      </div>
+
+      <div className="w-full mt-2 flex items-center justify-between pt-3 border-t border-zinc-900">
+        <span className="text-xs text-zinc-400 font-bold">Rarity: <span className={
+          currentBorder.rarity === 'Mythic' ? 'text-purple-400 font-black animate-pulse' :
+          currentBorder.rarity === 'Legendary' ? 'text-amber-400 font-extrabold' :
+          currentBorder.rarity === 'Epic' ? 'text-pink-400 font-bold' :
+          currentBorder.rarity === 'Rare' ? 'text-cyan-400' : 'text-zinc-450'
+        }>{currentBorder.rarity}</span></span>
+        
+        <div className="flex items-center gap-1">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0"><circle cx="12" cy="12" r="10" fill="#FFB800" /><circle cx="12" cy="12" r="8" fill="#FFC700" /><path d="M12 6L13.8 9.6L17.5 10L14.7 12.6L15.5 16.5L12 14.5L8.5 16.5L9.3 12.6L6.5 10L10.2 9.6L12 6Z" fill="#FFD600" /></svg>
+          <span className="text-xs font-black text-yellow-500">{currentBorder.cost === 0 ? 'FREE' : `${currentBorder.cost} Coins`}</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  const gridNode = (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[380px] overflow-y-auto pr-2 custom-scrollbar pb-6 text-zinc-300">
+      {PFP_BORDERS.map((border, bIdx) => {
+        const isSelected = previewBorderId === border.id;
+        const owns = border.cost === 0 || unlockedBorders.includes(border.id);
+        return (
+          <button
+            key={border.id}
+            type="button"
+            onClick={() => {
+              setPreviewBorderId(border.id);
+              setIndex(bIdx);
+              setScreen('preview');
+            }}
+            className={`p-2.5 rounded-xl border flex flex-col items-center justify-between text-center transition-all min-h-[96px] relative ${
+              isSelected 
+                ? 'bg-violet-500/10 border-violet-500 shadow-lg scale-105 z-10' 
+                : 'bg-[#151515] hover:bg-zinc-800 border-zinc-850 hover:border-zinc-700'
+            }`}
+          >
+            <div className="text-[9px] font-black uppercase text-zinc-500 truncate w-full mb-1">{border.rarity}</div>
+            <div className="font-bold text-xs text-white line-clamp-2 leading-tight flex-1 flex items-center justify-center">{border.name}</div>
+            <div className="mt-2 text-[9px] font-mono flex items-center justify-center gap-1">
+              {owns ? (
+                <span className="text-violet-400 font-extrabold uppercase text-[8px] tracking-wider">OWNED</span>
+              ) : (
+                <>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0"><circle cx="12" cy="12" r="10" fill="#FFB800" /><circle cx="12" cy="12" r="8" fill="#FFC700" /><path d="M12 6L13.8 9.6L17.5 10L14.7 12.6L15.5 16.5L12 14.5L8.5 16.5L9.3 12.6L6.5 10L10.2 9.6L12 6Z" fill="#FFD600" /></svg>
+                  <span className="text-yellow-500 font-black">{border.cost}</span>
+                </>
+              )}
+            </div>
+            {isSelected && <span className="absolute top-1.5 right-1.5 font-black text-violet-400 text-xs">✓</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <CosmeticShopLayout
+      title="PFP Borders"
+      tag={isUnlocked ? "OWNED / EQUIP" : `${currentBorder.cost} COINS`}
       onClose={onClose}
       onSave={handleSave}
       onPrev={handlePrev}
@@ -4506,8 +4867,8 @@ function ProfileCreatorModal({ profile, bioData, onClose, onSave }: any) {
 }
 
 function ProfileBorderForm({ profile, onClose, onSave, bioData, initialTab }: any) {
-  const [activeTab, setActiveTab] = useState<'combos' | 'effects' | 'borders' | 'creator'>(() => {
-    if (initialTab === 'borders' || initialTab === 'effects' || initialTab === 'combos' || initialTab === 'creator') {
+  const [activeTab, setActiveTab] = useState<'combos' | 'effects' | 'borders'>(() => {
+    if (initialTab === 'borders' || initialTab === 'effects' || initialTab === 'combos') {
       return initialTab;
     }
     return 'combos';
@@ -4737,7 +5098,7 @@ function ProfileBorderForm({ profile, onClose, onSave, bioData, initialTab }: an
           </div>
 
           {/* Workspace category tabs */}
-          <div className="grid grid-cols-4 gap-1 bg-[#141416] p-1 rounded-xl border border-zinc-900 animate-in fade-in duration-300">
+          <div className="grid grid-cols-3 gap-1 bg-[#141416] p-1 rounded-xl border border-zinc-900 animate-in fade-in duration-300">
             <button 
               onClick={() => setActiveTab('combos')} 
               className={`py-2 rounded-lg text-xs font-extrabold flex items-center justify-center transition-all ${
@@ -4767,16 +5128,6 @@ function ProfileBorderForm({ profile, onClose, onSave, bioData, initialTab }: an
               }`}
             >
               <span>Borders</span>
-            </button>
-            <button 
-              onClick={() => setActiveTab('creator')} 
-              className={`py-2 rounded-lg text-xs font-extrabold flex items-center justify-center transition-all ${
-                activeTab === 'creator' 
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm font-black' 
-                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800/40'
-              }`}
-            >
-              <span>Creator</span>
             </button>
           </div>
 
@@ -4960,7 +5311,7 @@ function ProfileBorderForm({ profile, onClose, onSave, bioData, initialTab }: an
             )}
 
             {/* PANEL 4: CUSTOM BORDER DESIGN BUILDER */}
-            {activeTab === 'creator' && (
+            {(activeTab as string) === 'creator' && (
               <div className="flex flex-col gap-4 animate-in fade-in duration-200">
                 <div className="p-3 bg-zinc-950/40 border border-zinc-900 rounded-xl">
                   <p className="text-[10px] text-zinc-400 font-medium leading-relaxed">
