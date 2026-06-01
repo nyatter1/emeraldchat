@@ -3206,6 +3206,18 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                     <button
                       type="button"
                       onClick={() => {
+                        setShowProfileViewsModal(true);
+                        setShowAddons(false);
+                      }}
+                      title="Profile Views & Insights"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-zinc-400 hover:text-emerald-400 hover:bg-[#34343a] transition-colors"
+                    >
+                      <Eye className="h-[18px] w-[18px]" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
                         setShowPaintCanvasModal(true);
                         setShowAddons(false);
                       }}
