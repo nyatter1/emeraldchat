@@ -666,7 +666,16 @@ export let globalAdminState = {
   muted_users: [] as string[],
   custom_rank_order: [] as string[],
   default_rank: 'VIP',
-  custom_ranks: [] as {name: string, icon: string, level: number}[]
+  custom_ranks: [] as {name: string, icon: string, level: number}[],
+  banned_reasons: {} as Record<string, string>,
+  muted_reasons: {} as Record<string, string>,
+  muted_expires: {} as Record<string, string>,
+  kicked_expires: {} as Record<string, string>,
+  kicked_duration: {} as Record<string, number>,
+  kicked_reasons: {} as Record<string, string>,
+  addons_disabled: [] as string[],
+  addons_custom: [] as { id: string; name: string; icon: string; code: string; enabled: boolean }[],
+  addons_updated_at: ''
 };
 
 export function getCustomRanks(): {name: string, icon: string, level: number}[] {
@@ -1050,6 +1059,15 @@ export interface BioData {
   hide_friends_on_profile?: boolean;
   hide_me_from_friends?: boolean;
   profile_views_unlocked_until?: string;
+  banned_reasons?: Record<string, string>;
+  muted_reasons?: Record<string, string>;
+  muted_expires?: Record<string, string>;
+  kicked_expires?: Record<string, string>;
+  kicked_duration?: Record<string, number>;
+  kicked_reasons?: Record<string, string>;
+  addons_disabled?: string[];
+  addons_custom?: { id: string; name: string; icon: string; code: string; enabled: boolean }[];
+  addons_updated_at?: string;
 }
 
 export function parseBio(bioStr: string | null | undefined): BioData {
@@ -1073,7 +1091,16 @@ export function parseBio(bioStr: string | null | undefined): BioData {
     dating_username: '',
     hide_friends_on_profile: false,
     hide_me_from_friends: false,
-    profile_views_unlocked_until: ''
+    profile_views_unlocked_until: '',
+    banned_reasons: {},
+    muted_reasons: {},
+    muted_expires: {},
+    kicked_expires: {},
+    kicked_duration: {},
+    kicked_reasons: {},
+    addons_disabled: [],
+    addons_custom: [],
+    addons_updated_at: ''
   };
   try {
     const data = JSON.parse(bioStr);
@@ -1109,7 +1136,16 @@ export function parseBio(bioStr: string | null | undefined): BioData {
       dating_username: data.dating_username || '',
       hide_friends_on_profile: !!data.hide_friends_on_profile,
       hide_me_from_friends: !!data.hide_me_from_friends,
-      profile_views_unlocked_until: data.profile_views_unlocked_until || ''
+      profile_views_unlocked_until: data.profile_views_unlocked_until || '',
+      banned_reasons: data.banned_reasons || {},
+      muted_reasons: data.muted_reasons || {},
+      muted_expires: data.muted_expires || {},
+      kicked_expires: data.kicked_expires || {},
+      kicked_duration: data.kicked_duration || {},
+      kicked_reasons: data.kicked_reasons || {},
+      addons_disabled: data.addons_disabled || [],
+      addons_custom: data.addons_custom || [],
+      addons_updated_at: data.addons_updated_at || ''
     };
   } catch (e) {}
   return { 
@@ -1637,6 +1673,64 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [newNewsContent, setNewNewsContent] = useState('');
   const [hasNewNews, setHasNewNews] = useState(false);
   const [rankOverrides, setRankOverrides] = useState<Record<string, string>>({});
+  const lastAddonsUpdatedRef = useRef<string>('');
+  const [selectedAddon, setSelectedAddon] = useState<any | null>(null);
+
+  const [kickSecondsLeft, setKickSecondsLeft] = useState<number>(0);
+  const [kickReason, setKickReason] = useState<string>('');
+  const [kickDuration, setKickDuration] = useState<number>(0);
+
+  const isCurrentlyMuted = useMemo(() => {
+    const isMutedInList = globalAdminState.muted_users?.includes(currentUserProfile.id);
+    if (!isMutedInList) return false;
+    
+    const expiresAtStr = globalAdminState.muted_expires?.[currentUserProfile.id];
+    if (expiresAtStr) {
+      const expiresAt = new Date(expiresAtStr);
+      if (new Date() >= expiresAt) {
+        return false;
+      }
+    }
+    return true;
+  }, [currentUserProfile.id, globalAdminState.muted_users, globalAdminState.muted_expires]);
+
+  const muteDetails = useMemo(() => {
+    const hasMute = globalAdminState.muted_users?.includes(currentUserProfile.id);
+    if (!hasMute) return null;
+    const expiresAtStr = globalAdminState.muted_expires?.[currentUserProfile.id];
+    const rsn = globalAdminState.muted_reasons?.[currentUserProfile.id] || 'Terms of Service violation';
+    if (expiresAtStr) {
+      const expiresAt = new Date(expiresAtStr);
+      const isExpired = new Date() >= expiresAt;
+      return { expiresAtStr, reason: rsn, expired: isExpired, date: expiresAt };
+    }
+    return { expiresAtStr: null, reason: rsn, expired: false, date: null };
+  }, [currentUserProfile.id, globalAdminState.muted_users, globalAdminState.muted_expires, globalAdminState.muted_reasons]);
+
+  useEffect(() => {
+    const checkKickStatus = () => {
+      const expiresAtStr = globalAdminState.kicked_expires?.[currentUserProfile.id];
+      if (expiresAtStr) {
+        const expiresAt = new Date(expiresAtStr);
+        const now = new Date();
+        if (now < expiresAt) {
+          const diffMs = expiresAt.getTime() - now.getTime();
+          const secs = Math.ceil(diffMs / 1000);
+          setKickSecondsLeft(secs);
+          setKickReason(globalAdminState.kicked_reasons?.[currentUserProfile.id] || 'Temporary infraction');
+          setKickDuration(globalAdminState.kicked_duration?.[currentUserProfile.id] || 0);
+        } else {
+          setKickSecondsLeft(0);
+        }
+      } else {
+        setKickSecondsLeft(0);
+      }
+    };
+
+    checkKickStatus();
+    const interval = setInterval(checkKickStatus, 1000);
+    return () => clearInterval(interval);
+  }, [currentUserProfile.id, globalAdminState.kicked_expires, globalAdminState.kicked_reasons, globalAdminState.kicked_duration]);
 
   // Computed incoming friend requests
   const myBio = useMemo(() => parseBio(currentUserProfile.bio), [currentUserProfile.bio]);
@@ -1936,6 +2030,17 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           if (bio.custom_ranks) {
             globalAdminState.custom_ranks = bio.custom_ranks;
           }
+          globalAdminState.banned_reasons = bio.banned_reasons || {};
+          globalAdminState.muted_reasons = bio.muted_reasons || {};
+          globalAdminState.muted_expires = bio.muted_expires || {};
+          globalAdminState.kicked_expires = bio.kicked_expires || {};
+          globalAdminState.kicked_duration = bio.kicked_duration || {};
+          globalAdminState.kicked_reasons = bio.kicked_reasons || {};
+          globalAdminState.addons_disabled = bio.addons_disabled || [];
+          globalAdminState.addons_custom = bio.addons_custom || [];
+          globalAdminState.addons_updated_at = bio.addons_updated_at || '';
+          lastAddonsUpdatedRef.current = bio.addons_updated_at || '';
+
           if (globalAdminState.banned_users.includes(currentUserProfile.id)) {
             onSignOut();
           }
@@ -2060,6 +2165,30 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
            if (bio.custom_ranks) {
              globalAdminState.custom_ranks = bio.custom_ranks;
            }
+           
+           globalAdminState.banned_reasons = bio.banned_reasons || {};
+           globalAdminState.muted_reasons = bio.muted_reasons || {};
+           globalAdminState.muted_expires = bio.muted_expires || {};
+           globalAdminState.kicked_expires = bio.kicked_expires || {};
+           globalAdminState.kicked_duration = bio.kicked_duration || {};
+           globalAdminState.kicked_reasons = bio.kicked_reasons || {};
+           globalAdminState.addons_disabled = bio.addons_disabled || [];
+           globalAdminState.addons_custom = bio.addons_custom || [];
+           
+           const oldAddonsUpdate = lastAddonsUpdatedRef.current;
+           const newAddonsUpdate = bio.addons_updated_at || '';
+           globalAdminState.addons_updated_at = newAddonsUpdate;
+           
+           if (oldAddonsUpdate && oldAddonsUpdate !== newAddonsUpdate) {
+             lastAddonsUpdatedRef.current = newAddonsUpdate;
+             toast.success("Addons nodes updated! Synced reloading database for everyone...");
+             setTimeout(() => {
+               window.location.reload();
+             }, 1600);
+           } else {
+             lastAddonsUpdatedRef.current = newAddonsUpdate;
+           }
+
            if (globalAdminState.banned_users.includes(currentUserProfile.id)) {
              onSignOut();
            }
@@ -2144,7 +2273,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
     e.preventDefault();
     if (!newMessage.trim()) return;
 
-    if (globalAdminState.muted_users.includes(currentUserProfile.id)) {
+    if (isCurrentlyMuted) {
       setNewMessage('');
       toast.error("You are currently muted.");
       return;
@@ -2627,7 +2756,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   };
 
   const sendDirectMessage = async (contentStr: string) => {
-    if (globalAdminState.muted_users.includes(currentUserProfile.id)) {
+    if (isCurrentlyMuted) {
       toast.error("You are currently muted.");
       return;
     }
@@ -2814,8 +2943,79 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
   const isDev = ['test@gmail.com', 'dev@gmail.com'].includes(currentUserProfile.email || '');
 
+  const isBanned = useMemo(() => {
+    return globalAdminState.banned_users?.includes(currentUserProfile.id);
+  }, [currentUserProfile.id, globalAdminState.banned_users]);
+
+  const banReason = useMemo(() => {
+    return globalAdminState.banned_reasons?.[currentUserProfile.id] || 'Violated Chat Guidelines';
+  }, [currentUserProfile.id, globalAdminState.banned_reasons]);
+
+  const formatTimeLeft = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div className="flex h-full bg-zinc-950 text-zinc-100 font-sans overflow-hidden w-full relative">
+      {/* Ban Screen Overlay */}
+      {isBanned && (
+        <div className="fixed inset-0 z-[999999] bg-black flex flex-col items-center justify-center p-6 text-zinc-100 select-none">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.15),transparent_70%)] animate-pulse" />
+          <div className="relative border border-red-900 bg-zinc-950/95 p-12 rounded-2xl max-w-lg w-full text-center shadow-[0_0_50px_rgba(220,38,38,0.25)] space-y-8 backdrop-blur-md">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-950 border border-red-600 animate-bounce">
+              <span className="text-3xl font-extrabold text-red-500">🚫</span>
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-3xl font-black tracking-tighter text-red-500 font-sans uppercase">YOU BEEN BANNED</h1>
+              <p className="text-zinc-500 text-xs uppercase tracking-widest font-mono">Access Denied by Administrator</p>
+            </div>
+            <div className="border-t border-zinc-900 pt-6 space-y-4">
+              <div className="text-left bg-zinc-900/50 rounded-xl p-4 border border-zinc-800">
+                <div className="text-[10px] uppercase font-black tracking-wider text-red-400 font-mono">REASON:</div>
+                <div className="text-sm font-medium text-zinc-100 mt-1">{banReason}</div>
+              </div>
+            </div>
+            <p className="text-[10px] text-zinc-600 font-mono">If you believe this is an error, contact support or server owners.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Kick Screen Overlay */}
+      {!isBanned && kickSecondsLeft > 0 && (
+        <div className="fixed inset-0 z-[999998] bg-black flex flex-col items-center justify-center p-6 text-zinc-100 select-none">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.15),transparent_70%)] animate-pulse" />
+          <div className="relative border border-amber-900 bg-zinc-950/95 p-12 rounded-2xl max-w-lg w-full text-center shadow-[0_0_50px_rgba(245,158,11,0.25)] space-y-8 backdrop-blur-md">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-950 border border-amber-500 animate-pulse">
+              <span className="text-2xl font-extrabold text-amber-500 font-sans">⏳</span>
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-3xl font-black tracking-tighter text-amber-500 font-sans uppercase">YOU BEEN KICKED</h1>
+              <p className="text-zinc-500 text-xs uppercase tracking-widest font-mono">Temporary Restraining Protocol</p>
+            </div>
+            <div className="border-t border-zinc-900 pt-6 space-y-4">
+              <div className="text-left bg-zinc-900/50 rounded-xl p-5 border border-zinc-800/80 space-y-3">
+                <div>
+                  <div className="text-[10px] uppercase font-black tracking-wider text-amber-400 font-mono">REASON:</div>
+                  <div className="text-sm font-bold text-zinc-200 mt-0.5">{kickReason}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-zinc-900/80">
+                  <div>
+                    <div className="text-[10px] uppercase font-black tracking-wider text-zinc-500 font-mono">DURATION:</div>
+                    <div className="text-sm font-extrabold text-zinc-200">{kickDuration} MINS</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase font-black tracking-wider text-amber-400 font-mono">TIME LEFT:</div>
+                    <div className="text-sm font-extrabold text-amber-500 font-mono tracking-widest">{formatTimeLeft(kickSecondsLeft)}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p className="text-[10px] text-zinc-600 font-mono">Access will automatically restore when the countdown hits zero.</p>
+          </div>
+        </div>
+      )}
       <AnimatePresence>
         {fullscreenImageUrl && (
           <motion.div 
@@ -3370,59 +3570,86 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                     exit={{ opacity: 0, width: 0 }}
                     className="flex items-center gap-1.5 overflow-hidden pr-1"
                   >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowConvertCoinsModal(true);
-                        setShowAddons(false);
-                      }}
-                      title="Gold & Ruby Treasury"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-zinc-400 hover:text-amber-400 hover:bg-[#34343a] transition-colors"
-                    >
-                      <Coins className="h-[18px] w-[18px]" />
-                    </button>
+                    {!globalAdminState.addons_disabled?.includes('currency') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowConvertCoinsModal(true);
+                          setShowAddons(false);
+                        }}
+                        title="Gold & Ruby Treasury"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-zinc-400 hover:text-amber-400 hover:bg-[#34343a] transition-colors"
+                      >
+                        <Coins className="h-[18px] w-[18px]" />
+                      </button>
+                    )}
                     
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowProfileViewsModal(true);
-                        setShowAddons(false);
-                      }}
-                      title="Profile Views & Insights"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-zinc-400 hover:text-emerald-400 hover:bg-[#34343a] transition-colors"
-                    >
-                      <Eye className="h-[18px] w-[18px]" />
-                    </button>
+                    {!globalAdminState.addons_disabled?.includes('profile-views') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowProfileViewsModal(true);
+                          setShowAddons(false);
+                        }}
+                        title="Profile Views & Insights"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-zinc-400 hover:text-emerald-400 hover:bg-[#34343a] transition-colors"
+                      >
+                        <Eye className="h-[18px] w-[18px]" />
+                      </button>
+                    )}
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowPaintCanvasModal(true);
-                        setShowAddons(false);
-                      }}
-                      title="Paint & Color Canvas"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-zinc-400 hover:text-indigo-400 hover:bg-[#34343a] transition-colors"
-                    >
-                      <Paintbrush className="h-[18px] w-[18px]" />
-                    </button>
+                    {!globalAdminState.addons_disabled?.includes('paint') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPaintCanvasModal(true);
+                          setShowAddons(false);
+                        }}
+                        title="Paint & Color Canvas"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-zinc-400 hover:text-indigo-400 hover:bg-[#34343a] transition-colors"
+                      >
+                        <Paintbrush className="h-[18px] w-[18px]" />
+                      </button>
+                    )}
 
-                    <label
-                      title="Send Image/GIF/Video (MP4)"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-zinc-400 hover:text-emerald-400 hover:bg-[#34343a] transition-colors cursor-pointer"
-                    >
-                      {isUploadingFile ? (
-                        <Loader2 className="h-[18px] w-[18px] animate-spin text-emerald-400" />
-                      ) : (
-                        <Upload className="h-[18px] w-[18px]" />
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*,video/mp4,video/webm,image/gif"
-                        className="hidden"
-                        onChange={handleDirectFileUpload}
-                        disabled={isUploadingFile}
-                      />
-                    </label>
+                    {!globalAdminState.addons_disabled?.includes('media-uploader') && (
+                      <label
+                        title="Send Image/GIF/Video (MP4)"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-zinc-400 hover:text-emerald-400 hover:bg-[#34343a] transition-colors cursor-pointer"
+                      >
+                        {isUploadingFile ? (
+                          <Loader2 className="h-[18px] w-[18px] animate-spin text-emerald-400" />
+                        ) : (
+                          <Upload className="h-[18px] w-[18px]" />
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*,video/mp4,video/webm,image/gif"
+                          className="hidden"
+                          onChange={handleDirectFileUpload}
+                          disabled={isUploadingFile}
+                        />
+                      </label>
+                    )}
+
+                    {/* Custom Addons Toggled here */}
+                    {(globalAdminState.addons_custom || []).map((addon: any) => {
+                      if (addon.enabled === false) return null;
+                      return (
+                        <button
+                          key={addon.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedAddon(addon);
+                            setShowAddons(false);
+                          }}
+                          title={addon.name}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#34d399]/10 text-emerald-400 hover:text-emerald-300 hover:bg-[#34d399]/20 transition-all shadow-md transform hover:scale-105"
+                        >
+                          <IconRenderer name={addon.icon} className="h-[18px] w-[18px]" />
+                        </button>
+                      );
+                    })}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -3654,6 +3881,13 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           }}
           onSendMessage={handleSendPrivateMessage}
           initialTargetId={pmTargetId}
+        />
+      )}
+
+      {selectedAddon && (
+        <CustomAddonRunnerModal 
+          addon={selectedAddon}
+          onClose={() => setSelectedAddon(null)}
         />
       )}
 
@@ -8783,6 +9017,106 @@ function FriendButton({
           )}
         </>
       )}
+    </div>
+  );
+}
+
+export const IconRenderer = ({ name, className }: { name: string; className?: string }) => {
+  const normName = (name || '').toLowerCase().trim();
+  if (normName === 'sparkles') return <Sparkles className={className} />;
+  if (normName === 'layers') return <Layers className={className} />;
+  if (normName === 'settings') return <Settings className={className} />;
+  if (normName === 'globe') return <Globe className={className} />;
+  if (normName === 'wallet') return <Wallet className={className} />;
+  if (normName === 'music') return <Music className={className} />;
+  if (normName === 'heart') return <Heart className={className} />;
+  if (normName === 'thumbsup') return <ThumbsUp className={className} />;
+  if (normName === 'shieldcheck') return <ShieldCheck className={className} />;
+  if (normName === 'gem') return <Gem className={className} />;
+  if (normName === 'coins') return <Coins className={className} />;
+  if (normName === 'paintbrush') return <Paintbrush className={className} />;
+  if (normName === 'eye') return <Eye className={className} />;
+  if (normName === 'plus') return <Plus className={className} />;
+  return <Sparkles className={className} />;
+};
+
+interface CustomAddonRunnerModalProps {
+  addon: { id: string; name: string; icon: string; code: string; enabled: boolean };
+  onClose: () => void;
+}
+
+export function CustomAddonRunnerModal({ addon, onClose }: CustomAddonRunnerModalProps) {
+  const iframeSrcDoc = useMemo(() => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+          body {
+            background-color: #0c0c0c;
+            color: #f4f4f5;
+            font-family: ui-sans-serif, system-ui, sans-serif;
+            padding: 1.5rem;
+            margin: 0;
+            overflow-x: hidden;
+          }
+          /* Custom scrollbar */
+          ::-webkit-scrollbar {
+            width: 8px;
+          }
+          ::-webkit-scrollbar-track {
+            background: #09090b;
+          }
+          ::-webkit-scrollbar-thumb {
+            background: #27272a;
+            border-radius: 4px;
+          }
+          ::-webkit-scrollbar-thumb:hover {
+            background: #3f3f46;
+          }
+        </style>
+      </head>
+      <body>
+        ${addon.code}
+      </body>
+      </html>
+    `;
+  }, [addon.code]);
+
+  return (
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="bg-[#0e0e11] border border-zinc-800 rounded-2xl w-full max-w-4xl h-[75vh] flex flex-col shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-950/50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+              <IconRenderer name={addon.icon} className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold text-white">{addon.name}</h2>
+              <p className="text-[10px] text-zinc-500 font-mono">SANDBOXED ADDON RUNNER ID: {addon.id}</p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-1 px-3 py-1.5 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors font-semibold"
+          >
+            Close Addon
+          </button>
+        </div>
+
+        {/* Content Viewport */}
+        <div className="flex-1 bg-black relative">
+          <iframe 
+            srcDoc={iframeSrcDoc}
+            title={addon.name}
+            className="w-full h-full border-0"
+            sandbox="allow-scripts"
+          />
+        </div>
+      </div>
     </div>
   );
 }
