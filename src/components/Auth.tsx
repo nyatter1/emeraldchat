@@ -85,9 +85,8 @@ export function Auth({ onAuthSuccess }: { onAuthSuccess: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-4 font-sans text-zinc-100">
       <div className="w-full max-w-md rounded-xl bg-zinc-900 border border-zinc-800 p-8 shadow-2xl relative">
-        <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-2 whitespace-nowrap">
-          <img src="/logo.png" className="h-7 w-7 object-contain" alt="Emerald Chat Logo" />
-          <h1 className="text-2xl font-bold tracking-tight text-emerald-500 drop-shadow-sm">Emerald Chat</h1>
+        <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center justify-center">
+          <img src="/logo.png" className="h-10 w-10 object-contain" alt="Logo" />
         </div>
         
         <h2 className="mb-6 mt-2 text-xl font-semibold tracking-tight text-white text-center">
