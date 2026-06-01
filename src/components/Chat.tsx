@@ -764,7 +764,16 @@ const MarkdownComponents = {
     
     if (isSafeUrl(href)) {
       if (IMAGE_EXT_REGEX.test(lowerHref)) {
-        return <img src={href} alt={children?.toString() || 'Image'} className="max-w-full rounded-lg my-2 border border-zinc-800" loading="lazy" />;
+        return <img 
+          src={href} 
+          alt={children?.toString() || 'Image'} 
+          className="max-w-full rounded-lg my-2 border border-zinc-800 cursor-pointer object-cover max-h-[360px]" 
+          loading="lazy" 
+          onClick={(e) => {
+            e.preventDefault();
+            window.dispatchEvent(new CustomEvent('openFullscreenImage', { detail: href }));
+          }}
+        />;
       }
       if (VIDEO_EXT_REGEX.test(lowerHref)) {
         return (
@@ -976,6 +985,7 @@ export interface BioData {
   dating_username?: string;
   hide_friends_on_profile?: boolean;
   hide_me_from_friends?: boolean;
+  profile_views_unlocked_until?: string;
 }
 
 export function parseBio(bioStr: string | null | undefined): BioData {
@@ -998,7 +1008,8 @@ export function parseBio(bioStr: string | null | undefined): BioData {
     dating_user_id: '',
     dating_username: '',
     hide_friends_on_profile: false,
-    hide_me_from_friends: false
+    hide_me_from_friends: false,
+    profile_views_unlocked_until: ''
   };
   try {
     const data = JSON.parse(bioStr);
@@ -1033,7 +1044,8 @@ export function parseBio(bioStr: string | null | undefined): BioData {
       dating_user_id: data.dating_user_id || '',
       dating_username: data.dating_username || '',
       hide_friends_on_profile: !!data.hide_friends_on_profile,
-      hide_me_from_friends: !!data.hide_me_from_friends
+      hide_me_from_friends: !!data.hide_me_from_friends,
+      profile_views_unlocked_until: data.profile_views_unlocked_until || ''
     };
   } catch (e) {}
   return { 
@@ -1055,7 +1067,8 @@ export function parseBio(bioStr: string | null | undefined): BioData {
     dating_user_id: '',
     dating_username: '',
     hide_friends_on_profile: false,
-    hide_me_from_friends: false
+    hide_me_from_friends: false,
+    profile_views_unlocked_until: ''
   };
 }
 
@@ -1518,6 +1531,15 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [showPaintCanvasModal, setShowPaintCanvasModal] = useState(false);
   const [showSocialRequestsModal, setShowSocialRequestsModal] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [fullscreenImageUrl, setFullscreenImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleOpenFullscreen = (e: any) => {
+      setFullscreenImageUrl(e.detail);
+    };
+    window.addEventListener('openFullscreenImage', handleOpenFullscreen);
+    return () => window.removeEventListener('openFullscreenImage', handleOpenFullscreen);
+  }, []);
   
   const [onlineUsers, setOnlineUsers] = useState<Profile[]>([TEST_BOT]);
   const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
@@ -2634,7 +2656,27 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const isDev = ['test@gmail.com', 'dev@gmail.com'].includes(currentUserProfile.email || '');
 
   return (
-    <div className="flex h-full bg-zinc-950 text-zinc-100 font-sans overflow-hidden w-full">
+    <div className="flex h-full bg-zinc-950 text-zinc-100 font-sans overflow-hidden w-full relative">
+      <AnimatePresence>
+        {fullscreenImageUrl && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+            onClick={() => setFullscreenImageUrl(null)}
+          >
+            <button className="absolute top-4 right-4 p-2 text-white/50 hover:text-white bg-black/50 rounded-full">
+              <X className="w-8 h-8" />
+            </button>
+            <img 
+              src={fullscreenImageUrl} 
+              alt="Fullscreen" 
+              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl" 
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
       
         {/* Left Drawer Menu */}
         {leftPanelMode !== 'none' && (
@@ -4432,6 +4474,20 @@ function PrivateMessagesModal({
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [showPaintCanvasModal, setShowPaintCanvasModal] = useState(false);
+
+  useEffect(() => {
+    // When selected user changes, mark messages as read
+    if (selectedUserId) {
+      supabase.from('private_messages')
+        .update({ read_at: new Date().toISOString() })
+        .eq('sender_id', selectedUserId)
+        .eq('receiver_id', currentUserProfile.id)
+        .is('read_at', null)
+        .then(() => {});
+    }
+  }, [selectedUserId, privateMessages, currentUserProfile.id]);
 
   const contacts = useMemo(() => {
     const userIds = new Set<string>();
@@ -4461,6 +4517,33 @@ function PrivateMessagesModal({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [currentChat]);
+
+  const handleDirectFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedUserId) return;
+
+    setIsUploadingFile(true);
+    const fileExt = file.name.split('.').pop();
+    const randomId = crypto.randomUUID();
+    const filePath = `attachments/${currentUserProfile.id}/${randomId}.${fileExt}`;
+
+    const uploadToast = toast.loading(`Uploading ${file.name}...`);
+    try {
+      const { error: uploadError } = await supabase.storage.from('banners').upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('banners').getPublicUrl(filePath);
+      if (!data?.publicUrl) throw new Error("Could not construct public URL");
+
+      await onSendMessage(selectedUserId, data.publicUrl);
+      toast.success("File sent!", { id: uploadToast });
+    } catch (error: any) {
+      toast.error(`Upload failed: ${error.message || 'Unknown error'}`, { id: uploadToast });
+    } finally {
+      setIsUploadingFile(false);
+      e.target.value = '';
+    }
+  };
 
   const selectedUser = allProfiles.find(p => p.id === selectedUserId);
 
@@ -4571,8 +4654,13 @@ function PrivateMessagesModal({
                             </Markdown>
                           </div>
                         </div>
-                        <div className={`text-[10px] mt-1 opacity-50 font-medium tracking-wide ${isMe ? 'pr-2' : 'pl-2'}`}>
+                        <div className={`text-[10px] mt-1 opacity-50 font-medium tracking-wide ${isMe ? 'pr-2' : 'pl-2'} flex items-center justify-end gap-1`}>
                           {format(new Date(m.created_at), 'HH:mm')}
+                          {isMe && (
+                            <span className="text-[9px] uppercase font-black text-emerald-400">
+                              {m.read_at ? 'Read' : 'Delivered'}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -4587,8 +4675,35 @@ function PrivateMessagesModal({
                     setNewMessage('');
                   }
                 }}
-                className="p-4 border-t border-zinc-800 flex gap-3 bg-[#0a0a0a]"
+                className="p-4 border-t border-zinc-800 flex items-center gap-3 bg-[#0a0a0a]"
               >
+                <div className="flex items-center gap-1">
+                  <label
+                    title="Send Image/GIF/Video (MP4)"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-zinc-400 hover:text-emerald-400 hover:bg-[#34343a] transition-colors cursor-pointer"
+                  >
+                    {isUploadingFile ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-emerald-400" />
+                    ) : (
+                      <Upload className="h-5 w-5" />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*,video/mp4,video/webm,image/gif"
+                      className="hidden"
+                      onChange={handleDirectFileUpload}
+                      disabled={isUploadingFile}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    title="Paint & Send"
+                    onClick={() => setShowPaintCanvasModal(true)}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#29292e] text-purple-400 hover:text-purple-300 hover:bg-[#34343a] transition-colors"
+                  >
+                    <Paintbrush className="h-5 w-5" />
+                  </button>
+                </div>
                 <input 
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
@@ -4599,6 +4714,20 @@ function PrivateMessagesModal({
                   <Send className="w-5 h-5 ml-1 my-0.5 mr-0.5" />
                 </button>
               </form>
+              
+              <AnimatePresence>
+                {showPaintCanvasModal && (
+                  <PaintCanvasModal
+                    onClose={() => setShowPaintCanvasModal(false)}
+                    onSend={async (url: string) => {
+                      if (!selectedUserId) return;
+                      await onSendMessage(selectedUserId, url);
+                      setShowPaintCanvasModal(false);
+                    }}
+                  />
+                )}
+              </AnimatePresence>
+              
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-10 relative">
@@ -4615,408 +4744,6 @@ function PrivateMessagesModal({
         </div>
       </div>
     </div>
-  );
-}
-
-function SpotifyStylesModal({ profile, bioData, onClose, onSave }: any) {
-  const [screen, setScreen] = useState<'preview' | 'grid'>('preview');
-  const [mixerTab, setMixerTab] = useState<'presets' | 'custom'>('presets');
-
-  // Customization state
-  const [theme, setTheme] = useState(() => bioData?.spotify_theme || 'classic-emerald');
-  const [glow, setGlow] = useState(() => bioData?.spotify_glow || 'emerald');
-  const [border, setBorder] = useState(() => bioData?.spotify_border || 'standard');
-  const [animation, setAnimation] = useState(() => bioData?.spotify_animation || 'none');
-  const [visualizer, setVisualizer] = useState(() => bioData?.spotify_visualizer || 'none');
-
-  // Search or filter presets
-  const [presetSearch, setPresetSearch] = useState('');
-  const [presetRarity, setPresetRarity] = useState<string>('All');
-
-  const filteredPresets = SPOTIFY_PRESETS.filter(p => {
-    const matchSearch = p.name.toLowerCase().includes(presetSearch.toLowerCase());
-    const matchRarity = presetRarity === 'All' || p.rarity === presetRarity;
-    return matchSearch && matchRarity;
-  });
-
-  const handleSelectPreset = (p: any) => {
-    setTheme(p.theme);
-    setGlow(p.glow);
-    setBorder(p.border);
-    setAnimation(p.animation);
-    setVisualizer(p.visualizer);
-    toast.success(`Preset "${p.name}" selected!`);
-  };
-
-  const handlePrev = () => {
-    let prevIdx = SPOTIFY_PRESETS.findIndex(
-      p => p.theme === theme && p.glow === glow && p.border === border && p.animation === animation && p.visualizer === visualizer
-    );
-    if (prevIdx === -1) prevIdx = 0;
-    const nextIdx = (prevIdx - 1 + SPOTIFY_PRESETS.length) % SPOTIFY_PRESETS.length;
-    const p = SPOTIFY_PRESETS[nextIdx];
-    setTheme(p.theme);
-    setGlow(p.glow);
-    setBorder(p.border);
-    setAnimation(p.animation);
-    setVisualizer(p.visualizer);
-  };
-
-  const handleNext = () => {
-    let prevIdx = SPOTIFY_PRESETS.findIndex(
-      p => p.theme === theme && p.glow === glow && p.border === border && p.animation === animation && p.visualizer === visualizer
-    );
-    if (prevIdx === -1) prevIdx = 0;
-    const nextIdx = (prevIdx + 1) % SPOTIFY_PRESETS.length;
-    const p = SPOTIFY_PRESETS[nextIdx];
-    setTheme(p.theme);
-    setGlow(p.glow);
-    setBorder(p.border);
-    setAnimation(p.animation);
-    setVisualizer(p.visualizer);
-  };
-
-  const handleSave = () => {
-    onSave({
-      spotify_theme: theme,
-      spotify_glow: glow,
-      spotify_border: border,
-      spotify_animation: animation,
-      spotify_visualizer: visualizer
-    });
-    toast.success("Spotify Styles equipped!");
-  };
-
-  // Resolve styles for mock preview
-  const activeTheme = SPOTIFY_THEMES.find(t => t.id === theme) || SPOTIFY_THEMES[0];
-  const activeGlow = SPOTIFY_GLOWS.find(g => g.id === glow) || SPOTIFY_GLOWS[0];
-  const activeBorder = SPOTIFY_BORDERS.find(b => b.id === border) || SPOTIFY_BORDERS[0];
-  const activeAnim = SPOTIFY_ANIMATIONS.find(a => a.id === animation) || SPOTIFY_ANIMATIONS[0];
-
-  const isVinyl = theme === 'vinyl-record';
-  const isCassette = theme === 'retro-cassette';
-  const isChromaBorder = border === 'chroma';
-
-  const previewNode = (
-    <div className="flex flex-col items-center justify-center p-2">
-      <div 
-        className={`w-full rounded-2xl p-4 relative overflow-hidden border bg-gradient-to-br transition-all duration-300 ${activeTheme.className} ${activeGlow.className} ${activeAnim.className}`}
-        style={{
-          backgroundOrigin: isChromaBorder ? 'border-box' : undefined,
-          backgroundClip: isChromaBorder ? 'padding-box, border-box' : undefined,
-          borderColor: isChromaBorder ? 'transparent' : undefined,
-        }}
-      >
-        {/* Background gradient overlay */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${activeTheme.bgColorClass} opacity-95 z-0 pointer-events-none rounded-2xl`} />
-
-        {/* Tape reels */}
-        {isCassette && (
-          <div className="absolute inset-x-3 bottom-1 h-8 flex justify-between px-6 z-10 pointer-events-none text-zinc-650 opacity-45">
-            <div className="flex flex-col items-center text-[7px] font-mono leading-none">
-              <span className="animate-[spin_4s_linear_infinite]">⭕</span>
-              <span className="mt-0.5">TAPE-A</span>
-            </div>
-            <div className="flex flex-col items-center text-[7px] font-mono leading-none">
-              <span className="animate-[spin_4s_linear_infinite_reverse]">⭕</span>
-              <span className="mt-0.5">TAPE-B</span>
-            </div>
-          </div>
-        )}
-
-        {/* Vinyl slide out */}
-        {isVinyl && (
-          <div className="absolute right-[-45px] top-6 w-32 h-32 rounded-full bg-zinc-950 border-4 border-zinc-800 flex items-center justify-center opacity-75 shadow-lg animate-[spin_10s_linear_infinite] overflow-hidden">
-            <div className="w-24 h-24 rounded-full border border-zinc-900 flex items-center justify-center">
-              <div className="w-16 h-16 rounded-full border border-zinc-900 flex items-center justify-center">
-                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-[7px] font-black text-black">SPIN</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Simulated active visualizer */}
-        {visualizer !== 'none' && (
-          <div className="absolute bottom-2 inset-x-4 h-6 flex items-end gap-1 pointer-events-none z-10 opacity-35">
-            {Array.from({ length: 18 }).map((_, i) => {
-              const h = Math.floor(Math.random() * 16) + 4;
-              const delay = (i * 0.08).toFixed(2);
-              return (
-                <span 
-                  key={i} 
-                  className="flex-1 bg-current rounded-t"
-                  style={{
-                    height: `${h}px`,
-                    animation: `bounceBeat 0.8s infinite ease-in-out alternate -${delay}s`,
-                  }}
-                />
-              );
-            })}
-          </div>
-        )}
-
-        {/* Real Header Badge */}
-        <div className="relative z-10 flex items-center justify-between mb-3 text-white">
-          <span className="text-[9px] uppercase tracking-widest font-black flex items-center gap-1 opacity-75">
-            <svg className="w-3.5 h-3.5 animate-[spin_4s_linear_infinite]" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm1 15.5h-2v-6h2v6zm0-8h-2V7h2v2.5z"/>
-            </svg>
-            Spotify Preview
-          </span>
-          <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase font-black tracking-wider ${activeTheme.textColorClass} bg-black/40 border border-current/25`}>
-            {activeTheme.name}
-          </span>
-        </div>
-
-        {/* Mock Song details */}
-        <div className="relative z-10 w-full rounded-xl overflow-hidden shadow-inner border border-black/30 bg-black/60 p-4 h-[152px] flex flex-col justify-between">
-          <div className="flex gap-3">
-            <div className="w-16 h-16 rounded bg-zinc-850 border border-zinc-750 flex items-center justify-center text-[11px] font-black tracking-tighter text-emerald-500 overflow-hidden shrink-0 shadow-lg">
-              <div className="w-full h-full relative flex items-center justify-center">
-                <Music className="w-6 h-6 text-emerald-400 rotate-12 animate-bounce" />
-              </div>
-            </div>
-            <div className="flex flex-col min-w-0 justify-center">
-              <span className="text-xs font-black text-white truncate text-left">Emerald Theme Symphony</span>
-              <span className="text-[10px] text-emerald-400 font-bold truncate text-left">Star Beats & Electro Vibe</span>
-              <span className="text-[8px] text-zinc-500 font-mono mt-1 text-left">EMERALD PLATINUM SOUND</span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/40">
-            <div className="flex items-center gap-3">
-              <span className="text-zinc-450 hover:text-white transition-colors cursor-pointer text-[10px]">◀</span>
-              <button type="button" className="w-7 h-7 rounded-full bg-emerald-500 text-zinc-950 font-bold text-xs flex items-center justify-center shadow-md animate-pulse">▶</button>
-              <span className="text-zinc-450 hover:text-white transition-colors cursor-pointer text-[10px]">▶</span>
-            </div>
-            <div className="flex items-center gap-1 font-mono text-[9px] text-zinc-500">
-              <span>0:34</span>
-              <span>/</span>
-              <span>3:42</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const gridNode = (
-    <div className="space-y-4">
-      {/* Grid Tab Navigation */}
-      <div className="flex bg-[#121214] border border-zinc-905 rounded-xl p-1 gap-1 select-none">
-        <button 
-          type="button" 
-          onClick={() => setMixerTab('presets')} 
-          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 ${mixerTab === 'presets' ? 'bg-zinc-805 text-emerald-400 font-extrabold shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-        >
-          Preset Designs
-        </button>
-        <button 
-          type="button" 
-          onClick={() => setMixerTab('custom')} 
-          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 ${mixerTab === 'custom' ? 'bg-zinc-805 text-emerald-400 font-extrabold shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-        >
-          Manual Mixer
-        </button>
-      </div>
-
-      {mixerTab === 'presets' ? (
-        <div className="space-y-3 pt-1">
-          {/* Filters for presets */}
-          <div className="flex flex-col sm:flex-row gap-2 bg-[#121214] border border-zinc-900 p-2 rounded-xl">
-            <input 
-              type="text" 
-              placeholder="Search presets..."
-              value={presetSearch}
-              onChange={(e) => setPresetSearch(e.target.value)}
-              className="w-full bg-[#161619] border border-zinc-800 text-xs rounded-lg px-2.5 py-1.5 text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40"
-            />
-            <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-none shrink-0">
-              {['All', 'Common', 'Rare', 'Epic', 'Legendary', 'Mythic'].map((rarity) => (
-                <button
-                  key={rarity}
-                  type="button"
-                  onClick={() => setPresetRarity(rarity)}
-                  className={`text-[8px] font-black uppercase tracking-wide px-2 py-1 rounded transition-all ${
-                    presetRarity === rarity 
-                      ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' 
-                      : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  {rarity}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Grid list of presets */}
-          <div className="grid grid-cols-2 gap-2 pb-4">
-            {filteredPresets.map((p) => {
-              const isSelected = theme === p.theme && glow === p.glow && border === p.border && animation === p.animation && visualizer === p.visualizer;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => handleSelectPreset(p)}
-                  className={`p-2.5 rounded-xl border flex flex-col justify-between text-left transition-all relative group h-20 ${
-                    isSelected 
-                      ? 'bg-emerald-500/10 border-emerald-500 shadow-sm scale-[1.01] z-10' 
-                      : 'bg-[#0f0f11] hover:bg-zinc-850 border-zinc-900'
-                  }`}
-                >
-                  <span className={`text-[7px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded self-start ${
-                    p.rarity === 'Mythic' ? 'bg-purple-950 border border-purple-500/20 text-purple-400' :
-                    p.rarity === 'Legendary' ? 'bg-amber-950 border border-amber-500/20 text-amber-400' :
-                    p.rarity === 'Epic' ? 'bg-pink-950 border border-pink-500/20 text-pink-400' :
-                    p.rarity === 'Rare' ? 'bg-cyan-950 border border-cyan-500/20 text-cyan-400' :
-                    'bg-zinc-900 border border-zinc-800 text-zinc-500'
-                  }`}>
-                    {p.rarity}
-                  </span>
-                  <div className="font-extrabold text-[11px] text-zinc-200 mt-1 line-clamp-1 truncate uppercase tracking-tight">{p.name}</div>
-                  <span className="text-[8px] text-zinc-650 font-mono flex items-center gap-1 mt-0.5 uppercase">
-                    {p.theme.replace('-', ' ')} • {p.visualizer !== 'none' ? 'EQ ACTIVE' : 'EQ OFF'}
-                  </span>
-                  {isSelected && (
-                    <span className="absolute top-2 right-2 bg-emerald-500 text-zinc-950 rounded-full w-4 h-4 flex items-center justify-center font-black text-[9px]">✓</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4 pb-4">
-          {/* Card Theme */}
-          <div className="space-y-1 text-left">
-            <span className="text-[9.5px] uppercase font-black text-zinc-500 tracking-wider">Card Theme</span>
-            <div className="grid grid-cols-2 gap-1.5">
-              {SPOTIFY_THEMES.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTheme(t.id)}
-                  className={`px-2.5 py-1.5 rounded-lg border text-left flex items-center justify-between text-[11px] ${
-                    theme === t.id 
-                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold' 
-                      : 'bg-[#101012] border-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-850'
-                  }`}
-                >
-                  <span>{t.name}</span>
-                  {theme === t.id && <span className="text-emerald-400 font-black">✓</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Outer Neon Glow */}
-          <div className="space-y-1 text-left pt-2 border-t border-zinc-900">
-            <span className="text-[9.5px] uppercase font-black text-zinc-500 tracking-wider">Outer Neon Glow</span>
-            <div className="grid grid-cols-2 gap-1.5">
-              {SPOTIFY_GLOWS.map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => setGlow(g.id)}
-                  className={`px-2.5 py-1.5 rounded-lg border text-left flex items-center justify-between text-[11px] ${
-                    glow === g.id 
-                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold' 
-                      : 'bg-[#101012] border-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-850'
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: g.colorHex === 'rainbow' ? '#ec4899' : g.colorHex }} />
-                    <span>{g.name}</span>
-                  </div>
-                  {glow === g.id && <span className="text-emerald-400 font-black">✓</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Border Style */}
-          <div className="space-y-1 text-left pt-2 border-t border-zinc-900">
-            <span className="text-[9.5px] uppercase font-black text-zinc-500 tracking-wider">Border Style</span>
-            <div className="grid grid-cols-2 gap-1.5">
-              {SPOTIFY_BORDERS.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => setBorder(b.id)}
-                  className={`px-2.5 py-1.5 rounded-lg border text-left flex items-center justify-between text-[11px] ${
-                    border === b.id 
-                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold' 
-                      : 'bg-[#101012] border-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-850'
-                  }`}
-                >
-                  <span>{b.name}</span>
-                  {border === b.id && <span className="text-emerald-400 font-black">✓</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Card Animation */}
-          <div className="space-y-1 text-left pt-2 border-t border-zinc-900">
-            <span className="text-[9.5px] uppercase font-black text-zinc-500 tracking-wider">Card Animation</span>
-            <div className="grid grid-cols-2 gap-1.5">
-              {SPOTIFY_ANIMATIONS.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => setAnimation(a.id)}
-                  className={`px-2.5 py-1.5 rounded-lg border text-left flex items-center justify-between text-[11px] ${
-                    animation === a.id 
-                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold' 
-                      : 'bg-[#101012] border-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-850'
-                  }`}
-                >
-                  <span>{a.name}</span>
-                  {animation === a.id && <span className="text-emerald-400 font-black">✓</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Music Equalizer */}
-          <div className="space-y-1 text-left pt-2 border-t border-zinc-900">
-            <span className="text-[9.5px] uppercase font-black text-zinc-500 tracking-wider">Music Equalizer</span>
-            <div className="grid grid-cols-2 gap-1.5">
-              {SPOTIFY_VISUALIZERS.map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => setVisualizer(v.id)}
-                  className={`px-2.5 py-1.5 rounded-lg border text-left flex items-center justify-between text-[11px] ${
-                    visualizer === v.id 
-                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold' 
-                      : 'bg-[#101012] border-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-850'
-                  }`}
-                >
-                  <span>{v.name}</span>
-                  {visualizer === v.id && <span className="text-emerald-400 font-black">✓</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  return (
-    <CosmeticShopLayout
-      title="Spotify Styles"
-      tag="50+ CUSTOMIZATIONS"
-      onClose={onClose}
-      onSave={handleSave}
-      onPrev={handlePrev}
-      onNext={handleNext}
-      onViewGrid={() => setScreen(screen === 'preview' ? 'grid' : 'preview')}
-      screen={screen}
-      previewNode={previewNode}
-      gridNode={gridNode}
-    />
   );
 }
 
