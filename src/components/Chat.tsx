@@ -783,6 +783,50 @@ const MarkdownComponents = {
     const lowerHref = href.toLowerCase();
     
     if (isSafeUrl(href)) {
+      if (lowerHref.includes('spotify.com')) {
+        let embedUrl = href.trim();
+        if (!embedUrl.includes('spotify.com/embed')) {
+          embedUrl = embedUrl.replace('spotify.com/', 'spotify.com/embed/');
+        }
+        return (
+          <div className="my-2 w-full max-w-md shrink-0 block">
+            <iframe 
+              style={{ borderRadius: '12px' }} 
+              src={embedUrl} 
+              width="100%" 
+              height="152" 
+              frameBorder="0" 
+              allowFullScreen 
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+              loading="lazy"
+            />
+          </div>
+        );
+      }
+
+      const getYouTubeId = (urlStr: string) => {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        const match = urlStr.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+      };
+
+      if (lowerHref.includes('youtube.com') || lowerHref.includes('youtu.be')) {
+        const ytId = getYouTubeId(href);
+        if (ytId) {
+          return (
+            <div className="my-2 w-full max-w-md aspect-video shrink-0 block">
+              <iframe
+                className="w-full h-full rounded-lg border border-zinc-800"
+                src={`https://www.youtube.com/embed/${ytId}`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                loading="lazy"
+              />
+            </div>
+          );
+        }
+      }
+
       if (IMAGE_EXT_REGEX.test(lowerHref)) {
         return <img 
           src={href} 
@@ -1582,6 +1626,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [onlineUsers, setOnlineUsers] = useState<Profile[]>([TEST_BOT]);
   const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
   const [showDeveloperPanel, setShowDeveloperPanel] = useState(false);
+  const [showGlobalAdminPanel, setShowGlobalAdminPanel] = useState(false);
   const [leftPanelMode, setLeftPanelMode] = useState<'none' | 'menu' | 'news' | 'rules'>('none');
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [profileMenuState, setProfileMenuState] = useState<'closed' | 'main' | 'wallet'>('closed');
@@ -2151,7 +2196,11 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
     if (commandName === '/dev') {
       setNewMessage('');
-      if (!DEV_EMAILS.includes(currentUserProfile.email) && currentUserProfile.email !== 'test@gmail.com') {
+      const canDev = 
+        (currentUserProfile.email && DEV_EMAILS.includes(currentUserProfile.email || '')) || 
+        currentUserProfile.email === 'test@gmail.com' ||
+        ['Developer', 'Founder', 'Owner'].includes(getRank(currentUserProfile.email, currentUserProfile.id, currentUserProfile.rank).name);
+      if (!canDev) {
         toast.error('You do not have permission to use /dev');
         return;
       }
@@ -2161,7 +2210,11 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
     if (commandName === '/ranks') {
       setNewMessage('');
-      if (!DEV_EMAILS.includes(currentUserProfile.email) && currentUserProfile.email !== 'test@gmail.com') {
+      const canRanks = 
+        (currentUserProfile.email && DEV_EMAILS.includes(currentUserProfile.email || '')) || 
+        currentUserProfile.email === 'test@gmail.com' ||
+        ['Developer', 'Founder', 'Owner'].includes(getRank(currentUserProfile.email, currentUserProfile.id, currentUserProfile.rank).name);
+      if (!canRanks) {
         toast.error('You do not have permission to use /ranks');
         return;
       }
@@ -2172,7 +2225,11 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
     if (commandName === '/rank') {
       setNewMessage('');
-      if (!DEV_EMAILS.includes(currentUserProfile.email) && currentUserProfile.email !== 'test@gmail.com') {
+      const canRank = 
+        (currentUserProfile.email && DEV_EMAILS.includes(currentUserProfile.email || '')) || 
+        currentUserProfile.email === 'test@gmail.com' ||
+        ['Developer', 'Founder', 'Owner'].includes(getRank(currentUserProfile.email, currentUserProfile.id, currentUserProfile.rank).name);
+      if (!canRank) {
         toast.error('You do not have permission to use /rank');
         return;
       }
@@ -3027,6 +3084,27 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                         <MessageSquare className="w-5 h-5 text-emerald-500" />
                         Private Messages
                       </button>
+                      {(() => {
+                        const resolvedRankName = getRank(currentUserProfile.email, currentUserProfile.id, currentUserProfile.rank).name;
+                        const isStaff = ['Developer', 'Founder', 'Owner', 'SuperAdmin', 'Admin', 'Mod', 'MoP'].includes(resolvedRankName) || 
+                          (currentUserProfile.email && DEV_EMAILS.includes(currentUserProfile.email)) || 
+                          currentUserProfile.email === 'test@gmail.com';
+                        if (isStaff) {
+                          return (
+                            <button 
+                              onClick={() => {
+                                setShowGlobalAdminPanel(true);
+                                setProfileMenuState('closed');
+                              }}
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-red-400 hover:bg-[#222222] transition-colors"
+                            >
+                              <ShieldCheck className="w-5 h-5 text-red-500" />
+                              Admin Panel
+                            </button>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                     <div className="border-t border-[#222222] py-2">
                       <button 
@@ -3123,7 +3201,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                       </div>
                       <div className="flex items-center group/msg w-full">
                         <div 
-                          className={isCustomCard ? `mt-1 max-w-[85%] shadow-md break-words ${messageCard.bubbleClass}` : "text-zinc-200 text-[15px] leading-relaxed break-words pr-4"} 
+                          className={isCustomCard ? `mt-1 p-2.5 rounded-xl border max-w-[85%] shadow-md break-words ${messageCard.bubbleClass}` : "text-zinc-200 text-[15px] leading-relaxed break-words pr-4"} 
                           style={isCustomCard ? messageCard.bubbleStyle : undefined}
                         >
                         {renderMsg.content?.startsWith('__SYSTEM__:') ? (
@@ -3518,6 +3596,13 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
       {showDeveloperPanel && (
         <DeveloperPanel onClose={() => setShowDeveloperPanel(false)} allProfiles={allProfiles} />
+      )}
+
+      {showGlobalAdminPanel && (
+        <AdminPanel 
+          currentUserProfile={currentUserProfile}
+          onClose={() => setShowGlobalAdminPanel(false)}
+        />
       )}
 
       {showConvertCoinsModal && (
@@ -4088,11 +4173,6 @@ function ProfileModal({
                           <button onClick={() => setActiveEditModal('preferences')} className="col-span-2 py-2.5 bg-[#1e1e22] border border-emerald-500/25 hover:border-emerald-500/50 hover:bg-[#252529] text-emerald-400 hover:text-emerald-300 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-sm">
                             <Settings className="w-4 h-4 text-emerald-500 animate-[spin_8s_linear_infinite]" /> Preferences & Privacy
                           </button>
-                          {['Developer', 'Founder', 'SuperAdmin', 'Admin', 'Mod'].includes(currentUserProfile.rank || '') && (
-                            <button onClick={() => setShowAdminPanel(true)} className="col-span-2 py-2.5 bg-red-950/30 border border-red-500/25 hover:border-red-500/50 hover:bg-red-900/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-sm">
-                              <ShieldCheck className="w-4 h-4 text-red-500" /> Admin Panel
-                            </button>
-                          )}
                         </>
                       )}
 
