@@ -1534,6 +1534,7 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [fullscreenImageUrl, setFullscreenImageUrl] = useState<string | null>(null);
   const [activeTypers, setActiveTypers] = useState<{ userId: string, targetId: string, timestamp: number }[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedProfileId && selectedProfileId !== currentUserProfile.id) {
