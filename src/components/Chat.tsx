@@ -1530,8 +1530,19 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
   const [showConvertCoinsModal, setShowConvertCoinsModal] = useState(false);
   const [showPaintCanvasModal, setShowPaintCanvasModal] = useState(false);
   const [showSocialRequestsModal, setShowSocialRequestsModal] = useState(false);
+  const [showProfileViewsModal, setShowProfileViewsModal] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [fullscreenImageUrl, setFullscreenImageUrl] = useState<string | null>(null);
+  const [activeTypers, setActiveTypers] = useState<{ userId: string, targetId: string, timestamp: number }[]>([]);
+
+  useEffect(() => {
+    if (selectedProfileId && selectedProfileId !== currentUserProfile.id) {
+       supabase.from('profile_views').insert({
+         viewer_id: currentUserProfile.id,
+         viewed_id: selectedProfileId
+       }).then(() => {});
+    }
+  }, [selectedProfileId, currentUserProfile.id]);
 
   useEffect(() => {
     const handleOpenFullscreen = (e: any) => {
@@ -2003,17 +2014,37 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           onSignOut();
         }
       })
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        const { userId, targetId } = payload.payload;
+        setActiveTypers(prev => {
+          const filtered = prev.filter(t => t.userId !== userId && Date.now() - t.timestamp < 3000);
+          return [...filtered, { userId, targetId, timestamp: Date.now() }];
+        });
+      })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           await room.track({ profile: currentUserProfile });
         }
       });
 
+    const typingInterval = setInterval(() => {
+      setActiveTypers(prev => prev.filter(t => Date.now() - t.timestamp < 3000));
+    }, 1000);
+
     return () => {
+      clearInterval(typingInterval);
       messageSubscription.unsubscribe();
       room.unsubscribe();
     };
   }, [currentUserProfile]);
+
+  const broadcastTyping = (targetId: string) => {
+    supabase.channel('online_users').send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { userId: currentUserProfile.id, targetId }
+    });
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3129,6 +3160,13 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
             })}
             <div ref={messagesEndRef} />
           </div>
+          
+          {activeTypers.filter(t => t.targetId === 'main').length > 0 && (
+            <div className="px-6 py-2 text-[11px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-2 animate-pulse bg-zinc-950/80 backdrop-blur-sm absolute bottom-[100px] left-0 right-0 z-10 border-t border-zinc-800/50">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              {activeTypers.filter(t => t.targetId === 'main').map(t => allProfiles.find(p => p.id === t.userId)?.username).filter(Boolean).join(', ')} is typing...
+            </div>
+          )}
         </div>
 
         {/* Input Area */}
@@ -3201,7 +3239,10 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
 
             <textarea
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => {
+                setNewMessage(e.target.value);
+                broadcastTyping('main');
+              }}
               onKeyDown={handleKeyPress}
               placeholder="Message Emerald Chat..."
               className="max-h-[50vh] min-h-[40px] w-full resize-none bg-transparent px-3 py-2 text-[16px] md:text-[15px] text-zinc-100 placeholder-zinc-500 focus:outline-none custom-scrollbar"
@@ -3398,6 +3439,8 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
           currentUserProfile={currentUserProfile}
           allProfiles={allProfiles}
           privateMessages={privateMessages}
+          activeTypers={activeTypers}
+          broadcastTyping={broadcastTyping}
           onClose={() => {
             setShowPmInbox(false);
             setPmTargetId(null);
@@ -4462,10 +4505,191 @@ function MessageCardsModal({ profile, bioData, onClose, onSave }: any) {
   );
 }
 
+function ProfileViewsModal({ currentUserProfile, allProfiles, onProfileUpdate, onClose }: any) {
+  const [activeTab, setActiveTab] = useState<'insights' | 'leaderboard'>('insights');
+  const [views, setViews] = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isPurchasing, setIsPurchasing] = useState(false);
+
+  const bio = parseBio(currentUserProfile.bio);
+  const isUnlocked = bio.profile_views_unlocked_until && new Date(bio.profile_views_unlocked_until) > new Date();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      if (isUnlocked && activeTab === 'insights') {
+        const { data } = await supabase.from('profile_views')
+          .select('*')
+          .eq('viewed_id', currentUserProfile.id)
+          .order('created_at', { ascending: false });
+        if (data) setViews(data);
+      } else if (activeTab === 'leaderboard') {
+        const { data } = await supabase.from('profile_views_leaderboard')
+          .select('*')
+          .order('total_views', { ascending: false })
+          .limit(50);
+        if (data) setLeaderboard(data);
+      }
+      setLoading(false);
+    };
+    fetchData();
+  }, [isUnlocked, activeTab, currentUserProfile.id]);
+
+  const handlePurchase = async () => {
+    if (bio.coins < 1000 || bio.gems < 10) {
+      toast.error('Not enough coins or gems!');
+      return;
+    }
+    setIsPurchasing(true);
+    const newUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const newBio = { ...bio, coins: bio.coins - 1000, gems: bio.gems - 10, profile_views_unlocked_until: newUntil };
+    
+    const { error } = await supabase.from('profiles').update({ bio: JSON.stringify(newBio) }).eq('id', currentUserProfile.id);
+    setIsPurchasing(false);
+    if (!error) {
+      onProfileUpdate();
+      toast.success('Profile Insights unlocked for 24 hours!');
+    }
+  };
+
+  const totalViews = views.length;
+  const uniqueVisitors = new Set(views.map(v => v.viewer_id)).size;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in font-sans">
+      <div className="w-full max-w-2xl bg-[#0c0c0c] border border-zinc-800 rounded-[2rem] shadow-2xl flex flex-col overflow-hidden max-h-[85vh]">
+        <div className="p-6 border-b border-zinc-800 flex items-center justify-between bg-[#141416]">
+          <h2 className="text-xl font-black uppercase tracking-tight flex items-center gap-2 text-white">
+            <Eye className="w-6 h-6 text-emerald-500" />
+            Profile Insights
+          </h2>
+          <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">
+            <X className="w-5 h-5 text-zinc-400" />
+          </button>
+        </div>
+
+        <div className="flex border-b border-zinc-800 bg-[#09090b]">
+          <button 
+            onClick={() => setActiveTab('insights')} 
+            className={`flex-1 py-4 text-sm font-bold uppercase tracking-widest ${activeTab === 'insights' ? 'border-b-2 border-emerald-500 text-emerald-500' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            My Insights
+          </button>
+          <button 
+            onClick={() => setActiveTab('leaderboard')} 
+            className={`flex-1 py-4 text-sm font-bold uppercase tracking-widest ${activeTab === 'leaderboard' ? 'border-b-2 border-emerald-500 text-emerald-500' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            Leaderboard
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 relative">
+          {activeTab === 'insights' && (
+            <>
+              {!isUnlocked ? (
+                <div className="flex flex-col items-center justify-center h-full text-center py-10">
+                  <div className="w-24 h-24 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-6 text-emerald-500">
+                    <Lock className="w-10 h-10" />
+                  </div>
+                  <h3 className="text-2xl font-black text-white mb-2 tracking-tight">Unlock Insights</h3>
+                  <p className="text-zinc-400 max-w-sm mb-8 leading-relaxed">See who viewed your profile, unique visitor count, and detailed view logs for 24 hours.</p>
+                  <button 
+                    onClick={handlePurchase}
+                    disabled={isPurchasing}
+                    className="flex items-center gap-3 px-8 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-black uppercase tracking-widest text-sm transition-all active:scale-95 text-white disabled:opacity-50 relative overflow-hidden group"
+                  >
+                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
+                    <span className="relative z-10 flex items-center gap-2">
+                       Buy Access
+                       <span className="w-px h-4 bg-white/30 mx-1"></span>
+                       10 <Gem className="w-4 h-4 mr-1 text-emerald-200" />
+                       1000 <Coins className="w-4 h-4 text-amber-300" />
+                    </span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-center shadow-inner">
+                      <div className="text-3xl font-black text-white mb-1">{loading ? '...' : totalViews}</div>
+                      <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Total Views</div>
+                    </div>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-center shadow-inner">
+                      <div className="text-3xl font-black text-emerald-500 mb-1">{loading ? '...' : uniqueVisitors}</div>
+                      <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Unique Visitors</div>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-zinc-400 uppercase tracking-widest mb-4 border-b border-zinc-800 pb-2">Recent Visitors</h3>
+                    {loading ? (
+                       <p className="text-zinc-500 text-sm">Loading...</p>
+                    ) : (
+                       <div className="space-y-3">
+                         {views.length === 0 && <p className="text-zinc-500 text-sm">No one has visited your profile yet!</p>}
+                         {views.map(v => {
+                           const user = allProfiles.find(p => p.id === v.viewer_id);
+                           return (
+                             <div key={v.id} className="flex items-center justify-between p-3 rounded-xl bg-[#141416] border border-zinc-800 hover:border-zinc-700 transition-colors">
+                               <div className="flex items-center gap-3">
+                                 {user && <RenderPfpWithCustomBorder profile={user} size={32} />}
+                                 <span className="font-bold text-white text-[15px]">{user?.username || 'Unknown User'}</span>
+                               </div>
+                               <span className="text-xs text-zinc-500 font-medium">
+                                 {format(new Date(v.created_at), 'MMM d, HH:mm')}
+                               </span>
+                             </div>
+                           )
+                         })}
+                       </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === 'leaderboard' && (
+            <div className="space-y-3">
+               {loading ? (
+                 <p className="text-zinc-500 text-sm text-center py-10">Loading leaderboard...</p>
+               ) : (
+                 <>
+                   {leaderboard.length === 0 && <p className="text-zinc-500 text-sm text-center py-10">No views registered on the server yet.</p>}
+                   {leaderboard.map((entry, idx) => {
+                     const user = allProfiles.find(p => p.id === entry.viewed_id);
+                     return (
+                       <div key={entry.viewed_id} className="flex items-center p-3 rounded-xl bg-[#141416] border border-zinc-800">
+                         <div className="w-8 text-center font-black text-zinc-600 mr-2">#{idx + 1}</div>
+                         <div className="flex items-center gap-3 flex-1">
+                           {user && <RenderPfpWithCustomBorder profile={user} size={36} />}
+                           <div className="flex flex-col">
+                             <span className="font-bold text-white text-[15px]">{user?.username || 'Unknown'}</span>
+                             <span className="text-xs text-zinc-500 font-medium">{entry.unique_visitors} Unique Visitors</span>
+                           </div>
+                         </div>
+                         <div className="text-emerald-500 font-black text-lg">
+                           {entry.total_views} <span className="text-[10px] text-zinc-500 uppercase tracking-widestml-1">Views</span>
+                         </div>
+                       </div>
+                     );
+                   })}
+                 </>
+               )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PrivateMessagesModal({ 
   currentUserProfile, 
   allProfiles, 
   privateMessages, 
+  activeTypers,
+  broadcastTyping,
   onClose,
   onSendMessage,
   initialTargetId = null
@@ -4667,6 +4891,12 @@ function PrivateMessagesModal({
                   );
                 })}
               </div>
+              {activeTypers && activeTypers.filter(t => t.targetId === `pm_${currentUserProfile.id}` && t.userId === selectedUserId).length > 0 && (
+                <div className="px-6 py-2 text-[11px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-2 animate-pulse bg-[#0a0a0a]/80 backdrop-blur-md border-t border-zinc-800/50 absolute bottom-[90px] left-0 right-0 z-10 w-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  {selectedUser?.username} is typing...
+                </div>
+              )}
               <form 
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -4675,7 +4905,7 @@ function PrivateMessagesModal({
                     setNewMessage('');
                   }
                 }}
-                className="p-4 border-t border-zinc-800 flex items-center gap-3 bg-[#0a0a0a]"
+                className="p-4 border-t border-zinc-800 flex items-center gap-3 bg-[#0a0a0a] relative z-20"
               >
                 <div className="flex items-center gap-1">
                   <label
@@ -4706,7 +4936,12 @@ function PrivateMessagesModal({
                 </div>
                 <input 
                   value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                  onChange={(e) => {
+                    setNewMessage(e.target.value);
+                    if (broadcastTyping && selectedUserId) {
+                      broadcastTyping(`pm_${selectedUserId}`);
+                    }
+                  }}
                   placeholder={`Message @${selectedUser?.username || 'user'}...`}
                   className="flex-1 bg-zinc-900 border border-zinc-700 rounded-full px-5 py-3 text-[15px] text-white focus:outline-none focus:border-emerald-500/50 transition-colors shadow-inner"
                 />
