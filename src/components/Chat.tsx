@@ -747,6 +747,25 @@ function isSafeUrl(url: string | undefined): boolean {
   // Explicitly check forbidden TLDs first
   if (FORBIDDEN_TLDS.test(lowerUrl)) return false;
   
+  // Whitelist: major safe domains
+  const isSafeDomain = 
+    lowerUrl.includes('spotify.com') || 
+    lowerUrl.includes('youtube.com') || 
+    lowerUrl.includes('youtu.be') || 
+    lowerUrl.includes('soundcloud.com') || 
+    lowerUrl.includes('discord.gg') || 
+    lowerUrl.includes('twitch.tv') ||
+    lowerUrl.includes('github.com') ||
+    lowerUrl.includes('reddit.com') ||
+    lowerUrl.includes('twitter.com') ||
+    lowerUrl.includes('x.com') ||
+    lowerUrl.includes('google.com') ||
+    lowerUrl.includes('apple.com') ||
+    lowerUrl.startsWith('mailto:') ||
+    lowerUrl.startsWith('tel:');
+
+  if (isSafeDomain) return true;
+  
   // Whitelist: direct image, or video links
   return IMAGE_EXT_REGEX.test(url) || VIDEO_EXT_REGEX.test(url);
 }
@@ -957,7 +976,7 @@ export function UserProfileFontsLoader({ bio }: { bio: string | null | undefined
 export interface BioData {
   text: string;
   mood: string;
-  profile_music_type?: 'mp3' | 'youtube' | '';
+  profile_music_type?: 'mp3' | 'youtube' | 'spotify' | '';
   profile_music_source?: string;
   profile_card_bg?: string;
   profile_border?: string;
@@ -3102,9 +3121,9 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                         </div>
                         {renderMsg.is_saved && <Bookmark className="w-3.5 h-3.5 text-zinc-500/50" />}
                       </div>
-                      <div className="flex items-center group/msg">
+                      <div className="flex items-center group/msg w-full">
                         <div 
-                          className={isCustomCard ? `mt-1 p-2.5 rounded-xl border max-w-[85%] shadow-md break-words ${messageCard.bubbleClass}` : "text-zinc-200 text-[15px] leading-relaxed break-words pr-4"} 
+                          className={isCustomCard ? `mt-1 max-w-[85%] shadow-md break-words ${messageCard.bubbleClass}` : "text-zinc-200 text-[15px] leading-relaxed break-words pr-4"} 
                           style={isCustomCard ? messageCard.bubbleStyle : undefined}
                         >
                         {renderMsg.content?.startsWith('__SYSTEM__:') ? (
@@ -3210,13 +3229,13 @@ export function Chat({ currentUserProfile, onSignOut, onProfileUpdate }: { curre
                           </Markdown>
                         )}
                         </div>
-                        {(renderMsg.user_id === currentUserProfile.id || ['Developer', 'Founder', 'Superadmin', 'Admin', 'Mod'].includes(currentUserProfile.rank || '')) && (
+                        {(renderMsg.user_id === currentUserProfile.id || ['Developer', 'Founder', 'SuperAdmin', 'Admin', 'Mod'].includes(currentUserProfile.rank || '')) && (
                           <div className="relative ml-2 opacity-0 group-hover/msg:opacity-100 transition-opacity">
                             <button 
                               onClick={() => setOpenMainDropdownId(openMainDropdownId === renderMsg.id ? null : renderMsg.id)} 
-                              className="p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                              className="p-1 hover:bg-zinc-850/80 rounded-md transition-colors shrink-0"
                             >
-                              <Menu className="w-4 h-4 text-zinc-500" />
+                              <MoreVertical className="w-4 h-4 text-zinc-400 hover:text-zinc-200" />
                             </button>
                             {openMainDropdownId === renderMsg.id && (
                               <div className="absolute top-full left-0 mt-1 z-50 flex flex-col min-w-[100px] shadow-xl">
@@ -3886,7 +3905,28 @@ function ProfileModal({
                 </div>
 
                 {/* Visualizer centered above About Me and under the mood */}
-                {musicType && musicSource && (
+                {musicType === 'spotify' && musicSource ? (
+                  <div className="flex flex-col items-center justify-center my-2 w-full shrink-0 z-10 relative px-6">
+                    {(() => {
+                      let embedUrl = musicSource.trim();
+                      if (embedUrl.includes('spotify.com') && !embedUrl.includes('spotify.com/embed')) {
+                        embedUrl = embedUrl.replace('spotify.com/', 'spotify.com/embed/');
+                      }
+                      return (
+                        <iframe 
+                          style={{ borderRadius: '12px' }} 
+                          src={embedUrl} 
+                          width="100%" 
+                          height="152" 
+                          frameBorder="0" 
+                          allowFullScreen 
+                          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+                          loading="lazy"
+                        />
+                      );
+                    })()}
+                  </div>
+                ) : musicType && musicSource && (
                   <div className="flex flex-col items-center justify-center my-2 w-full shrink-0 z-10 relative px-6">
                     <button 
                       onClick={togglePlay}
@@ -4048,7 +4088,7 @@ function ProfileModal({
                           <button onClick={() => setActiveEditModal('preferences')} className="col-span-2 py-2.5 bg-[#1e1e22] border border-emerald-500/25 hover:border-emerald-500/50 hover:bg-[#252529] text-emerald-400 hover:text-emerald-300 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-sm">
                             <Settings className="w-4 h-4 text-emerald-500 animate-[spin_8s_linear_infinite]" /> Preferences & Privacy
                           </button>
-                          {['Developer', 'Founder', 'Superadmin', 'Admin', 'Mod'].includes(currentUserProfile.rank || '') && (
+                          {['Developer', 'Founder', 'SuperAdmin', 'Admin', 'Mod'].includes(currentUserProfile.rank || '') && (
                             <button onClick={() => setShowAdminPanel(true)} className="col-span-2 py-2.5 bg-red-950/30 border border-red-500/25 hover:border-red-500/50 hover:bg-red-900/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-sm">
                               <ShieldCheck className="w-4 h-4 text-red-500" /> Admin Panel
                             </button>
@@ -4817,6 +4857,7 @@ function PrivateMessagesModal({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [showPaintCanvasModal, setShowPaintCanvasModal] = useState(false);
+  const [openPmDropdownId, setOpenPmDropdownId] = useState<string | null>(null);
 
   useEffect(() => {
     // When selected user changes, mark messages as read
@@ -5064,7 +5105,7 @@ function PrivateMessagesModal({
                           {format(new Date(m.created_at), 'HH:mm')}
                           {isMe && (
                             <span className="text-[9px] uppercase font-black text-emerald-400">
-                              {m.read_at ? 'Read' : 'Delivered'}
+                              {m.read_at ? 'Seen' : 'Delivered'}
                             </span>
                           )}
                         </div>
@@ -7230,7 +7271,7 @@ function MoodEditForm({ profile, data, setData }: any) {
 }
 
 function MusicEditForm({ profile, data, setData }: any) {
-  const [type, setType] = useState<'mp3' | 'youtube'>('mp3');
+  const [type, setType] = useState<'mp3' | 'youtube' | 'spotify'>('mp3');
   const [source, setSource] = useState('');
   const [uploading, setUploading] = useState(false);
 
@@ -7244,7 +7285,7 @@ function MusicEditForm({ profile, data, setData }: any) {
     });
   }, []);
 
-  const handleTypeChange = (newType: 'mp3' | 'youtube') => {
+  const handleTypeChange = (newType: 'mp3' | 'youtube' | 'spotify') => {
     setType(newType);
     setSource('');
     setData({
@@ -7295,20 +7336,27 @@ function MusicEditForm({ profile, data, setData }: any) {
     <div className="space-y-4 text-left">
       <div>
         <label className="text-xs text-zinc-400 mb-1.5 block font-bold uppercase tracking-wider">Music Type Selection</label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={() => handleTypeChange('mp3')}
-            className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${type === 'mp3' ? 'bg-emerald-600/25 border-emerald-500 text-emerald-400' : 'bg-zinc-805 bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'}`}
+            className={`py-2 px-3 text-[10px] font-semibold rounded-lg border transition-all ${type === 'mp3' ? 'bg-emerald-600/25 border-emerald-500 text-emerald-400' : 'bg-zinc-805 bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'}`}
           >
-            MP3 (Direct URL / Upload)
+            MP3 Direct
           </button>
           <button
             type="button"
             onClick={() => handleTypeChange('youtube')}
-            className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${type === 'youtube' ? 'bg-emerald-600/25 border-emerald-500 text-emerald-400' : 'bg-zinc-805 bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'}`}
+            className={`py-2 px-3 text-[10px] font-semibold rounded-lg border transition-all ${type === 'youtube' ? 'bg-emerald-600/25 border-emerald-500 text-emerald-400' : 'bg-zinc-805 bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'}`}
           >
-            YouTube Video URL
+            YouTube
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTypeChange('spotify')}
+            className={`py-2 px-3 text-[10px] font-semibold rounded-lg border transition-all ${type === 'spotify' ? 'bg-emerald-600/25 border-emerald-500 text-emerald-400' : 'bg-zinc-805 bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'}`}
+          >
+            Spotify
           </button>
         </div>
       </div>
@@ -7354,7 +7402,7 @@ function MusicEditForm({ profile, data, setData }: any) {
             </div>
           </div>
         </div>
-      ) : (
+      ) : type === 'youtube' ? (
         <div>
           <label className="text-xs text-zinc-400 mb-1 block">YouTube Video/Music URL</label>
           <input
@@ -7365,6 +7413,18 @@ function MusicEditForm({ profile, data, setData }: any) {
             className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
           />
           <p className="text-[10px] text-zinc-500 mt-1.5 leading-normal">Allows any YouTube link. Will stop playing immediately when exiting the profile.</p>
+        </div>
+      ) : (
+        <div>
+          <label className="text-xs text-zinc-400 mb-1 block">Spotify Track/Playlist URL</label>
+          <input
+            type="text"
+            placeholder="https://open.spotify.com/track/..."
+            value={source}
+            onChange={e => handleSourceChange(e.target.value)}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-[#1DB954]"
+          />
+          <p className="text-[10px] text-zinc-500 mt-2">Paste a link to a Spotify Track, Album, or Playlist to embed it on your profile.</p>
         </div>
       )}
     </div>
